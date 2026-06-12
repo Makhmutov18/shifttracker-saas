@@ -18,5 +18,18 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+    @classmethod
+    def _validate_database_url(cls, v: str) -> str:
+        """Force asyncpg driver for SQLAlchemy async engine.
+        Railway provides DATABASE_URL as postgresql://... which defaults to sync psycopg2.
+        """
+        if v and v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.DATABASE_URL = self._validate_database_url(self.DATABASE_URL)
+
 
 settings = Settings()
