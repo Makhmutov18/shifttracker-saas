@@ -1,6 +1,5 @@
 import os
 import logging
-from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
@@ -81,11 +80,13 @@ async def lifespan(app: FastAPI):
         _dispatcher = Dispatcher()
         _dispatcher.include_router(bot_router)
 
-        # Set webhook — strip port, Telegram only accepts 80/88/443/8443
-        parsed = urlparse(settings.WEBAPP_URL)
-        webhook_url = f"https://{parsed.hostname}/webhook"
-        await _bot.set_webhook(url=webhook_url)
-        logger.info(f"Bot webhook set to {webhook_url}")
+        # Set webhook — use public domain, skip for localhost
+        webhook_url = f"{settings.webhook_base_url}/webhook"
+        if "localhost" in webhook_url or "127.0.0.1" in webhook_url:
+            logger.warning(f"Skipping webhook setup for local URL: {webhook_url}")
+        else:
+            await _bot.set_webhook(url=webhook_url)
+            logger.info(f"Bot webhook set to {webhook_url}")
 
     yield
 

@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
     BOT_TOKEN: str = ""
     WEBAPP_URL: str = "https://localhost:8000"
 
+    # Railway auto-provided public domain (e.g. shifttracker-saas-production.up.railway.app)
+    RAILWAY_PUBLIC_DOMAIN: Optional[str] = None
+
     # Security
     SECRET_KEY: str = "change-me-in-production"
     DEBUG: bool = False
@@ -17,6 +21,16 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    @property
+    def webhook_base_url(self) -> str:
+        """Return the public HTTPS base URL for Telegram webhook.
+        Prefers RAILWAY_PUBLIC_DOMAIN, falls back to WEBAPP_URL hostname.
+        """
+        if self.RAILWAY_PUBLIC_DOMAIN:
+            return f"https://{self.RAILWAY_PUBLIC_DOMAIN}"
+        parsed = urlparse(self.WEBAPP_URL)
+        return f"https://{parsed.hostname}"
 
     @classmethod
     def _validate_database_url(cls, v: str) -> str:
