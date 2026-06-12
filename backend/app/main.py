@@ -74,10 +74,11 @@ async def lifespan(app: FastAPI):
     # Setup bot webhook in production
     if settings.BOT_TOKEN:
         from aiogram import Bot, Dispatcher
+        from aiogram.fsm.storage.memory import MemoryStorage
         from app.bot import router as bot_router
 
         _bot = Bot(token=settings.BOT_TOKEN)
-        _dispatcher = Dispatcher()
+        _dispatcher = Dispatcher(storage=MemoryStorage())
         _dispatcher.include_router(bot_router)
 
         # Set webhook — use public domain, skip for localhost
@@ -134,7 +135,8 @@ async def telegram_webhook(request: Request):
         return {"ok": True}
     except Exception as e:
         logger.error(f"Webhook error: {e}")
-        return {"ok": False}
+        # Don't re-raise — Telegram will retry if we return non-200
+        return {"ok": False, "error": str(e)}
 
 
 # ─── Frontend static files ──────────────────────────────────────────────────
