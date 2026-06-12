@@ -32,6 +32,15 @@ class Settings(BaseSettings):
         parsed = urlparse(self.WEBAPP_URL)
         return f"https://{parsed.hostname}"
 
+    @property
+    def effective_webapp_url(self) -> str:
+        """Return the public WebApp URL for Telegram inline keyboard buttons.
+        Prefers RAILWAY_PUBLIC_DOMAIN, falls back to WEBAPP_URL as-is.
+        """
+        if self.RAILWAY_PUBLIC_DOMAIN:
+            return f"https://{self.RAILWAY_PUBLIC_DOMAIN}"
+        return self.WEBAPP_URL
+
     @classmethod
     def _validate_database_url(cls, v: str) -> str:
         """Force asyncpg driver for SQLAlchemy async engine.

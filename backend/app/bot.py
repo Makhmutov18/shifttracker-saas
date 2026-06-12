@@ -32,7 +32,7 @@ async def cmd_start(message: types.Message):
         ).scalar_one_or_none()
 
         if user:
-            webapp_url = f"{settings.WEBAPP_URL}?tg_id={telegram_id}"
+            webapp_url = f"{settings.effective_webapp_url}?tg_id={telegram_id}"
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -86,7 +86,7 @@ async def cmd_auth(message: types.Message):
         user.telegram_id = telegram_id
         session.commit()
 
-        webapp_url = f"{settings.WEBAPP_URL}?tg_id={telegram_id}"
+        webapp_url = f"{settings.effective_webapp_url}?tg_id={telegram_id}"
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [

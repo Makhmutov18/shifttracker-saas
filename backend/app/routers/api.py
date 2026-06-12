@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
@@ -35,7 +36,9 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Telegram ID not found")
 
     result = await session.execute(
-        select(User).where(User.telegram_id == int(telegram_id))
+        select(User)
+        .options(selectinload(User.venue))
+        .where(User.telegram_id == int(telegram_id))
     )
     user = result.scalar_one_or_none()
     if not user:
