@@ -65,8 +65,8 @@ async def create_shift(
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    # Employees can only create shifts for today or yesterday
-    if user.role != UserRole.owner and shift_data.date < yesterday:
+    # Baristas can only create shifts for today or yesterday
+    if user.role != UserRole.admin and shift_data.date < yesterday:
         raise HTTPException(
             status_code=403,
             detail="You can only create shifts for today or yesterday",
@@ -120,9 +120,9 @@ async def list_pending_shifts(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Owner-only: list all pending shifts for the venue."""
-    if user.role != UserRole.owner:
-        raise HTTPException(status_code=403, detail="Only owners can view pending shifts")
+    """Admin-only: list all pending shifts for the venue."""
+    if user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Only admins can view pending shifts")
 
     query = select(Shift).where(
         Shift.venue_id == user.venue_id,
@@ -148,9 +148,9 @@ async def update_shift(
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
 
-    # Only owner can approve/update shifts
-    if user.role != UserRole.owner:
-        raise HTTPException(status_code=403, detail="Only owners can update shifts")
+    # Only admin can approve/update shifts
+    if user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Only admins can update shifts")
 
     if shift_data.start_time is not None:
         shift.start_time = shift_data.start_time

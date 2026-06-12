@@ -41,9 +41,10 @@ export interface User {
   id: string;
   telegram_id: number | null;
   name: string;
-  role: 'owner' | 'employee';
+  role: 'admin' | 'barista';
   venue_id: string;
   hourly_rate: string;
+  is_active: boolean;
   venue?: Venue;
 }
 
@@ -161,4 +162,25 @@ export async function getMonthlyStats(month?: number, year?: number): Promise<Mo
   if (year) params.set('year', String(year));
   const qs = params.toString();
   return request<MonthlyStats>(`/stats/monthly${qs ? `?${qs}` : ''}`);
+}
+
+// ─── Admin ──────────────────────────────────────────────────────────────────
+
+export interface AdminCreateUserRequest {
+  first_name: string;
+  role: string;
+  hourly_rate: number;
+}
+
+export interface AdminCreateUserResponse {
+  token: string;
+  invite_link: string;
+  user_id: string;
+}
+
+export async function createUser(data: AdminCreateUserRequest): Promise<AdminCreateUserResponse> {
+  return request<AdminCreateUserResponse>('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }

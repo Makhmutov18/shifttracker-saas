@@ -1,5 +1,5 @@
 from aiogram import Bot, Router, types
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session as SyncSession
@@ -21,89 +21,80 @@ def _get_sync_session() -> SyncSession:
     return SyncSession(bind=_sync_engine)
 
 
+def _webapp_keyboard(telegram_id: int) -> InlineKeyboardMarkup:
+    """Build inline keyboard with WebApp button."""
+    webapp_url = f"{settings.effective_webapp_url}?tg_id={telegram_id}"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🚀 Открыть приложение",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            ]
+        ]
+    )
+
+
 @router.message(Command("start"))
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message, command: CommandObject):
     telegram_id = message.from_user.id
     username = message.from_user.full_name or "User"
+    args = command.args
 
     with _get_sync_session() as session:
+        # ─── If invite token provided → activate user ────────────────────────
+        if args:
+            user = session.execute(
+                select(User).where(User.invite_token == args)
+            ).scalar_one_or_none()
+
+            if not user:
+                await message.answer(
+                    "❌ Неверная или устаревшая ссылка приглашения.\n"
+                    "Пожалуйста, попроси администратора создать новую."
+                )
+                return
+
+            if user.telegram_id is not None:
+                await message.answer(
+                    "❌ Эта ссылка уже была использована другим пользователем."
+                )
+                return
+
+            # Activate user
+            user.telegram_id = telegram_id
+            user.is_active = True
+            user.invite_token = None
+            session.commit()
+
+            await message.answer(
+                f"✅ Привет, {user.name}!\n"
+                f"Ты успешно привязан к системе.\n"
+                f"🏪 Заведение: {user.venue.name if user.venue else '—'}\n"
+                f"💰 Ставка: {user.hourly_rate} ₽/час",
+                reply_markup=_webapp_keyboard(telegram_id),
+            )
+            return
+
+        # ─── No token → check if user exists ─────────────────────────────────
         user = session.execute(
             select(User).where(User.telegram_id == telegram_id)
         ).scalar_one_or_none()
 
         if user:
-            webapp_url = f"{settings.effective_webapp_url}?tg_id={telegram_id}"
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="🚀 Открыть приложение",
-                            web_app=WebAppInfo(url=webapp_url),
-                        )
-                    ]
-                ]
-            )
             await message.answer(
                 f"👋 С возвращением, {user.name}!\n"
                 f"🏪 Заведение: {user.venue.name if user.venue else '—'}\n"
                 f"💰 Ставка: {user.hourly_rate} ₽/час",
-                reply_markup=keyboard,
+                reply_markup=_webapp_keyboard(telegram_id),
             )
         else:
             await message.answer(
                 f"👋 Привет, {username}!\n\n"
-                "Ты ещё не привязан к системе. Пожалуйста, введи код авторизации, "
-                "который выдал тебе администратор.\n\n"
-                "Пример: `/auth ABC123`",
-                parse_mode="Markdown",
+                "Ты ещё не привязан к системе. Попроси администратора "
+                "создать приглашение, и перейди по ссылке.",
             )
-
-
-@router.message(Command("auth"))
-async def cmd_auth(message: types.Message):
-    telegram_id = message.from_user.id
-    args = message.text.split(maxsplit=1)
-
-    if len(args) < 2:
-        await message.answer("❌ Пожалуйста, укажи код авторизации.\nПример: `/auth ABC123`")
-        return
-
-    auth_code = args[1].strip()
-
-    with _get_sync_session() as session:
-        user = session.execute(
-            select(User).where(User.auth_code == auth_code)
-        ).scalar_one_or_none()
-
-        if not user:
-            await message.answer("❌ Неверный код авторизации. Попробуй ещё раз.")
-            return
-
-        if user.telegram_id is not None:
-            await message.answer("❌ Этот код уже использован.")
-            return
-
-        user.telegram_id = telegram_id
-        session.commit()
-
-        webapp_url = f"{settings.effective_webapp_url}?tg_id={telegram_id}"
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="🚀 Открыть приложение",
-                        web_app=WebAppInfo(url=webapp_url),
-                    )
-                ]
-            ]
-        )
-
-        await message.answer(
-            f"✅ Успешно! Ты привязан как {user.name}.\n"
-            f"🏪 Заведение: {user.venue.name if user.venue else '—'}\n"
-            f"💰 Ставка: {user.hourly_rate} ₽/час",
-            reply_markup=keyboard,
-        )
 
 
 async def setup_bot() -> Bot:

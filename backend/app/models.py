@@ -25,8 +25,8 @@ import enum
 
 
 class UserRole(str, enum.Enum):
-    owner = "owner"
-    employee = "employee"
+    admin = "admin"
+    barista = "barista"
 
 
 class ShiftStatus(str, enum.Enum):
@@ -60,7 +60,7 @@ class User(Base):
     telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        SAEnum(UserRole, name="user_role"), nullable=False, default=UserRole.employee
+        SAEnum(UserRole, name="user_role"), nullable=False, default=UserRole.barista
     )
     venue_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("venues.id"), nullable=False
@@ -68,8 +68,11 @@ class User(Base):
     hourly_rate: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, default=Decimal("0.00")
     )
-    auth_code: Mapped[str] = mapped_column(
-        String(64), unique=True, nullable=False, default=lambda: uuid.uuid4().hex[:12]
+    is_active: Mapped[bool] = mapped_column(
+        default=False, server_default="false"
+    )
+    invite_token: Mapped[Optional[str]] = mapped_column(
+        String(64), unique=True, nullable=True
     )
 
     # Relationships

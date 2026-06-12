@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     # Telegram
     BOT_TOKEN: str = ""
+    BOT_USERNAME: str = ""
     WEBAPP_URL: str = "https://localhost:8000"
 
     # Railway auto-provided public domain (e.g. shifttracker-saas-production.up.railway.app)

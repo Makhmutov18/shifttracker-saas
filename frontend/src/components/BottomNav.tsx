@@ -6,7 +6,7 @@ type Page = 'dashboard' | 'shift' | 'history' | 'owner';
 interface Props {
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  isOwner: boolean;
+  isAdmin: boolean;
 }
 
 const navItems: { page: Page; label: string; icon: React.ReactNode; ownerOnly?: boolean }[] = [
@@ -16,8 +16,8 @@ const navItems: { page: Page; label: string; icon: React.ReactNode; ownerOnly?: 
   { page: 'owner', label: 'Управление', icon: <ShieldCheck className="w-5 h-5" />, ownerOnly: true },
 ];
 
-export default function BottomNav({ currentPage, onNavigate, isOwner }: Props) {
-  const visibleItems = navItems.filter(item => !item.ownerOnly || isOwner);
+export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
+  const visibleItems = navItems.filter(item => !item.ownerOnly || isAdmin);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-tg-bg border-t border-gray-200 dark:border-gray-800 safe-area-bottom z-50">

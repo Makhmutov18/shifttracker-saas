@@ -20,7 +20,7 @@ export default function App() {
   if (error) return <ErrorScreen message={error} />;
   if (!user) return <ErrorScreen message="Не удалось загрузить пользователя" />;
 
-  const isOwner = user.role === 'owner';
+  const isAdmin = user.role === 'admin';
 
   const renderPage = () => {
     switch (page) {
@@ -43,7 +43,7 @@ export default function App() {
       <BottomNav
         currentPage={page}
         onNavigate={setPage}
-        isOwner={isOwner}
+        isAdmin={isAdmin}
       />
     </div>
   );

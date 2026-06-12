@@ -23,13 +23,24 @@ class UserOut(BaseModel):
     role: str
     venue_id: uuid.UUID
     hourly_rate: Decimal
+    is_active: bool
     venue: Optional[VenueOut] = None
 
     model_config = {"from_attributes": True}
 
 
-class AuthCodeRequest(BaseModel):
-    auth_code: str
+# ─── Admin ───────────────────────────────────────────────────────────────────
+
+class AdminCreateUser(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=255)
+    role: str = Field(default="barista", pattern="^(barista|admin)$")
+    hourly_rate: Decimal = Field(..., ge=0)
+
+
+class AdminCreateUserResponse(BaseModel):
+    token: str
+    invite_link: str
+    user_id: uuid.UUID
 
 
 # ─── Shift ───────────────────────────────────────────────────────────────────

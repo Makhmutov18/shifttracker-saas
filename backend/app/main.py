@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.config import settings
 from app.database import init_db
 from app.routers.api import router as api_router
+from app.routers.admin import router as admin_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,14 +60,23 @@ async def lifespan(app: FastAPI):
                 admin = User(
                     telegram_id=ADMIN_TELEGRAM_ID,
                     name="Admin",
-                    role=UserRole.owner,
+                    role=UserRole.admin,
                     venue_id=venue.id,
                     hourly_rate=Decimal("0.00"),
+                    is_active=True,
                 )
                 session.add(admin)
                 await session.commit()
                 logger.info(f"Admin user seeded (telegram_id={ADMIN_TELEGRAM_ID})")
             else:
+                # Ensure admin has correct role and is_active
+                if admin.role != UserRole.admin:
+                    admin.role = UserRole.admin
+                    logger.info(f"Admin role corrected to admin (telegram_id={ADMIN_TELEGRAM_ID})")
+                if not admin.is_active:
+                    admin.is_active = True
+                    logger.info(f"Admin is_active set to True (telegram_id={ADMIN_TELEGRAM_ID})")
+                await session.commit()
                 logger.info(f"Admin user already exists (telegram_id={ADMIN_TELEGRAM_ID})")
     except Exception as e:
         logger.error(f"Failed to seed admin user: {e}")
@@ -117,6 +127,7 @@ app.add_middleware(
 
 # ─── API routes — registered FIRST, highest priority ────────────────────────
 app.include_router(api_router)
+app.include_router(admin_router)
 
 
 # ─── Telegram webhook endpoint ──────────────────────────────────────────────
