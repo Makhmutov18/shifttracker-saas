@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "docker",
+    "dockerfile": "Dockerfile"
+  },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "healthcheckPath": "/api/me",
+    "healthcheckTimeout": 30
+  }
+}

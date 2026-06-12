@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tg-bg: #ffffff;
+  --tg-text: #000000;
+  --tg-hint: #999999;
+  --tg-link: #2481cc;
+  --tg-primary: #2481cc;
+  --tg-button: #2481cc;
+  --tg-button-text: #ffffff;
+  --tg-secondary-bg: #f0f0f0;
+}
+
+.dark {
+  --tg-bg: #1c1c1e;
+  --tg-text: #ffffff;
+  --tg-hint: #8e8e93;
+  --tg-link: #64b5f6;
+  --tg-primary: #64b5f6;
+  --tg-button: #64b5f6;
+  --tg-button-text: #000000;
+  --tg-secondary-bg: #2c2c2e;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--tg-bg);
+  color: var(--tg-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--tg-hint);
+  border-radius: 2px;
+}
+
+/* Smooth transitions for theme switching */
+body, .card, button, input, select, textarea {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
