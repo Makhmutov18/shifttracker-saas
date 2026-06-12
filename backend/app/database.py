@@ -42,10 +42,8 @@ async def init_db():
         """))
 
         # Update old role values to new ones
-        await conn.execute(text("""
-            UPDATE users SET role = 'admin' WHERE role = 'owner';
-            UPDATE users SET role = 'barista' WHERE role = 'employee';
-        """))
+        await conn.execute(text("UPDATE users SET role = 'admin' WHERE role = 'owner'"))
+        await conn.execute(text("UPDATE users SET role = 'barista' WHERE role = 'employee'"))
 
         # ─── Migration: drop old column ────────────────────────────────────
         await conn.execute(text("""
