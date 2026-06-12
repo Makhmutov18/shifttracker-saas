@@ -21,12 +21,55 @@ _dispatcher = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: init DB and setup bot webhook on startup."""
+    """Application lifespan: init DB, seed admin, setup bot webhook."""
     global _bot, _dispatcher
 
     logger.info("Starting up...")
     await init_db()
     logger.info("Database initialized")
+
+    # ─── Seed admin user ──────────────────────────────────────────────────────
+    ADMIN_TELEGRAM_ID = 7673563218
+    try:
+        from sqlalchemy import select
+        from app.database import async_session_factory
+        from app.models import User, Venue, UserRole
+        from decimal import Decimal
+
+        async with async_session_factory() as session:
+            # Check if admin already exists
+            result = await session.execute(
+                select(User).where(User.telegram_id == ADMIN_TELEGRAM_ID)
+            )
+            admin = result.scalar_one_or_none()
+
+            if not admin:
+                # Find or create a default venue
+                result = await session.execute(
+                    select(Venue).limit(1)
+                )
+                venue = result.scalar_one_or_none()
+
+                if not venue:
+                    venue = Venue(name="Основное заведение")
+                    session.add(venue)
+                    await session.flush()
+
+                # Create admin user
+                admin = User(
+                    telegram_id=ADMIN_TELEGRAM_ID,
+                    name="Admin",
+                    role=UserRole.owner,
+                    venue_id=venue.id,
+                    hourly_rate=Decimal("0.00"),
+                )
+                session.add(admin)
+                await session.commit()
+                logger.info(f"Admin user seeded (telegram_id={ADMIN_TELEGRAM_ID})")
+            else:
+                logger.info(f"Admin user already exists (telegram_id={ADMIN_TELEGRAM_ID})")
+    except Exception as e:
+        logger.error(f"Failed to seed admin user: {e}")
 
     # Setup bot webhook in production
     if settings.BOT_TOKEN:
