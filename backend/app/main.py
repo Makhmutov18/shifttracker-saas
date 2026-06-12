@@ -91,10 +91,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown — intentionally NOT deleting webhook here.
+    # Railway terminates the old container after the new one is healthy.
+    # If we delete the webhook on shutdown, the new container's webhook
+    # gets wiped out by the old container's shutdown sequence.
     if _bot:
-        await _bot.delete_webhook()
-        logger.info("Bot webhook deleted")
+        logger.info("Shutting down (webhook preserved for new container)")
 
 
 app = FastAPI(
