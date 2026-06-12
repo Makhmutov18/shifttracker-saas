@@ -5,7 +5,7 @@ import { useStats } from '../hooks/useStats';
 import StatsWidget from '../components/StatsWidget';
 import { formatCurrency } from '../utils/helpers';
 
-type Page = 'dashboard' | 'shift' | 'history' | 'owner';
+type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
 interface Props {
   user: UserType;
@@ -18,7 +18,10 @@ export default function Dashboard({ user, onNavigate }: Props) {
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
       {/* Profile header */}
-      <div className="flex items-center justify-between mb-6">
+      <div
+        onClick={() => onNavigate('profile')}
+        className="flex items-center justify-between mb-6 cursor-pointer active:scale-[0.98] transition-transform"
+      >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-tg-secondary-bg flex items-center justify-center">
             <User className="w-6 h-6 text-tg-hint" />
@@ -26,14 +29,20 @@ export default function Dashboard({ user, onNavigate }: Props) {
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
             <p className="text-sm text-tg-hint">
-              {user.venue?.name || 'Заведение'} · {formatCurrency(user.hourly_rate)}/ч
+              {user.venue?.name || 'Заведение'} · {
+                user.pay_model === 'hourly'
+                  ? `${formatCurrency(user.hourly_rate)}/ч`
+                  : user.pay_model === 'revenue'
+                  ? `${user.revenue_percentage}% от выручки`
+                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`
+              }
             </p>
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <StatsWidget stats={stats!} loading={loading} />
+      {stats && <StatsWidget stats={stats} loading={loading} />}
 
       {/* Add shift button */}
       <button

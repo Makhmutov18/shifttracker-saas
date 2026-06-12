@@ -5,11 +5,12 @@ import Dashboard from './pages/Dashboard';
 import ShiftForm from './pages/ShiftForm';
 import History from './pages/History';
 import OwnerPanel from './pages/OwnerPanel';
+import Profile from './pages/Profile';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import BottomNav from './components/BottomNav';
 
-type Page = 'dashboard' | 'shift' | 'history' | 'owner';
+type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
 export default function App() {
   useTelegramTheme();
@@ -20,7 +21,7 @@ export default function App() {
   if (error) return <ErrorScreen message={error} />;
   if (!user) return <ErrorScreen message="Не удалось загрузить пользователя" />;
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = ['owner', 'admin', 'senior'].includes(user.role);
 
   const renderPage = () => {
     switch (page) {
@@ -32,6 +33,8 @@ export default function App() {
         return <History user={user} />;
       case 'owner':
         return <OwnerPanel user={user} />;
+      case 'profile':
+        return <Profile user={user} onBack={() => setPage('dashboard')} />;
       default:
         return <Dashboard user={user} onNavigate={setPage} />;
     }

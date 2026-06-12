@@ -1,18 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
+import csv
+import io
 
 from app.database import get_session
-from app.models import User, Shift, Expense, UserRole, ShiftStatus
+from app.models import User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType
 from app.schemas import (
     UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
+    AuditLogOut, AdjustmentCreate, AdjustmentOut,
 )
 from app.auth import validate_init_data, extract_user_from_init_data
-from app.utils import calculate_hours, calculate_salary, get_current_month_range
+from app.utils import calculate_hours, calculate_salary
+from app.notifications import notify_shift_approved, notify_shift_rejected, notify_bonus_added, notify_penalty_added
 
 import uuid
 
@@ -65,8 +70,8 @@ async def create_shift(
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    # Baristas can only create shifts for today or yesterday
-    if user.role != UserRole.admin and shift_data.date < yesterday:
+    # Baristas and cooks can only create shifts for today or yesterday
+    if user.role in (UserRole.barista, UserRole.cook) and shift_data.date < yesterday:
         raise HTTPException(
             status_code=403,
             detail="You can only create shifts for today or yesterday",
@@ -74,7 +79,12 @@ async def create_shift(
 
     # Calculate hours and salary
     total_hours = calculate_hours(shift_data.start_time, shift_data.end_time)
-    salary_earned = calculate_salary(total_hours, user.hourly_rate)
+    salary_earned = calculate_salary(
+        total_hours, user.hourly_rate,
+        revenue=shift_data.revenue,
+        revenue_percentage=user.revenue_percentage,
+        pay_model=user.pay_model.value,
+    )
 
     shift = Shift(
         user_id=user.id,
@@ -85,11 +95,25 @@ async def create_shift(
         cashier_hours=shift_data.cashier_hours,
         total_hours=total_hours,
         salary_earned=salary_earned,
+        revenue=shift_data.revenue,
         comment=shift_data.comment,
     )
     session.add(shift)
     await session.commit()
     await session.refresh(shift)
+
+    # Audit log
+    log = AuditLog(
+        user_id=user.id,
+        venue_id=user.venue_id,
+        action="shift_created",
+        entity_type="shift",
+        entity_id=shift.id,
+        new_value={"date": str(shift.date), "start_time": str(shift.start_time), "end_time": str(shift.end_time), "salary": str(shift.salary_earned)},
+    )
+    session.add(log)
+    await session.commit()
+
     return shift
 
 
@@ -120,9 +144,9 @@ async def list_pending_shifts(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Admin-only: list all pending shifts for the venue."""
-    if user.role != UserRole.admin:
-        raise HTTPException(status_code=403, detail="Only admins can view pending shifts")
+    """Admin/senior: list all pending shifts for the venue."""
+    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
+        raise HTTPException(status_code=403, detail="Only admins/seniors can view pending shifts")
 
     query = select(Shift).where(
         Shift.venue_id == user.venue_id,
@@ -148,9 +172,9 @@ async def update_shift(
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
 
-    # Only admin can approve/update shifts
-    if user.role != UserRole.admin:
-        raise HTTPException(status_code=403, detail="Only admins can update shifts")
+    # Only admin/senior can approve/update shifts
+    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
+        raise HTTPException(status_code=403, detail="Only admins/seniors can update shifts")
 
     if shift_data.start_time is not None:
         shift.start_time = shift_data.start_time
@@ -158,21 +182,64 @@ async def update_shift(
         shift.end_time = shift_data.end_time
     if shift_data.cashier_hours is not None:
         shift.cashier_hours = shift_data.cashier_hours
+    if shift_data.revenue is not None:
+        shift.revenue = shift_data.revenue
     if shift_data.comment is not None:
         shift.comment = shift_data.comment
     if shift_data.status is not None:
-        shift.status = ShiftStatus(shift_data.status)
+        try:
+            old_status = shift.status.value
+            shift.status = ShiftStatus(shift_data.status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {shift_data.status}")
 
-    # Recalculate if times changed
-    if shift_data.start_time is not None or shift_data.end_time is not None:
+    # Recalculate if times or revenue changed
+    if shift_data.start_time is not None or shift_data.end_time is not None or shift_data.revenue is not None:
         shift.total_hours = calculate_hours(shift.start_time, shift.end_time)
-        # Get user's hourly rate
+        # Get user's pay model
         user_result = await session.get(User, shift.user_id)
         if user_result:
-            shift.salary_earned = calculate_salary(shift.total_hours, user_result.hourly_rate)
+            shift.salary_earned = calculate_salary(
+                shift.total_hours, user_result.hourly_rate,
+                revenue=shift.revenue or shift_data.revenue,
+                revenue_percentage=user_result.revenue_percentage,
+                pay_model=user_result.pay_model.value,
+            )
 
     await session.commit()
     await session.refresh(shift)
+
+    # Audit log
+    log = AuditLog(
+        user_id=user.id,
+        target_user_id=shift.user_id,
+        venue_id=user.venue_id,
+        action="shift_approved" if shift_data.status == "approved" else "shift_edited",
+        entity_type="shift",
+        entity_id=shift.id,
+        old_value={"status": old_status} if shift_data.status else None,
+        new_value={"status": shift.status.value, "salary": str(shift.salary_earned)},
+    )
+    session.add(log)
+    await session.commit()
+
+    # Send notification to shift owner
+    if shift_data.status and shift.user_id:
+        shift_owner = await session.get(User, shift.user_id)
+        if shift_owner and shift_owner.telegram_id:
+            if shift_data.status == "approved":
+                await notify_shift_approved(
+                    shift_owner.telegram_id,
+                    str(shift.date),
+                    str(shift.salary_earned),
+                )
+            elif shift_data.status == "rejected":
+                await notify_shift_rejected(
+                    shift_owner.telegram_id,
+                    str(shift.date),
+                    shift_data.comment or "",
+                )
+
     return shift
 
 
@@ -258,10 +325,348 @@ async def monthly_stats(
     expense_result = await session.execute(expenses_query)
     total_expenses = expense_result.scalar() or Decimal("0.00")
 
+    # Bonuses
+    bonuses_query = select(
+        func.coalesce(func.sum(Adjustment.amount), 0),
+    ).where(
+        Adjustment.user_id == user.id,
+        Adjustment.type == AdjustmentType.bonus,
+        Adjustment.month == m,
+        Adjustment.year == y,
+    )
+    bonuses_result = await session.execute(bonuses_query)
+    total_bonuses = bonuses_result.scalar() or Decimal("0.00")
+
+    # Penalties
+    penalties_query = select(
+        func.coalesce(func.sum(Adjustment.amount), 0),
+    ).where(
+        Adjustment.user_id == user.id,
+        Adjustment.type == AdjustmentType.penalty,
+        Adjustment.month == m,
+        Adjustment.year == y,
+    )
+    penalties_result = await session.execute(penalties_query)
+    total_penalties = penalties_result.scalar() or Decimal("0.00")
+
     return MonthlyStats(
         total_earned=Decimal(str(total_earned)),
         total_hours=Decimal(str(total_hours)),
         total_cashier_hours=Decimal(str(total_cashier_hours)),
         total_expenses=Decimal(str(total_expenses)),
+        total_bonuses=Decimal(str(total_bonuses)),
+        total_penalties=Decimal(str(total_penalties)),
         shifts_count=int(shifts_count),
     )
+
+
+# ─── Audit Logs ─────────────────────────────────────────────────────────────
+
+@router.get("/audit-logs", response_model=list[AuditLogOut])
+async def list_audit_logs(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    offset = (page - 1) * limit
+
+    query = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.user), selectinload(AuditLog.target_user))
+        .where(AuditLog.venue_id == user.venue_id)
+        .order_by(AuditLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    return [
+        AuditLogOut(
+            id=log.id,
+            user_id=log.user_id,
+            target_user_id=log.target_user_id,
+            action=log.action,
+            entity_type=log.entity_type,
+            entity_id=log.entity_id,
+            old_value=log.old_value,
+            new_value=log.new_value,
+            created_at=log.created_at.isoformat() if log.created_at else "",
+            user_name=log.user.name if log.user else None,
+            target_user_name=log.target_user.name if log.target_user else None,
+        )
+        for log in logs
+    ]
+
+
+# ─── Adjustments (Bonuses / Penalties) ──────────────────────────────────────
+
+@router.post("/adjustments", response_model=AdjustmentOut)
+async def create_adjustment(
+    adjustment_data: AdjustmentCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
+        raise HTTPException(status_code=403, detail="Only admins/seniors can create adjustments")
+
+    now = datetime.now(timezone.utc)
+    adjustment = Adjustment(
+        user_id=adjustment_data.user_id,
+        venue_id=user.venue_id,
+        type=AdjustmentType(adjustment_data.type),
+        amount=adjustment_data.amount,
+        reason=adjustment_data.reason,
+        created_by=user.id,
+        month=now.month,
+        year=now.year,
+    )
+    session.add(adjustment)
+    await session.commit()
+    await session.refresh(adjustment)
+
+    # Audit log
+    log = AuditLog(
+        user_id=user.id,
+        target_user_id=adjustment_data.user_id,
+        venue_id=user.venue_id,
+        action=f"{adjustment_data.type}_added",
+        entity_type="adjustment",
+        entity_id=adjustment.id,
+        new_value={"type": adjustment_data.type, "amount": str(adjustment_data.amount), "reason": adjustment_data.reason},
+    )
+    session.add(log)
+    await session.commit()
+
+    # Send notification to target user
+    target_user = await session.get(User, adjustment_data.user_id)
+    if target_user and target_user.telegram_id:
+        if adjustment_data.type == "bonus":
+            await notify_bonus_added(
+                target_user.telegram_id,
+                str(adjustment_data.amount),
+                adjustment_data.reason,
+            )
+        elif adjustment_data.type == "penalty":
+            await notify_penalty_added(
+                target_user.telegram_id,
+                str(adjustment_data.amount),
+                adjustment_data.reason,
+            )
+
+    return AdjustmentOut(
+        id=adjustment.id,
+        user_id=adjustment.user_id,
+        type=adjustment.type.value,
+        amount=adjustment.amount,
+        reason=adjustment.reason,
+        created_by=adjustment.created_by,
+        month=adjustment.month,
+        year=adjustment.year,
+        created_at=adjustment.created_at.isoformat() if adjustment.created_at else "",
+    )
+
+
+@router.get("/adjustments", response_model=list[AdjustmentOut])
+async def list_adjustments(
+    month: int | None = None,
+    year: int | None = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    now = datetime.now(timezone.utc)
+    m = month or now.month
+    y = year or now.year
+
+    query = (
+        select(Adjustment)
+        .options(selectinload(Adjustment.user), selectinload(Adjustment.creator))
+        .where(
+            Adjustment.user_id == user.id,
+            Adjustment.month == m,
+            Adjustment.year == y,
+        )
+        .order_by(Adjustment.created_at.desc())
+    )
+    result = await session.execute(query)
+    adjustments = result.scalars().all()
+
+    return [
+        AdjustmentOut(
+            id=a.id,
+            user_id=a.user_id,
+            type=a.type.value,
+            amount=a.amount,
+            reason=a.reason,
+            created_by=a.created_by,
+            month=a.month,
+            year=a.year,
+            created_at=a.created_at.isoformat() if a.created_at else "",
+            user_name=a.user.name if a.user else None,
+            creator_name=a.creator.name if a.creator else None,
+        )
+        for a in adjustments
+    ]
+
+
+# ─── CSV Export ──────────────────────────────────────────────────────────────
+
+@router.get("/export/csv")
+async def export_csv(
+    month: int | None = None,
+    year: int | None = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Export monthly payroll data as CSV for accounting."""
+    now = datetime.now(timezone.utc)
+    m = month or now.month
+    y = year or now.year
+
+    # Get all shifts for the venue in this month
+    shifts_query = (
+        select(Shift, User)
+        .join(User, Shift.user_id == User.id)
+        .where(
+            Shift.venue_id == user.venue_id,
+            func.extract("month", Shift.date) == m,
+            func.extract("year", Shift.date) == y,
+        )
+        .order_by(User.name, Shift.date)
+    )
+    result = await session.execute(shifts_query)
+    shifts_with_users = result.all()
+
+    # Get adjustments for this month
+    adj_query = (
+        select(Adjustment, User)
+        .join(User, Adjustment.user_id == User.id)
+        .where(
+            Adjustment.venue_id == user.venue_id,
+            Adjustment.month == m,
+            Adjustment.year == y,
+        )
+    )
+    adj_result = await session.execute(adj_query)
+    adjustments_with_users = adj_result.all()
+
+    # Build adjustments summary per user
+    adj_by_user: dict[uuid.UUID, dict] = {}
+    for adj, adj_user in adjustments_with_users:
+        uid = adj.user_id
+        if uid not in adj_by_user:
+            adj_by_user[uid] = {"bonuses": Decimal("0"), "penalties": Decimal("0")}
+        if adj.type == AdjustmentType.bonus:
+            adj_by_user[uid]["bonuses"] += adj.amount
+        else:
+            adj_by_user[uid]["penalties"] += adj.amount
+
+    # Build CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Сотрудник", "Дата", "Часы", "Ставка/ч", "Выручка", "% от выручки",
+        "Модель оплаты", "Бонусы", "Штрафы", "Итого ЗП"
+    ])
+
+    user_totals: dict[uuid.UUID, dict] = {}
+
+    for shift, shift_user in shifts_with_users:
+        # Calculate revenue part
+        rev_pct = shift_user.revenue_percentage or Decimal("0")
+        revenue = shift.revenue or Decimal("0")
+        rev_part = (revenue * rev_pct / Decimal("100")).quantize(Decimal("0.01")) if rev_pct > 0 else Decimal("0")
+
+        # Get adjustments for this user
+        user_adj = adj_by_user.get(shift.user_id, {"bonuses": Decimal("0"), "penalties": Decimal("0")})
+
+        # Track totals per user
+        if shift.user_id not in user_totals:
+            user_totals[shift.user_id] = {
+                "name": shift_user.name,
+                "hours": Decimal("0"),
+                "salary": Decimal("0"),
+                "bonuses": user_adj["bonuses"],
+                "penalties": user_adj["penalties"],
+            }
+        user_totals[shift.user_id]["hours"] += shift.total_hours
+        user_totals[shift.user_id]["salary"] += shift.salary_earned
+
+        writer.writerow([
+            shift_user.name,
+            str(shift.date),
+            str(shift.total_hours),
+            str(shift_user.hourly_rate),
+            str(revenue) if revenue else "",
+            str(rev_pct) if rev_pct else "",
+            shift_user.pay_model.value,
+            "",  # Bonuses shown in summary row
+            "",  # Penalties shown in summary row
+            str(shift.salary_earned),
+        ])
+
+    # Add summary rows per user
+    output.write("\n")
+    writer.writerow(["ИТОГО ПО СОТРУДНИКАМ"])
+    writer.writerow(["Сотрудник", "Всего часов", "ЗП за смены", "Бонусы", "Штрафы", "Итого к выплате"])
+
+    for uid, totals in user_totals.items():
+        net = totals["salary"] + totals["bonuses"] - totals["penalties"]
+        writer.writerow([
+            totals["name"],
+            str(totals["hours"]),
+            str(totals["salary"]),
+            str(totals["bonuses"]),
+            str(totals["penalties"]),
+            str(net.quantize(Decimal("0.01"))),
+        ])
+
+    output.seek(0)
+
+    # Generate filename
+    month_names = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+    ]
+    filename = f"raschet_{month_names[m-1]}_{y}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue().encode("utf-8-sig")]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ─── Reminders (called by external cron) ─────────────────────────────────────
+
+@router.post("/reminders/shifts")
+async def send_shift_reminders(
+    session: AsyncSession = Depends(get_session),
+):
+    """Send reminders to users who haven't logged today's shift. Call via cron at 21:00."""
+    from app.notifications import send_shift_reminder
+    from app.models import Shift as ShiftModel
+
+    today = date.today()
+
+    # Find all active users in all venues
+    users_result = await session.execute(
+        select(User).where(User.is_active == True, User.telegram_id.isnot(None))
+    )
+    all_users = users_result.scalars().all()
+
+    # Find users who already have a shift for today
+    shifts_result = await session.execute(
+        select(ShiftModel.user_id).where(ShiftModel.date == today)
+    )
+    users_with_shift = {row[0] for row in shifts_result.all()}
+
+    # Send reminders to users without a shift
+    reminded = 0
+    for user in all_users:
+        if user.id not in users_with_shift and user.telegram_id:
+            await send_shift_reminder(user.telegram_id)
+            reminded += 1
+
+    return {"reminded": reminded}

@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
                 admin = User(
                     telegram_id=ADMIN_TELEGRAM_ID,
                     name="Admin",
-                    role=UserRole.admin,
+                    role=UserRole.owner,
                     venue_id=venue.id,
                     hourly_rate=Decimal("0.00"),
                     is_active=True,
@@ -70,8 +70,8 @@ async def lifespan(app: FastAPI):
                 logger.info(f"Admin user seeded (telegram_id={ADMIN_TELEGRAM_ID})")
             else:
                 # Ensure admin has correct role and is_active
-                if admin.role != UserRole.admin:
-                    admin.role = UserRole.admin
+                if admin.role not in (UserRole.owner, UserRole.admin):
+                    admin.role = UserRole.owner
                     logger.info(f"Admin role corrected to admin (telegram_id={ADMIN_TELEGRAM_ID})")
                 if not admin.is_active:
                     admin.is_active = True
@@ -119,7 +119,11 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        settings.effective_webapp_url,
+        "https://localhost:5173",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -19,8 +19,33 @@ def calculate_hours(start_time, end_time) -> Decimal:
     return hours.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def calculate_salary(total_hours: Decimal, hourly_rate: Decimal) -> Decimal:
-    return (total_hours * hourly_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def calculate_salary(
+    total_hours: Decimal,
+    hourly_rate: Decimal,
+    revenue: Decimal | None = None,
+    revenue_percentage: Decimal | None = None,
+    pay_model: str = "hourly",
+) -> Decimal:
+    """
+    Calculate salary based on pay model.
+    - hourly: total_hours * hourly_rate
+    - revenue: revenue * revenue_percentage / 100
+    - hybrid: (total_hours * hourly_rate) + (revenue * revenue_percentage / 100)
+    """
+    hourly_part = (total_hours * hourly_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    if pay_model == "hourly":
+        return hourly_part
+    elif pay_model == "revenue":
+        if revenue and revenue_percentage:
+            return (revenue * revenue_percentage / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return Decimal("0.00")
+    elif pay_model == "hybrid":
+        revenue_part = Decimal("0.00")
+        if revenue and revenue_percentage:
+            revenue_part = (revenue * revenue_percentage / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return hourly_part + revenue_part
+    return hourly_part
 
 
 def get_current_month_range() -> tuple[datetime, datetime]:

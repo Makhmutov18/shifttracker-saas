@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    JSON,
     ForeignKey,
     Enum as SAEnum,
     UniqueConstraint,
@@ -25,13 +26,28 @@ import enum
 
 
 class UserRole(str, enum.Enum):
+    owner = "owner"
     admin = "admin"
+    senior = "senior"
     barista = "barista"
+    cook = "cook"
+    senior_cook = "senior_cook"
 
 
 class ShiftStatus(str, enum.Enum):
     pending = "pending"
     approved = "approved"
+
+
+class AdjustmentType(str, enum.Enum):
+    bonus = "bonus"
+    penalty = "penalty"
+
+
+class PayModel(str, enum.Enum):
+    hourly = "hourly"
+    revenue = "revenue"
+    hybrid = "hybrid"
 
 
 class Venue(Base):
@@ -67,6 +83,12 @@ class User(Base):
     )
     hourly_rate: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, default=Decimal("0.00")
+    )
+    revenue_percentage: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), nullable=False, default=Decimal("0.00")
+    )
+    pay_model: Mapped[PayModel] = mapped_column(
+        SAEnum(PayModel, name="pay_model"), nullable=False, default=PayModel.hourly
     )
     is_active: Mapped[bool] = mapped_column(
         default=False, server_default="false"
@@ -107,6 +129,9 @@ class Shift(Base):
     )
     salary_earned: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, default=Decimal("0.00")
+    )
+    revenue: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(10, 2), nullable=True
     )
     status: Mapped[ShiftStatus] = mapped_column(
         SAEnum(ShiftStatus, name="shift_status"), nullable=False, default=ShiftStatus.pending
@@ -150,3 +175,69 @@ class Expense(Base):
 
     def __repr__(self) -> str:
         return f"<Expense {self.amount} {self.category}>"
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    target_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    venue_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.id"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    old_value: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    new_value: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    target_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[target_user_id])
+    venue: Mapped["Venue"] = relationship("Venue")
+
+    def __repr__(self) -> str:
+        return f"<AuditLog {self.action} by {self.user_id}>"
+
+
+class Adjustment(Base):
+    __tablename__ = "adjustments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    venue_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.id"), nullable=False
+    )
+    type: Mapped[AdjustmentType] = mapped_column(
+        SAEnum(AdjustmentType, name="adjustment_type"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    month: Mapped[int] = mapped_column(nullable=False)
+    year: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
+    venue: Mapped["Venue"] = relationship("Venue")
+
+    def __repr__(self) -> str:
+        return f"<Adjustment {self.type} {self.amount} for {self.user_id}>"

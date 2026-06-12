@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Clock, CreditCard, TrendingDown } from 'lucide-react';
-import { User } from '../utils/api';
+import { Clock, CreditCard, TrendingDown, Download } from 'lucide-react';
+import { User, getExportCsvUrl } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import ShiftCard from '../components/ShiftCard';
@@ -42,6 +42,19 @@ export default function History({ user }: Props) {
           </button>
         ))}
       </div>
+
+      {/* Export button (admin only) */}
+      {user.role !== 'barista' && user.role !== 'cook' && (
+        <a
+          href={getExportCsvUrl(month, year)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full mb-4 bg-tg-secondary-bg text-tg-text py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+        >
+          <Download className="w-4 h-4" />
+          Скачать отчёт за {getMonthName(month)}
+        </a>
+      )}
 
       {/* Tabs */}
       <div className="flex bg-tg-secondary-bg rounded-xl p-1 mb-4">

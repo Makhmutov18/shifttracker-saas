@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, Clock, Coffee, CreditCard } from 'lucide-react';
+import { Wallet, Clock, Coffee, CreditCard, Gift, AlertTriangle } from 'lucide-react';
 import { MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours } from '../utils/helpers';
 
@@ -23,13 +23,6 @@ export default function StatsWidget({ stats, loading }: Props) {
 
   const items = [
     {
-      label: 'Заработано',
-      value: formatCurrency(stats.total_earned),
-      icon: <Wallet className="w-5 h-5" />,
-      color: 'text-emerald-500',
-      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-    },
-    {
       label: 'Часов отработано',
       value: formatHours(stats.total_hours),
       icon: <Clock className="w-5 h-5" />,
@@ -44,6 +37,20 @@ export default function StatsWidget({ stats, loading }: Props) {
       bg: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
+      label: 'Бонусы',
+      value: formatCurrency(stats.total_bonuses),
+      icon: <Gift className="w-5 h-5" />,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+    },
+    {
+      label: 'Штрафы',
+      value: formatCurrency(stats.total_penalties),
+      icon: <AlertTriangle className="w-5 h-5" />,
+      color: 'text-rose-500',
+      bg: 'bg-rose-50 dark:bg-rose-900/20',
+    },
+    {
       label: 'Расходы',
       value: formatCurrency(stats.total_expenses),
       icon: <CreditCard className="w-5 h-5" />,
@@ -52,12 +59,19 @@ export default function StatsWidget({ stats, loading }: Props) {
     },
   ];
 
+  const netIncome = (
+    parseFloat(stats.total_earned) +
+    parseFloat(stats.total_bonuses) -
+    parseFloat(stats.total_penalties) -
+    parseFloat(stats.total_expenses)
+  ).toFixed(2);
+
   return (
     <div className="space-y-3">
       {/* Main stat card */}
-      <div className="bg-gradient-to-br from-tg-primary to-blue-600 rounded-2xl p-5 text-white">
-        <p className="text-sm opacity-80 mb-1">Заработано за месяц</p>
-        <p className="text-3xl font-bold">{formatCurrency(stats.total_earned)}</p>
+      <div className="glass-card bg-gradient-to-br from-tg-primary/90 to-blue-600/90 rounded-2xl p-5 text-white">
+        <p className="text-sm opacity-80 mb-1">Итого к выплате</p>
+        <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
         <div className="flex items-center gap-2 mt-2 text-sm opacity-80">
           <Clock className="w-4 h-4" />
           <span>{formatHours(stats.total_hours)}</span>
@@ -68,7 +82,7 @@ export default function StatsWidget({ stats, loading }: Props) {
 
       {/* Grid stats */}
       <div className="grid grid-cols-2 gap-3">
-        {items.slice(1).map((item) => (
+        {items.map((item) => (
           <div
             key={item.label}
             className={`${item.bg} rounded-xl p-4`}

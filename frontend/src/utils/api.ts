@@ -41,9 +41,11 @@ export interface User {
   id: string;
   telegram_id: number | null;
   name: string;
-  role: 'admin' | 'barista';
+  role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
   venue_id: string;
   hourly_rate: string;
+  revenue_percentage: string;
+  pay_model: 'hourly' | 'revenue' | 'hybrid';
   is_active: boolean;
   venue?: Venue;
 }
@@ -64,6 +66,7 @@ export interface Shift {
   cashier_hours: string | null;
   total_hours: string;
   salary_earned: string;
+  revenue: string | null;
   status: 'pending' | 'approved';
   comment: string | null;
   created_at: string;
@@ -74,6 +77,7 @@ export interface ShiftCreate {
   start_time: string;
   end_time: string;
   cashier_hours?: number;
+  revenue?: number;
   comment?: string;
 }
 
@@ -153,6 +157,8 @@ export interface MonthlyStats {
   total_hours: string;
   total_cashier_hours: string;
   total_expenses: string;
+  total_bonuses: string;
+  total_penalties: string;
   shifts_count: number;
 }
 
@@ -168,8 +174,10 @@ export async function getMonthlyStats(month?: number, year?: number): Promise<Mo
 
 export interface AdminCreateUserRequest {
   first_name: string;
-  role: string;
+  role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
   hourly_rate: number;
+  revenue_percentage: number;
+  pay_model: 'hourly' | 'revenue' | 'hybrid';
 }
 
 export interface AdminCreateUserResponse {
@@ -183,4 +191,83 @@ export async function createUser(data: AdminCreateUserRequest): Promise<AdminCre
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+// ─── Audit Logs ─────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  target_user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_value: Record<string, any> | null;
+  new_value: Record<string, any> | null;
+  created_at: string;
+  user_name: string | null;
+  target_user_name: string | null;
+}
+
+export async function getAuditLogs(page?: number, limit?: number): Promise<AuditLog[]> {
+  const params = new URLSearchParams();
+  if (page) params.set('page', String(page));
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return request<AuditLog[]>(`/audit-logs${qs ? `?${qs}` : ''}`);
+}
+
+// ─── Adjustments ────────────────────────────────────────────────────────────
+
+export interface Adjustment {
+  id: string;
+  user_id: string;
+  type: 'bonus' | 'penalty';
+  amount: string;
+  reason: string;
+  created_by: string;
+  month: number;
+  year: number;
+  created_at: string;
+  user_name: string | null;
+  creator_name: string | null;
+}
+
+export interface AdjustmentCreate {
+  user_id: string;
+  type: 'bonus' | 'penalty';
+  amount: number;
+  reason: string;
+}
+
+export async function createAdjustment(data: AdjustmentCreate): Promise<Adjustment> {
+  return request<Adjustment>('/adjustments', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getAdjustments(month?: number, year?: number): Promise<Adjustment[]> {
+  const params = new URLSearchParams();
+  if (month) params.set('month', String(month));
+  if (year) params.set('year', String(year));
+  const qs = params.toString();
+  return request<Adjustment[]>(`/adjustments${qs ? `?${qs}` : ''}`);
+}
+
+// ─── Users (admin) ─────────────────────────────────────────────────────────
+
+export async function getUsers(): Promise<User[]> {
+  return request<User[]>('/admin/users');
+}
+
+// ─── Export ─────────────────────────────────────────────────────────────────
+
+export function getExportCsvUrl(month?: number, year?: number): string {
+  const params = new URLSearchParams();
+  if (month) params.set('month', String(month));
+  if (year) params.set('year', String(year));
+  const qs = params.toString();
+  const initData = getInitData();
+  return `${API_BASE}/export/csv${qs ? `?${qs}` : ''}`;
 }

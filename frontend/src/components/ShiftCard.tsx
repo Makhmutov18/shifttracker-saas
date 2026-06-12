@@ -14,7 +14,7 @@ export default function ShiftCard({ shift }: Props) {
 
   return (
     <div
-      className="bg-tg-secondary-bg rounded-xl overflow-hidden transition-all duration-200 cursor-pointer"
+      className="glass-card rounded-xl overflow-hidden transition-all duration-200 cursor-pointer"
       onClick={() => setExpanded(!expanded)}
     >
       {/* Collapsed header */}
@@ -63,6 +63,12 @@ export default function ShiftCard({ shift }: Props) {
             <div className="flex justify-between text-sm">
               <span className="text-tg-hint">Часы за кассой</span>
               <span className="text-tg-text font-medium">{formatHours(shift.cashier_hours)}</span>
+            </div>
+          )}
+          {shift.revenue && parseFloat(shift.revenue) > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-tg-hint">Выручка</span>
+              <span className="text-tg-text font-medium">{formatCurrency(shift.revenue)}</span>
             </div>
           )}
           {shift.comment && (

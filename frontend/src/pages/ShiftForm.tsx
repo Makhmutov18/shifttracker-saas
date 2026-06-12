@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Clock, Coffee, Send } from 'lucide-react';
 import { User, createShift } from '../utils/api';
 import { getTodayDate, getYesterdayDate, formatCurrency, formatHours } from '../utils/helpers';
+import { hapticSuccess, hapticError } from '../utils/telegram';
 
 interface Props {
   user: User;
@@ -14,9 +15,12 @@ export default function ShiftForm({ user, onBack }: Props) {
   const [endTime, setEndTime] = useState('18:00');
   const [cashierEnabled, setCashierEnabled] = useState(false);
   const [cashierHours, setCashierHours] = useState('0');
+  const [revenue, setRevenue] = useState('');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const needsRevenue = user.pay_model !== 'hourly';
 
   const totalHours = useMemo(() => {
     const [sh, sm] = startTime.split(':').map(Number);
@@ -30,12 +34,21 @@ export default function ShiftForm({ user, onBack }: Props) {
   const salary = useMemo(() => {
     const hours = parseFloat(totalHours);
     const rate = parseFloat(user.hourly_rate);
-    return (hours * rate).toFixed(2);
-  }, [totalHours, user.hourly_rate]);
+    const rev = parseFloat(revenue) || 0;
+    const revPct = parseFloat(user.revenue_percentage) || 0;
+
+    const hourlyPart = hours * rate;
+    const revenuePart = user.pay_model !== 'hourly' ? (rev * revPct) / 100 : 0;
+
+    if (user.pay_model === 'hourly') return hourlyPart.toFixed(2);
+    if (user.pay_model === 'revenue') return revenuePart.toFixed(2);
+    return (hourlyPart + revenuePart).toFixed(2);
+  }, [totalHours, user.hourly_rate, revenue, user.revenue_percentage, user.pay_model]);
 
   const handleSubmit = async () => {
-    if (startTime >= endTime) {
-      setError('Время ухода должно быть позже времени прихода');
+    const isOvernight = startTime >= endTime;
+    if (isOvernight && parseFloat(totalHours) > 16) {
+      setError('Смена не может длиться более 16 часов');
       return;
     }
 
@@ -48,10 +61,13 @@ export default function ShiftForm({ user, onBack }: Props) {
         start_time: startTime + ':00',
         end_time: endTime + ':00',
         cashier_hours: cashierEnabled ? parseFloat(cashierHours) || 0 : undefined,
+        revenue: needsRevenue ? parseFloat(revenue) || undefined : undefined,
         comment: comment || undefined,
       });
+      hapticSuccess();
       onBack();
     } catch (err: any) {
+      hapticError();
       setError(err.message || 'Ошибка при сохранении смены');
     } finally {
       setSubmitting(false);
@@ -154,6 +170,34 @@ export default function ShiftForm({ user, onBack }: Props) {
         )}
       </div>
 
+      {/* Revenue input (for hybrid/revenue pay models) */}
+      {needsRevenue && (
+        <div className="mb-5">
+          <label className="flex items-center gap-2 text-sm text-tg-hint mb-2">
+            Выручка за смену (₽)
+          </label>
+          <input
+            type="number"
+            value={revenue}
+            onChange={(e) => setRevenue(e.target.value)}
+            min="0"
+            step="0.01"
+            placeholder="Введите выручку"
+            className="w-full bg-tg-secondary-bg text-tg-text px-4 py-3 rounded-xl text-sm outline-none"
+          />
+          {user.pay_model === 'hybrid' && (
+            <p className="text-tg-hint text-xs mt-1">
+              + {formatCurrency(user.hourly_rate)}/ч × {formatHours(totalHours)}
+            </p>
+          )}
+          {user.pay_model === 'revenue' && (
+            <p className="text-tg-hint text-xs mt-1">
+              {user.revenue_percentage}% от выручки
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Comment */}
       <div className="mb-5">
         <textarea
@@ -166,7 +210,7 @@ export default function ShiftForm({ user, onBack }: Props) {
       </div>
 
       {/* Preview */}
-      <div className="bg-gradient-to-br from-tg-primary to-blue-600 rounded-2xl p-5 text-white mb-5">
+      <div className="glass-card bg-gradient-to-br from-tg-primary/90 to-blue-600/90 rounded-2xl p-5 text-white mb-5">
         <p className="text-sm opacity-80 mb-1">Предварительный расчёт</p>
         <div className="flex items-baseline justify-between">
           <p className="text-3xl font-bold">{formatCurrency(salary)}</p>

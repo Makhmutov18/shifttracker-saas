@@ -2,10 +2,11 @@ from aiogram import Bot, Router, types
 from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session as SyncSession
+from sqlalchemy.orm import Session as SyncSession, selectinload
 
 from app.config import settings
 from app.models import Base, User
+from app.notifications import notify_user_activated
 
 router = Router()
 
@@ -46,7 +47,7 @@ async def cmd_start(message: types.Message, command: CommandObject):
         # ─── If invite token provided → activate user ────────────────────────
         if args:
             user = session.execute(
-                select(User).where(User.invite_token == args)
+                select(User).options(selectinload(User.venue)).where(User.invite_token == args)
             ).scalar_one_or_none()
 
             if not user:
@@ -68,6 +69,15 @@ async def cmd_start(message: types.Message, command: CommandObject):
             user.invite_token = None
             session.commit()
 
+            # Notify admin about activation
+            from sqlalchemy import select as sa_select
+            admin_result = session.execute(
+                sa_select(User).where(User.venue_id == user.venue_id, User.role.in_(["owner", "admin"])).limit(1)
+            )
+            admin = admin_result.scalar_one_or_none()
+            if admin and admin.telegram_id:
+                await notify_user_activated(admin.telegram_id, user.name)
+
             await message.answer(
                 f"✅ Привет, {user.name}!\n"
                 f"Ты успешно привязан к системе.\n"
@@ -79,7 +89,7 @@ async def cmd_start(message: types.Message, command: CommandObject):
 
         # ─── No token → check if user exists ─────────────────────────────────
         user = session.execute(
-            select(User).where(User.telegram_id == telegram_id)
+            select(User).options(selectinload(User.venue)).where(User.telegram_id == telegram_id)
         ).scalar_one_or_none()
 
         if user:
@@ -97,7 +107,3 @@ async def cmd_start(message: types.Message, command: CommandObject):
             )
 
 
-async def setup_bot() -> Bot:
-    """Initialize and return the bot instance."""
-    bot = Bot(token=settings.BOT_TOKEN)
-    return bot

@@ -48,6 +48,8 @@ interface TelegramWebApp {
     selectionChanged: () => void;
   };
   sendData: (data: string) => void;
+  onEvent: (eventType: string, callback: () => void) => void;
+  offEvent: (eventType: string, callback: () => void) => void;
   isExpanded: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
