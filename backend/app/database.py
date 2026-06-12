@@ -50,6 +50,62 @@ async def init_db():
             ALTER TABLE users DROP COLUMN IF EXISTS auth_code;
         """))
 
+        # ─── Migration: add revenue/pay_model columns to users ─────────────
+        await conn.execute(text("""
+            ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS revenue_percentage NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+                ADD COLUMN IF NOT EXISTS pay_model VARCHAR(16) NOT NULL DEFAULT 'hourly'
+        """))
+
+        # ─── Migration: add revenue column to shifts ───────────────────────
+        await conn.execute(text("""
+            ALTER TABLE shifts
+                ADD COLUMN IF NOT EXISTS revenue NUMERIC(10,2)
+        """))
+
+        # ─── Migration: create audit_logs table ────────────────────────────
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES users(id),
+                target_user_id UUID REFERENCES users(id),
+                venue_id UUID NOT NULL REFERENCES venues(id),
+                action VARCHAR(50) NOT NULL,
+                entity_type VARCHAR(50) NOT NULL,
+                entity_id UUID,
+                old_value JSONB,
+                new_value JSONB,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+
+        # ─── Migration: create adjustments table ───────────────────────────
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS adjustments (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES users(id),
+                venue_id UUID NOT NULL REFERENCES venues(id),
+                type VARCHAR(16) NOT NULL,
+                amount NUMERIC(10,2) NOT NULL,
+                reason VARCHAR(500) NOT NULL,
+                created_by UUID NOT NULL REFERENCES users(id),
+                month INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+
+        # ─── Migration: drop old shift_status enum and recreate ─────────────
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shift_status') THEN
+                    ALTER TABLE shifts ALTER COLUMN status TYPE VARCHAR(16);
+                    DROP TYPE shift_status CASCADE;
+                END IF;
+            END $$;
+        """))
+
         # ─── Create all tables/enums (safe: skips existing) ────────────────
         await conn.run_sync(Base.metadata.create_all)
 
