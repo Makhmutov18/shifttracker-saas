@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.database import init_db
@@ -69,14 +70,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes
+# API routes — must be registered BEFORE static files
 app.include_router(api_router)
 
 # Serve frontend static files in production
 frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
 if os.path.isdir(frontend_dist):
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
-    logger.info(f"Serving frontend from {frontend_dist}")
+    # Mount static assets (JS, CSS, images) at /assets
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+
+    # Serve other static files (favicon, manifest, etc.)
+    app.mount("/static", StaticFiles(directory=frontend_dist), name="static")
+
+    # SPA fallback: serve index.html for all non-API, non-static routes
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't interfere with API routes
+        if full_path.startswith("api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.isfile(index_path):
+            return FileResponse(index_path)
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+    logger.info(f"Serving frontend SPA from {frontend_dist}")
 else:
     logger.warning(f"Frontend dist not found at {frontend_dist}. API only mode.")
 
