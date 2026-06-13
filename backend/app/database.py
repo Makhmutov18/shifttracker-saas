@@ -21,16 +21,8 @@ async def get_session() -> AsyncSession:
 
 async def init_db():
     async with engine.begin() as conn:
-        # ─── Migration: add new columns (safe for existing tables) ──────────
-        await conn.execute(text("""
-            ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT false,
-                ADD COLUMN IF NOT EXISTS invite_token VARCHAR(64)
-        """))
-
-        # ─── Migration: handle enum change (owner→admin, employee→barista) ─
-        # Drop the old PostgreSQL enum type and convert column to VARCHAR
-        # so SQLAlchemy can recreate the enum with new values via create_all
+        # ─── Step 1: create_all first — ensures tables exist before ALTER ──
+        # Handle enum type cleanup before create_all so it can create fresh enums
         await conn.execute(text("""
             DO $$
             BEGIN
@@ -40,30 +32,66 @@ async def init_db():
                 END IF;
             END $$;
         """))
-
-        # Update old role values to new ones
         await conn.execute(text("UPDATE users SET role = 'admin' WHERE role = 'owner'"))
         await conn.execute(text("UPDATE users SET role = 'barista' WHERE role = 'employee'"))
 
-        # ─── Migration: drop old column ────────────────────────────────────
+        await conn.run_sync(Base.metadata.create_all)
+
+        # ─── Step 2: ALTER TABLE migrations (each in its own DO block) ──────
         await conn.execute(text("""
-            ALTER TABLE users DROP COLUMN IF EXISTS auth_code;
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'is_active') THEN
+                    ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT false;
+                END IF;
+            END $$;
         """))
 
-        # ─── Migration: add revenue/pay_model columns to users ─────────────
         await conn.execute(text("""
-            ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS revenue_percentage NUMERIC(5,2) NOT NULL DEFAULT 0.00,
-                ADD COLUMN IF NOT EXISTS pay_model VARCHAR(16) NOT NULL DEFAULT 'hourly'
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'invite_token') THEN
+                    ALTER TABLE users ADD COLUMN invite_token VARCHAR(64);
+                END IF;
+            END $$;
         """))
 
-        # ─── Migration: add revenue column to shifts ───────────────────────
         await conn.execute(text("""
-            ALTER TABLE shifts
-                ADD COLUMN IF NOT EXISTS revenue NUMERIC(10,2)
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'revenue_percentage') THEN
+                    ALTER TABLE users ADD COLUMN revenue_percentage NUMERIC(5,2) NOT NULL DEFAULT 0.00;
+                END IF;
+            END $$;
         """))
 
-        # ─── Migration: create audit_logs table ────────────────────────────
+        await conn.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'pay_model') THEN
+                    ALTER TABLE users ADD COLUMN pay_model VARCHAR(16) NOT NULL DEFAULT 'hourly';
+                END IF;
+            END $$;
+        """))
+
+        await conn.execute(text("""
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'auth_code') THEN
+                    ALTER TABLE users DROP COLUMN auth_code;
+                END IF;
+            END $$;
+        """))
+
+        await conn.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'shifts' AND column_name = 'revenue') THEN
+                    ALTER TABLE shifts ADD COLUMN revenue NUMERIC(10,2);
+                END IF;
+            END $$;
+        """))
+
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -79,7 +107,6 @@ async def init_db():
             )
         """))
 
-        # ─── Migration: create adjustments table ───────────────────────────
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS adjustments (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,21 +122,6 @@ async def init_db():
             )
         """))
 
-        # ─── Migration: drop old shift_status enum and recreate ─────────────
-        await conn.execute(text("""
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shift_status') THEN
-                    ALTER TABLE shifts ALTER COLUMN status TYPE VARCHAR(16);
-                    DROP TYPE shift_status CASCADE;
-                END IF;
-            END $$;
-        """))
-
-        # ─── Create all tables/enums (safe: skips existing) ────────────────
-        await conn.run_sync(Base.metadata.create_all)
-
-        # ─── Unique index for invite_token (separate from ADD COLUMN) ──────
         await conn.execute(text("""
             CREATE UNIQUE INDEX IF NOT EXISTS ix_users_invite_token
             ON users(invite_token)

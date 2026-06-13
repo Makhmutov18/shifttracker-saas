@@ -151,7 +151,7 @@ async def list_pending_shifts(
 
     query = select(Shift).where(
         Shift.venue_id == user.venue_id,
-        Shift.status == ShiftStatus.pending,
+        Shift.status == "pending",
     ).order_by(Shift.date.desc(), Shift.start_time.desc())
 
     result = await session.execute(query)
@@ -188,11 +188,10 @@ async def update_shift(
     if shift_data.comment is not None:
         shift.comment = shift_data.comment
     if shift_data.status is not None:
-        try:
-            old_status = shift.status.value
-            shift.status = ShiftStatus(shift_data.status)
-        except ValueError:
+        if shift_data.status not in ("pending", "approved", "rejected"):
             raise HTTPException(status_code=400, detail=f"Invalid status: {shift_data.status}")
+        old_status = shift.status
+        shift.status = shift_data.status
 
     # Recalculate if times or revenue changed
     if shift_data.start_time is not None or shift_data.end_time is not None or shift_data.revenue is not None:

@@ -133,8 +133,8 @@ class Shift(Base):
     revenue: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(10, 2), nullable=True
     )
-    status: Mapped[ShiftStatus] = mapped_column(
-        SAEnum(ShiftStatus, name="shift_status"), nullable=False, default=ShiftStatus.pending
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending"
     )
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[DateTime] = mapped_column(

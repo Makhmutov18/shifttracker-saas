@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle, XCircle, UserPlus, Copy, Check, History, Gift, AlertTriangle, RefreshCw } from 'lucide-react';
-import { User, Shift, AuditLog, Adjustment, getPendingShifts, updateShift, createUser, getAuditLogs, createAdjustment, getUsers, AdminCreateUserResponse } from '../utils/api';
+import { ShieldCheck, CheckCircle, XCircle, UserPlus, Copy, Check, History, Gift, AlertTriangle, RefreshCw, Users, Pencil } from 'lucide-react';
+import { User, Shift, AuditLog, Adjustment, getPendingShifts, updateShift, createUser, getAuditLogs, createAdjustment, getUsers, updateUser, AdminCreateUserResponse } from '../utils/api';
 import { formatDate, formatTime, formatCurrency, formatHours } from '../utils/helpers';
 import { hapticSuccess, hapticError } from '../utils/telegram';
 
@@ -8,7 +8,7 @@ interface Props {
   user: User;
 }
 
-type Tab = 'invite' | 'approve' | 'audit' | 'adjust';
+type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team';
 
 export default function OwnerPanel({ user }: Props) {
   const [tab, setTab] = useState<Tab>('invite');
@@ -66,12 +66,24 @@ export default function OwnerPanel({ user }: Props) {
           <History className="w-4 h-4 inline mr-1" />
           История
         </button>
+        <button
+          onClick={() => setTab('team')}
+          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'team'
+              ? 'bg-tg-bg text-tg-text shadow-sm'
+              : 'text-tg-hint'
+          }`}
+        >
+          <Users className="w-4 h-4 inline mr-1" />
+          Команда
+        </button>
       </div>
 
       {tab === 'invite' && <InviteTab />}
       {tab === 'approve' && <ApproveTab />}
       {tab === 'adjust' && <AdjustTab venueId={user.venue_id} />}
       {tab === 'audit' && <AuditTab />}
+      {tab === 'team' && <TeamTab />}
     </div>
   );
 }
@@ -450,6 +462,162 @@ function ApproveTab() {
               Отклонить
             </button>
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Team Tab ───────────────────────────────────────────────────────────────
+
+const ROLE_OPTIONS = [
+  { value: 'barista', label: 'Бариста' },
+  { value: 'cook', label: 'Повар' },
+  { value: 'senior', label: 'Старший' },
+  { value: 'senior_cook', label: 'Шеф-повар' },
+  { value: 'admin', label: 'Админ' },
+];
+
+function TeamTab() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editRate, setEditRate] = useState('');
+  const [editRole, setEditRole] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await getUsers();
+      setUsers(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const startEdit = (user: User) => {
+    setEditingUser(user);
+    setEditName(user.name);
+    setEditRate(user.hourly_rate);
+    setEditRole(user.role);
+  };
+
+  const saveEdit = async () => {
+    if (!editingUser) return;
+    setSaving(true);
+    try {
+      const updated = await updateUser(editingUser.id, {
+        name: editName,
+        hourly_rate: parseFloat(editRate) || 0,
+        role: editRole as any,
+      });
+      hapticSuccess();
+      setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));
+      setEditingUser(null);
+    } catch (err: any) {
+      hapticError();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-tg-hint text-sm mb-2">
+        Сотрудников: {users.length}
+      </p>
+
+      {users.map((u) => (
+        <div key={u.id} className="bg-tg-secondary-bg rounded-xl p-4">
+          {editingUser?.id === u.id ? (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                placeholder="Имя"
+              />
+              <input
+                type="number"
+                value={editRate}
+                onChange={(e) => setEditRate(e.target.value)}
+                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                placeholder="Ставка ₽/ч"
+                min="0"
+                step="0.01"
+              />
+              <select
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value)}
+                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none appearance-none"
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={saveEdit}
+                  disabled={saving}
+                  className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
+                >
+                  {saving ? (
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Сохранить
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold text-sm">
+                  {u.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-tg-text font-medium text-sm">{u.name}</p>
+                  <p className="text-tg-hint text-xs">
+                    {ROLE_OPTIONS.find(r => r.value === u.role)?.label || u.role} · {formatCurrency(u.hourly_rate)}/ч
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => startEdit(u)}
+                className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+              >
+                <Pencil className="w-4 h-4 text-tg-hint" />
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
