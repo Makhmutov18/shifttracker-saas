@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle, UserPlus, Copy, Check, History, Gift, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, CheckCircle, XCircle, UserPlus, Copy, Check, History, Gift, AlertTriangle, RefreshCw } from 'lucide-react';
 import { User, Shift, AuditLog, Adjustment, getPendingShifts, updateShift, createUser, getAuditLogs, createAdjustment, getUsers, AdminCreateUserResponse } from '../utils/api';
 import { formatDate, formatTime, formatCurrency, formatHours } from '../utils/helpers';
 import { hapticSuccess, hapticError } from '../utils/telegram';
@@ -297,14 +297,31 @@ function InviteTab() {
 function ApproveTab() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
 
   const fetchShifts = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await getPendingShifts();
       setShifts(data);
-    } catch {
-      // ignore
+
+      // Fetch user names for each unique user_id
+      const userIds = [...new Set(data.map(s => s.user_id))];
+      const names: Record<string, string> = {};
+      for (const uid of userIds) {
+        try {
+          // We'll use the getUsers endpoint and find by id
+          const users = await getUsers();
+          for (const u of users) {
+            names[u.id] = u.name;
+          }
+        } catch {}
+      }
+      setUserNames(names);
+    } catch (err: any) {
+      setError(err.message || 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
@@ -312,11 +329,24 @@ function ApproveTab() {
 
   useEffect(() => {
     fetchShifts();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchShifts, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (shiftId: string) => {
     try {
       await updateShift(shiftId, { status: 'approved' });
+      hapticSuccess();
+      setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+    } catch {
+      hapticError();
+    }
+  };
+
+  const handleReject = async (shiftId: string) => {
+    try {
+      await updateShift(shiftId, { status: 'rejected' });
       hapticSuccess();
       setShifts((prev) => prev.filter((s) => s.id !== shiftId));
     } catch {
@@ -334,6 +364,22 @@ function ApproveTab() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-400 text-sm mb-2">Ошибка загрузки</p>
+        <p className="text-tg-hint text-xs mb-4">{error}</p>
+        <button
+          onClick={fetchShifts}
+          className="text-tg-primary text-sm font-medium flex items-center gap-1 mx-auto"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Повторить
+        </button>
+      </div>
+    );
+  }
+
   if (shifts.length === 0) {
     return (
       <div className="text-center py-12">
@@ -346,9 +392,18 @@ function ApproveTab() {
 
   return (
     <div className="space-y-3">
-      <p className="text-tg-hint text-sm mb-2">
-        Ожидают утверждения: {shifts.length}
-      </p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-tg-hint text-sm">
+          Ожидают утверждения: {shifts.length}
+        </p>
+        <button
+          onClick={fetchShifts}
+          className="text-tg-primary text-xs font-medium flex items-center gap-1"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Обновить
+        </button>
+      </div>
       {shifts.map((shift) => (
         <div
           key={shift.id}
@@ -357,10 +412,10 @@ function ApproveTab() {
           <div className="flex items-start justify-between mb-3">
             <div>
               <p className="text-tg-text font-medium text-sm">
-                {formatDate(shift.date)}
+                {userNames[shift.user_id] || 'Сотрудник'}
               </p>
               <p className="text-tg-hint text-xs">
-                {formatTime(shift.start_time)} — {formatTime(shift.end_time)}
+                {formatDate(shift.date)} · {formatTime(shift.start_time)} — {formatTime(shift.end_time)}
               </p>
             </div>
             <div className="text-right">
@@ -386,6 +441,13 @@ function ApproveTab() {
             >
               <CheckCircle className="w-4 h-4" />
               Утвердить
+            </button>
+            <button
+              onClick={() => handleReject(shift.id)}
+              className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform"
+            >
+              <XCircle className="w-4 h-4" />
+              Отклонить
             </button>
           </div>
         </div>

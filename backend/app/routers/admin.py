@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
+from typing import Optional
+from pydantic import BaseModel, Field
 
 from app.database import get_session
 from app.models import User, UserRole, AuditLog, PayModel
@@ -118,3 +120,112 @@ async def list_users(
     )
     users = result.scalars().all()
     return users
+
+
+class AdminUpdateUser(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    role: Optional[str] = Field(None, pattern="^(owner|admin|senior|barista|cook|senior_cook)$")
+    hourly_rate: Optional[Decimal] = Field(None, ge=0)
+    revenue_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
+    pay_model: Optional[str] = Field(None, pattern="^(hourly|revenue|hybrid)$")
+    is_active: Optional[bool] = None
+
+
+@router.patch("/users/{user_id}", response_model=UserOut)
+async def update_user(
+    user_id: str,
+    body: AdminUpdateUser,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update a user's information."""
+    import uuid
+    from sqlalchemy.orm import selectinload
+
+    target = await session.execute(
+        select(User)
+        .options(selectinload(User.venue))
+        .where(User.id == uuid.UUID(user_id), User.venue_id == admin.venue_id)
+    )
+    user = target.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_values = {}
+    if body.name is not None:
+        old_values["name"] = user.name
+        user.name = body.name
+    if body.role is not None:
+        old_values["role"] = user.role.value
+        user.role = UserRole(body.role)
+    if body.hourly_rate is not None:
+        old_values["hourly_rate"] = str(user.hourly_rate)
+        user.hourly_rate = body.hourly_rate
+    if body.revenue_percentage is not None:
+        old_values["revenue_percentage"] = str(user.revenue_percentage)
+        user.revenue_percentage = body.revenue_percentage
+    if body.pay_model is not None:
+        old_values["pay_model"] = user.pay_model.value
+        user.pay_model = PayModel(body.pay_model)
+    if body.is_active is not None:
+        old_values["is_active"] = user.is_active
+        user.is_active = body.is_active
+
+    await session.commit()
+    await session.refresh(user)
+
+    # Audit log
+    log = AuditLog(
+        user_id=admin.id,
+        target_user_id=user.id,
+        venue_id=admin.venue_id,
+        action="user_updated",
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_values if old_values else None,
+        new_value={k: str(v) for k, v in body.model_dump(exclude_none=True).items()},
+    )
+    session.add(log)
+    await session.commit()
+
+    return user
+
+
+@router.delete("/users/{user_id}")
+async def deactivate_user(
+    user_id: str,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Deactivate a user (soft delete)."""
+    import uuid
+    from sqlalchemy.orm import selectinload
+
+    target = await session.execute(
+        select(User)
+        .options(selectinload(User.venue))
+        .where(User.id == uuid.UUID(user_id), User.venue_id == admin.venue_id)
+    )
+    user = target.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
+
+    user.is_active = False
+    await session.commit()
+
+    # Audit log
+    log = AuditLog(
+        user_id=admin.id,
+        target_user_id=user.id,
+        venue_id=admin.venue_id,
+        action="user_deactivated",
+        entity_type="user",
+        entity_id=user.id,
+    )
+    session.add(log)
+    await session.commit()
+
+    return {"ok": True}

@@ -5,18 +5,18 @@
 :root {
   --tg-bg: #fafafa;
   --tg-text: #1a1a1a;
-  --tg-hint: #86868b;
+  --tg-hint: #636366;
   --tg-link: #2481cc;
   --tg-primary: #2481cc;
   --tg-button: #2481cc;
   --tg-button-text: #ffffff;
-  --tg-secondary-bg: #f0f0f2;
+  --tg-secondary-bg: #ececee;
 }
 
 .dark {
   --tg-bg: #000000;
   --tg-text: #f5f5f7;
-  --tg-hint: #86868b;
+  --tg-hint: #98989d;
   --tg-link: #64b5f6;
   --tg-primary: #64b5f6;
   --tg-button: #64b5f6;
@@ -64,15 +64,17 @@ body, button, input, select, textarea {
 
 /* Liquid Glass card style */
 .glass-card {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
 }
 
 .dark .glass-card {
-  background: rgba(28, 28, 30, 0.72);
+  background: rgba(28, 28, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* Safe area for bottom nav */

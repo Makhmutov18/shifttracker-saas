@@ -5,8 +5,9 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
-import csv
 import io
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill
 
 from app.database import get_session
 from app.models import User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType
@@ -512,7 +513,7 @@ async def list_adjustments(
 
 # ─── CSV Export ──────────────────────────────────────────────────────────────
 
-@router.get("/export/csv")
+@router.get("/export/xlsx")
 async def export_csv(
     month: int | None = None,
     year: int | None = None,
@@ -562,26 +563,36 @@ async def export_csv(
         else:
             adj_by_user[uid]["penalties"] += adj.amount
 
-    # Build CSV
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
+    # Build Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Расчёт"
+
+    # Styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="2481CC", end_color="2481CC", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+
+    # Headers
+    headers = [
         "Сотрудник", "Дата", "Часы", "Ставка/ч", "Выручка", "% от выручки",
-        "Модель оплаты", "Бонусы", "Штрафы", "Итого ЗП"
-    ])
+        "Модель оплаты", "Итого ЗП"
+    ]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
 
     user_totals: dict[uuid.UUID, dict] = {}
+    row = 2
 
     for shift, shift_user in shifts_with_users:
-        # Calculate revenue part
         rev_pct = shift_user.revenue_percentage or Decimal("0")
         revenue = shift.revenue or Decimal("0")
-        rev_part = (revenue * rev_pct / Decimal("100")).quantize(Decimal("0.01")) if rev_pct > 0 else Decimal("0")
 
-        # Get adjustments for this user
         user_adj = adj_by_user.get(shift.user_id, {"bonuses": Decimal("0"), "penalties": Decimal("0")})
 
-        # Track totals per user
         if shift.user_id not in user_totals:
             user_totals[shift.user_id] = {
                 "name": shift_user.name,
@@ -593,47 +604,62 @@ async def export_csv(
         user_totals[shift.user_id]["hours"] += shift.total_hours
         user_totals[shift.user_id]["salary"] += shift.salary_earned
 
-        writer.writerow([
-            shift_user.name,
-            str(shift.date),
-            str(shift.total_hours),
-            str(shift_user.hourly_rate),
-            str(revenue) if revenue else "",
-            str(rev_pct) if rev_pct else "",
-            shift_user.pay_model.value,
-            "",  # Bonuses shown in summary row
-            "",  # Penalties shown in summary row
-            str(shift.salary_earned),
-        ])
+        ws.cell(row=row, column=1, value=shift_user.name)
+        ws.cell(row=row, column=2, value=str(shift.date))
+        ws.cell(row=row, column=3, value=float(shift.total_hours))
+        ws.cell(row=row, column=4, value=float(shift_user.hourly_rate))
+        ws.cell(row=row, column=5, value=float(revenue) if revenue else None)
+        ws.cell(row=row, column=6, value=float(rev_pct) if rev_pct else None)
+        ws.cell(row=row, column=7, value=shift_user.pay_model.value)
+        ws.cell(row=row, column=8, value=float(shift.salary_earned))
+        row += 1
 
-    # Add summary rows per user
-    output.write("\n")
-    writer.writerow(["ИТОГО ПО СОТРУДНИКАМ"])
-    writer.writerow(["Сотрудник", "Всего часов", "ЗП за смены", "Бонусы", "Штрафы", "Итого к выплате"])
+    # Summary section
+    row += 1
+    summary_header = ws.cell(row=row, column=1, value="ИТОГО ПО СОТРУДНИКАМ")
+    summary_header.font = Font(bold=True, size=12)
+    row += 1
+
+    summary_headers = ["Сотрудник", "Всего часов", "ЗП за смены", "Бонусы", "Штрафы", "Итого к выплате"]
+    for col, header in enumerate(summary_headers, 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="E8F4FD", end_color="E8F4FD", fill_type="solid")
+    row += 1
 
     for uid, totals in user_totals.items():
         net = totals["salary"] + totals["bonuses"] - totals["penalties"]
-        writer.writerow([
-            totals["name"],
-            str(totals["hours"]),
-            str(totals["salary"]),
-            str(totals["bonuses"]),
-            str(totals["penalties"]),
-            str(net.quantize(Decimal("0.01"))),
-        ])
+        ws.cell(row=row, column=1, value=totals["name"])
+        ws.cell(row=row, column=2, value=float(totals["hours"]))
+        ws.cell(row=row, column=3, value=float(totals["salary"]))
+        ws.cell(row=row, column=4, value=float(totals["bonuses"]))
+        ws.cell(row=row, column=5, value=float(totals["penalties"]))
+        ws.cell(row=row, column=6, value=float(net.quantize(Decimal("0.01"))))
+        row += 1
 
+    # Auto-width columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 30)
+
+    # Save to buffer
+    output = io.BytesIO()
+    wb.save(output)
     output.seek(0)
 
-    # Generate filename
     month_names = [
         "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
         "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
     ]
-    filename = f"raschet_{month_names[m-1]}_{y}.csv"
+    filename = f"raschet_{month_names[m-1]}_{y}.xlsx"
 
     return StreamingResponse(
-        iter([output.getvalue().encode("utf-8-sig")]),
-        media_type="text/csv",
+        iter([output.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 

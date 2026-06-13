@@ -71,18 +71,8 @@ export default function Profile({ user, onBack }: Props) {
       {/* Profile card */}
       <div className="bg-tg-secondary-bg rounded-2xl p-5 mb-4">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-tg-bg flex items-center justify-center overflow-hidden">
-            {user.telegram_id ? (
-              <img
-                src={`https://t.me/i/userpic/size_192x192/${user.telegram_id}`}
-                alt={user.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            ) : null}
-            <User className="w-8 h-8 text-tg-hint absolute" />
+          <div className="w-16 h-16 rounded-full bg-tg-primary flex items-center justify-center text-white text-xl font-bold">
+            {user.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <h2 className="text-xl font-semibold text-tg-text">{user.name}</h2>

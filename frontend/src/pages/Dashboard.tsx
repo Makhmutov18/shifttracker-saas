@@ -23,8 +23,8 @@ export default function Dashboard({ user, onNavigate }: Props) {
         className="flex items-center justify-between mb-6 cursor-pointer active:scale-[0.98] transition-transform"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-tg-secondary-bg flex items-center justify-center">
-            <User className="w-6 h-6 text-tg-hint" />
+          <div className="w-12 h-12 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold">
+            {user.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
@@ -40,6 +40,11 @@ export default function Dashboard({ user, onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Current date */}
+      <p className="text-sm text-tg-hint mb-4">
+        {new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+      </p>
 
       {/* Stats */}
       {stats && <StatsWidget stats={stats} loading={loading} />}

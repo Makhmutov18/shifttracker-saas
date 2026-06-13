@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Clock, Coffee, Send } from 'lucide-react';
+import { ArrowLeft, Clock, Coffee, Send, CheckCircle } from 'lucide-react';
 import { User, createShift } from '../utils/api';
 import { getTodayDate, getYesterdayDate, formatCurrency, formatHours } from '../utils/helpers';
 import { hapticSuccess, hapticError } from '../utils/telegram';
@@ -19,6 +19,7 @@ export default function ShiftForm({ user, onBack }: Props) {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState<{ hours: string; salary: string } | null>(null);
 
   const needsRevenue = user.pay_model !== 'hourly';
 
@@ -61,11 +62,11 @@ export default function ShiftForm({ user, onBack }: Props) {
         start_time: startTime + ':00',
         end_time: endTime + ':00',
         cashier_hours: cashierEnabled ? parseFloat(cashierHours) || 0 : undefined,
-        revenue: needsRevenue ? parseFloat(revenue) || undefined : undefined,
+        revenue: needsRevenue ? (parseFloat(revenue) || 0) : undefined,
         comment: comment || undefined,
       });
       hapticSuccess();
-      onBack();
+      setSaved({ hours: totalHours, salary });
     } catch (err: any) {
       hapticError();
       setError(err.message || 'Ошибка при сохранении смены');
@@ -76,6 +77,33 @@ export default function ShiftForm({ user, onBack }: Props) {
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
+      {/* Success screen */}
+      {saved && (
+        <div className="text-center py-12">
+          <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-10 h-10 text-emerald-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-tg-text mb-2">Смена сохранена!</h2>
+          <p className="text-tg-hint text-sm mb-6">
+            {date === getTodayDate() ? 'Сегодня' : 'Вчера'}, {startTime} — {endTime}
+          </p>
+          <div className="glass-card bg-gradient-to-br from-tg-primary/90 to-blue-600/90 rounded-2xl p-5 text-white mb-6">
+            <p className="text-sm opacity-80 mb-1">Начислено</p>
+            <p className="text-3xl font-bold">{formatCurrency(saved.salary)}</p>
+            <p className="text-sm opacity-80 mt-1">{formatHours(saved.hours)}</p>
+          </div>
+          <button
+            onClick={onBack}
+            className="w-full bg-tg-primary text-tg-button-text font-semibold py-4 px-6 rounded-2xl active:scale-[0.98] transition-transform"
+          >
+            На главную
+          </button>
+        </div>
+      )}
+
+      {/* Form (hidden when saved) */}
+      {!saved && (
+        <>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-tg-secondary-bg transition-colors">
@@ -232,6 +260,8 @@ export default function ShiftForm({ user, onBack }: Props) {
         <Send className="w-5 h-5" />
         {submitting ? 'Сохранение...' : 'Сохранить смену'}
       </button>
+        </>
+      )}
     </div>
   );
 }

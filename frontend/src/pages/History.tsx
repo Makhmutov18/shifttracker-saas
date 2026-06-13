@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, CreditCard, TrendingDown, Download } from 'lucide-react';
-import { User, getExportCsvUrl } from '../utils/api';
+import { User, getExportUrl } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import ShiftCard from '../components/ShiftCard';
@@ -17,8 +17,8 @@ export default function History({ user }: Props) {
   const [month, setMonth] = useState(getCurrentMonth());
   const [year] = useState(getCurrentYear());
 
-  const { shifts, loading: shiftsLoading } = useShifts(month, year);
-  const { expenses, loading: expensesLoading } = useExpenses(month, year);
+  const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
+  const { expenses, loading: expensesLoading, error: expensesError } = useExpenses(month, year);
 
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -46,13 +46,13 @@ export default function History({ user }: Props) {
       {/* Export button (admin only) */}
       {user.role !== 'barista' && user.role !== 'cook' && (
         <a
-          href={getExportCsvUrl(month, year)}
+          href={getExportUrl(month, year)}
           target="_blank"
           rel="noopener noreferrer"
           className="w-full mb-4 bg-tg-secondary-bg text-tg-text py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         >
           <Download className="w-4 h-4" />
-          Скачать отчёт за {getMonthName(month)}
+          Скачать отчёт за {getMonthName(month)} (.xlsx)
         </a>
       )}
 
@@ -85,6 +85,11 @@ export default function History({ user }: Props) {
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
             ))}
+          </div>
+        ) : shiftsError ? (
+          <div className="text-center py-12">
+            <p className="text-red-400 text-sm mb-2">Ошибка загрузки</p>
+            <p className="text-tg-hint text-xs">{shiftsError}</p>
           </div>
         ) : shifts.length === 0 ? (
           <div className="text-center py-12">

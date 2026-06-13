@@ -261,13 +261,32 @@ export async function getUsers(): Promise<User[]> {
   return request<User[]>('/admin/users');
 }
 
+export interface AdminUpdateUser {
+  name?: string;
+  role?: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
+  hourly_rate?: number;
+  revenue_percentage?: number;
+  pay_model?: 'hourly' | 'revenue' | 'hybrid';
+  is_active?: boolean;
+}
+
+export async function updateUser(userId: string, data: AdminUpdateUser): Promise<User> {
+  return request<User>(`/admin/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await request(`/admin/users/${userId}`, { method: 'DELETE' });
+}
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
-export function getExportCsvUrl(month?: number, year?: number): string {
+export function getExportUrl(month?: number, year?: number): string {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
   const qs = params.toString();
-  const initData = getInitData();
-  return `${API_BASE}/export/csv${qs ? `?${qs}` : ''}`;
+  return `${API_BASE}/export/xlsx${qs ? `?${qs}` : ''}`;
 }
