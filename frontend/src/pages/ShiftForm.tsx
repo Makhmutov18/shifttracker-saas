@@ -147,7 +147,7 @@ export default function ShiftForm({ user, onBack }: Props) {
             type="time"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            className="w-full bg-tg-secondary-bg text-tg-text text-lg font-semibold px-4 py-3 rounded-xl border-none outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-50"
+            className="w-full bg-white text-[#111827] text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
           />
         </div>
         <div>
@@ -159,7 +159,7 @@ export default function ShiftForm({ user, onBack }: Props) {
             type="time"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            className="w-full bg-tg-secondary-bg text-tg-text text-lg font-semibold px-4 py-3 rounded-xl border-none outline-none appearance-none [&::-webkit-calendar-picker-indicator]:opacity-50"
+            className="w-full bg-white text-[#111827] text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
           />
         </div>
       </div>
@@ -192,7 +192,7 @@ export default function ShiftForm({ user, onBack }: Props) {
               min="0"
               max="24"
               placeholder="Количество часов"
-              className="w-full bg-tg-bg text-tg-text px-4 py-2.5 rounded-xl text-sm outline-none"
+              className="w-full bg-white text-[#111827] px-4 py-2.5 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
             />
           </div>
         )}
@@ -211,7 +211,7 @@ export default function ShiftForm({ user, onBack }: Props) {
             min="0"
             step="0.01"
             placeholder="Введите выручку"
-            className="w-full bg-tg-secondary-bg text-tg-text px-4 py-3 rounded-xl text-sm outline-none"
+            className="w-full bg-white text-[#111827] px-4 py-3 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
           />
           {user.pay_model === 'hybrid' && (
             <p className="text-tg-hint text-xs mt-1">
@@ -233,7 +233,7 @@ export default function ShiftForm({ user, onBack }: Props) {
           onChange={(e) => setComment(e.target.value)}
           placeholder="Комментарий (необязательно)"
           rows={2}
-          className="w-full bg-tg-secondary-bg text-tg-text px-4 py-3 rounded-xl text-sm outline-none resize-none placeholder:text-tg-hint"
+          className="w-full bg-white text-[#111827] px-4 py-3 rounded-xl text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
         />
       </div>
 

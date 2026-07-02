@@ -116,14 +116,28 @@ export default function Profile({ user, onBack }: Props) {
               <p className="text-xs opacity-70">Смены</p>
               <p className="font-semibold">{stats.shifts_count}</p>
             </div>
-            <div className="bg-white/10 rounded-xl p-3">
-              <p className="text-xs opacity-70">Бонусы</p>
-              <p className="font-semibold text-emerald-200">+{formatCurrency(stats.total_bonuses)}</p>
-            </div>
-            <div className="bg-white/10 rounded-xl p-3">
-              <p className="text-xs opacity-70">Штрафы</p>
-              <p className="font-semibold text-rose-200">-{formatCurrency(stats.total_penalties)}</p>
-            </div>
+            {parseFloat(String(stats.total_bonuses)) > 0 ? (
+              <div className="bg-white/10 rounded-xl p-3">
+                <p className="text-xs opacity-70">Бонусы</p>
+                <p className="font-semibold text-emerald-200">+{formatCurrency(stats.total_bonuses)}</p>
+              </div>
+            ) : (
+              <div className="bg-white/10 rounded-xl p-3">
+                <p className="text-xs opacity-70">Бонусы</p>
+                <p className="font-semibold">Бонусов нет</p>
+              </div>
+            )}
+            {parseFloat(String(stats.total_penalties)) > 0 ? (
+              <div className="bg-white/10 rounded-xl p-3">
+                <p className="text-xs opacity-70">Штрафы</p>
+                <p className="font-semibold text-rose-200">-{formatCurrency(stats.total_penalties)}</p>
+              </div>
+            ) : (
+              <div className="bg-white/10 rounded-xl p-3">
+                <p className="text-xs opacity-70">Штрафы</p>
+                <p className="font-semibold">Штрафов нет</p>
+              </div>
+            )}
           </div>
         </div>
       )}

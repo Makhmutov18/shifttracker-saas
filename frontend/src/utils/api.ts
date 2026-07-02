@@ -5,29 +5,70 @@ function getInitData(): string {
   return tg?.initData || '';
 }
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function readResponseBody(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return '';
+  }
+}
+
+function extractErrorMessage(body: string, fallback: string, status: number): string {
+  if (!body) {
+    return `${fallback}: HTTP ${status}`;
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed === 'string') return parsed || `${fallback}: HTTP ${status}`;
+    if (parsed && typeof parsed === 'object') {
+      const detail = (parsed as Record<string, unknown>).detail;
+      const message = (parsed as Record<string, unknown>).message;
+      if (typeof detail === 'string' && detail.trim()) return detail;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+  } catch {
+    // ignore parse errors and fall back to raw body
+  }
+
+  return body.trim() || `${fallback}: HTTP ${status}`;
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const initData = getInitData();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Init-Data': initData,
-    ...(options.headers as Record<string, string> || {}),
   };
+
+  if (initData) {
+    headers['X-Init-Data'] = initData;
+  }
+
+  if (options.headers) {
+    Object.assign(headers, options.headers as Record<string, string>);
+  }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
   });
 
+  const body = await readResponseBody(response);
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
+    throw new Error(extractErrorMessage(body, 'Не удалось выполнить запрос', response.status));
   }
 
-  return response.json();
+  if (!body) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    return body as T;
+  }
 }
 
 // ─── User ───────────────────────────────────────────────────────────────────
@@ -330,8 +371,8 @@ export async function downloadPayrollExport(month?: number, year?: number): Prom
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
+    const body = await readResponseBody(response);
+    throw new Error(extractErrorMessage(body, 'Не удалось скачать отчет', response.status));
   }
 
   return response.blob();

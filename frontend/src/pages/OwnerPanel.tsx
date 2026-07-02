@@ -332,16 +332,26 @@ function ApproveTab() {
     try {
       setLoading(true);
       setError(null);
-      const [data, users] = await Promise.all([getPendingShifts(), getUsers()]);
+      const [dataResult, usersResult] = await Promise.allSettled([getPendingShifts(), getUsers()]);
+      if (dataResult.status === 'rejected') {
+        throw dataResult.reason;
+      }
+
+      const data = dataResult.value;
       setShifts(data);
-      setUserNames(
-        users.reduce<Record<string, string>>((acc, current) => {
-          acc[current.id] = current.name;
-          return acc;
-        }, {})
-      );
+
+      if (usersResult.status === 'fulfilled') {
+        setUserNames(
+          usersResult.value.reduce<Record<string, string>>((acc, current) => {
+            acc[current.id] = current.name;
+            return acc;
+          }, {})
+        );
+      } else {
+        setUserNames({});
+      }
     } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки');
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить смены на подтверждение');
     } finally {
       setLoading(false);
     }
@@ -496,7 +506,7 @@ function ApproveTab() {
                       type="time"
                       value={draft.start_time}
                       onChange={(e) => setDraft((prev) => (prev ? { ...prev, start_time: e.target.value } : prev))}
-                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5"
                     />
                   </div>
                   <div>
@@ -505,7 +515,7 @@ function ApproveTab() {
                       type="time"
                       value={draft.end_time}
                       onChange={(e) => setDraft((prev) => (prev ? { ...prev, end_time: e.target.value } : prev))}
-                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5"
                     />
                   </div>
                 </div>
@@ -520,7 +530,7 @@ function ApproveTab() {
                       min="0"
                       step="0.01"
                       placeholder="0"
-                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5 placeholder:text-gray-400"
                     />
                   </div>
                   <div>
@@ -532,7 +542,7 @@ function ApproveTab() {
                       min="0"
                       step="0.01"
                       placeholder="0"
-                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5 placeholder:text-gray-400"
                     />
                   </div>
                 </div>
@@ -544,7 +554,7 @@ function ApproveTab() {
                     onChange={(e) => setDraft((prev) => (prev ? { ...prev, comment: e.target.value } : prev))}
                     rows={2}
                     placeholder="Комментарий к смене"
-                    className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
+                    className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -875,7 +885,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
             placeholder="Например: 500"
             min="0"
             step="0.01"
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+            className="w-full bg-white text-[#111827] rounded-xl px-4 py-3 text-sm outline-none border border-black/5 placeholder:text-gray-400 focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
           />
         </div>
 
@@ -886,7 +896,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
             onChange={(e) => setReason(e.target.value)}
             placeholder="Например: Отличная работа на смене"
             rows={2}
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none resize-none placeholder:text-tg-hint"
+            className="w-full bg-white text-[#111827] rounded-xl px-4 py-3 text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
           />
         </div>
 
