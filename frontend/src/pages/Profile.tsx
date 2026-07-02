@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle, History } from 'lucide-react';
-import { User as UserType, AuditLog, Adjustment, getAuditLogs, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
+import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle } from 'lucide-react';
+import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours, getMonthName, getCurrentMonth, getCurrentYear } from '../utils/helpers';
 
 interface Props {
@@ -26,20 +26,15 @@ const PAY_MODEL_LABELS: Record<string, string> = {
 export default function Profile({ user, onBack }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const isAdminContext = ['owner', 'admin', 'senior'].includes(user.role);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsData, adjData, logsData] = await Promise.all([
-          getMonthlyStats(),
-          getAdjustments(),
-          getAuditLogs(1, 20),
-        ]);
+        const [statsData, adjData] = await Promise.all([getMonthlyStats(), getAdjustments()]);
         setStats(statsData);
         setAdjustments(adjData);
-        setAuditLogs(logsData);
       } catch {
         // ignore
       } finally {
@@ -169,34 +164,11 @@ export default function Profile({ user, onBack }: Props) {
         </div>
       )}
 
-      {/* Personal audit log */}
-      {auditLogs.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-tg-hint mb-2">Последние действия</h3>
-          <div className="space-y-2">
-            {auditLogs.slice(0, 10).map((log) => (
-              <div key={log.id} className="bg-tg-secondary-bg rounded-xl p-3 flex items-start gap-3">
-                <History className="w-4 h-4 text-tg-hint mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-tg-text text-sm">
-                    {log.action === 'shift_created' && 'Создал смену'}
-                    {log.action === 'shift_approved' && 'Смена одобрена'}
-                    {log.action === 'shift_edited' && 'Смена отредактирована'}
-                    {log.action === 'bonus_added' && 'Начислен бонус'}
-                    {log.action === 'penalty_added' && 'Наложен штраф'}
-                  </p>
-                  <p className="text-tg-hint text-xs">
-                    {new Date(log.created_at).toLocaleString('ru-RU', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {!isAdminContext && (
+        <div className="mt-4 rounded-2xl border border-dashed border-tg-secondary-bg/80 bg-tg-secondary-bg/40 p-4">
+          <p className="text-sm text-tg-hint">
+            История действий и общий журнал изменений доступны в разделе управления для администраторов.
+          </p>
         </div>
       )}
     </div>
