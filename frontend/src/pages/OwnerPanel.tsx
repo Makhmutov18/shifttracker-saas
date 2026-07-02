@@ -1,14 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle, XCircle, UserPlus, Copy, Check, History, Gift, AlertTriangle, RefreshCw, Users, Pencil } from 'lucide-react';
-import { User, Shift, AuditLog, Adjustment, getPendingShifts, updateShift, createUser, getAuditLogs, createAdjustment, getUsers, updateUser, AdminCreateUserResponse } from '../utils/api';
-import { formatDate, formatTime, formatCurrency, formatHours } from '../utils/helpers';
-import { hapticSuccess, hapticError } from '../utils/telegram';
+import React, { useEffect, useState } from 'react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle,
+  Copy,
+  Gift,
+  History,
+  Pencil,
+  RefreshCw,
+  ShieldCheck,
+  UserPlus,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import {
+  AdminCreateUserResponse,
+  AuditLog,
+  Shift,
+  User,
+  createAdjustment,
+  createUser,
+  getAuditLogs,
+  getPendingShifts,
+  getUsers,
+  updateShift,
+  updateUser,
+} from '../utils/api';
+import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
+import { hapticError, hapticSuccess } from '../utils/telegram';
 
 interface Props {
   user: User;
 }
 
 type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team';
+
+type ShiftDraft = {
+  start_time: string;
+  end_time: string;
+  cashier_hours: string;
+  revenue: string;
+  comment: string;
+};
 
 export default function OwnerPanel({ user }: Props) {
   const [tab, setTab] = useState<Tab>('invite');
@@ -20,14 +53,11 @@ export default function OwnerPanel({ user }: Props) {
         <h1 className="text-lg font-semibold">Управление</h1>
       </div>
 
-      {/* Tab switcher */}
       <div className="flex bg-tg-secondary-bg rounded-xl p-1 mb-6 overflow-x-auto">
         <button
           onClick={() => setTab('invite')}
           className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'invite'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint'
+            tab === 'invite' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
           }`}
         >
           <UserPlus className="w-4 h-4 inline mr-1" />
@@ -36,9 +66,7 @@ export default function OwnerPanel({ user }: Props) {
         <button
           onClick={() => setTab('approve')}
           className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'approve'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint'
+            tab === 'approve' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
           }`}
         >
           <CheckCircle className="w-4 h-4 inline mr-1" />
@@ -47,9 +75,7 @@ export default function OwnerPanel({ user }: Props) {
         <button
           onClick={() => setTab('adjust')}
           className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'adjust'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint'
+            tab === 'adjust' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
           }`}
         >
           <Gift className="w-4 h-4 inline mr-1" />
@@ -58,9 +84,7 @@ export default function OwnerPanel({ user }: Props) {
         <button
           onClick={() => setTab('audit')}
           className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'audit'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint'
+            tab === 'audit' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
           }`}
         >
           <History className="w-4 h-4 inline mr-1" />
@@ -69,9 +93,7 @@ export default function OwnerPanel({ user }: Props) {
         <button
           onClick={() => setTab('team')}
           className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'team'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint'
+            tab === 'team' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
           }`}
         >
           <Users className="w-4 h-4 inline mr-1" />
@@ -87,8 +109,6 @@ export default function OwnerPanel({ user }: Props) {
     </div>
   );
 }
-
-// ─── Invite Tab ─────────────────────────────────────────────────────────────
 
 function InviteTab() {
   const [firstName, setFirstName] = useState('');
@@ -139,12 +159,11 @@ function InviteTab() {
   const handleCopy = async () => {
     if (!result) return;
     try {
-      await       navigator.clipboard.writeText(result.invite_link);
+      await navigator.clipboard.writeText(result.invite_link);
       hapticSuccess();
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
       const input = document.createElement('input');
       input.value = result.invite_link;
       document.body.appendChild(input);
@@ -159,7 +178,6 @@ function InviteTab() {
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* First name */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Имя сотрудника</label>
           <input
@@ -171,7 +189,6 @@ function InviteTab() {
           />
         </div>
 
-        {/* Role */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Роль</label>
           <div className="grid grid-cols-2 gap-2">
@@ -187,9 +204,7 @@ function InviteTab() {
                 type="button"
                 onClick={() => setRole(r.value)}
                 className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                  role === r.value
-                    ? 'bg-tg-primary text-white'
-                    : 'bg-tg-secondary-bg text-tg-hint'
+                  role === r.value ? 'bg-tg-primary text-white' : 'bg-tg-secondary-bg text-tg-hint'
                 }`}
               >
                 {r.label}
@@ -198,7 +213,6 @@ function InviteTab() {
           </div>
         </div>
 
-        {/* Hourly rate */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Почасовая ставка (₽)</label>
           <input
@@ -213,7 +227,6 @@ function InviteTab() {
           />
         </div>
 
-        {/* Pay model */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Модель оплаты</label>
           <div className="flex gap-2">
@@ -227,9 +240,7 @@ function InviteTab() {
                 type="button"
                 onClick={() => setPayModel(m.value)}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                  payModel === m.value
-                    ? 'bg-tg-primary text-white'
-                    : 'bg-tg-secondary-bg text-tg-hint'
+                  payModel === m.value ? 'bg-tg-primary text-white' : 'bg-tg-secondary-bg text-tg-hint'
                 }`}
               >
                 {m.label}
@@ -238,7 +249,6 @@ function InviteTab() {
           </div>
         </div>
 
-        {/* Revenue percentage (for revenue/hybrid models) */}
         {payModel !== 'hourly' && (
           <div>
             <label className="block text-sm text-tg-hint mb-1.5">% от выручки</label>
@@ -255,9 +265,7 @@ function InviteTab() {
           </div>
         )}
 
-        {error && (
-          <p className="text-red-400 text-sm">{error}</p>
-        )}
+        {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <button
           type="submit"
@@ -275,10 +283,9 @@ function InviteTab() {
         </button>
       </form>
 
-      {/* Result */}
       {result && (
         <div className="mt-6 bg-tg-secondary-bg rounded-xl p-4 space-y-3">
-          <p className="text-sm text-tg-hint">Сотрудник создан! Отправь ему эту ссылку:</p>
+          <p className="text-sm text-tg-hint">Сотрудник создан. Отправьте ему эту ссылку:</p>
           <div className="bg-tg-bg rounded-lg px-3 py-2.5 text-sm text-tg-text break-all select-all font-mono">
             {result.invite_link}
           </div>
@@ -289,7 +296,7 @@ function InviteTab() {
             {copied ? (
               <>
                 <Check className="w-4 h-4" />
-                Скопировано!
+                Скопировано
               </>
             ) : (
               <>
@@ -304,34 +311,35 @@ function InviteTab() {
   );
 }
 
-// ─── Approve Tab ────────────────────────────────────────────────────────────
-
 function ApproveTab() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ShiftDraft | null>(null);
+  const [savingShiftId, setSavingShiftId] = useState<string | null>(null);
+
+  const buildDraft = (shift: Shift): ShiftDraft => ({
+    start_time: shift.start_time.slice(0, 5),
+    end_time: shift.end_time.slice(0, 5),
+    cashier_hours: shift.cashier_hours ? String(shift.cashier_hours) : '',
+    revenue: shift.revenue ? String(shift.revenue) : '',
+    comment: shift.comment || '',
+  });
 
   const fetchShifts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getPendingShifts();
+      const [data, users] = await Promise.all([getPendingShifts(), getUsers()]);
       setShifts(data);
-
-      // Fetch user names for each unique user_id
-      const userIds = [...new Set(data.map(s => s.user_id))];
-      const names: Record<string, string> = {};
-      for (const uid of userIds) {
-        try {
-          // We'll use the getUsers endpoint and find by id
-          const users = await getUsers();
-          for (const u of users) {
-            names[u.id] = u.name;
-          }
-        } catch {}
-      }
-      setUserNames(names);
+      setUserNames(
+        users.reduce<Record<string, string>>((acc, current) => {
+          acc[current.id] = current.name;
+          return acc;
+        }, {})
+      );
     } catch (err: any) {
       setError(err.message || 'Ошибка загрузки');
     } finally {
@@ -341,28 +349,71 @@ function ApproveTab() {
 
   useEffect(() => {
     fetchShifts();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchShifts, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  const startEdit = (shift: Shift) => {
+    setEditingShiftId(shift.id);
+    setDraft(buildDraft(shift));
+  };
+
+  const cancelEdit = () => {
+    setEditingShiftId(null);
+    setDraft(null);
+  };
+
+  const saveEdit = async (shiftId: string) => {
+    if (!draft) return;
+
+    try {
+      setSavingShiftId(shiftId);
+      const updated = await updateShift(shiftId, {
+        start_time: draft.start_time || undefined,
+        end_time: draft.end_time || undefined,
+        cashier_hours: draft.cashier_hours === '' ? undefined : parseFloat(draft.cashier_hours),
+        revenue: draft.revenue === '' ? undefined : parseFloat(draft.revenue),
+        comment: draft.comment.trim() || undefined,
+      });
+      setShifts((prev) => prev.map((shift) => (shift.id === shiftId ? updated : shift)));
+      hapticSuccess();
+      cancelEdit();
+    } catch {
+      hapticError();
+    } finally {
+      setSavingShiftId(null);
+    }
+  };
+
   const handleApprove = async (shiftId: string) => {
     try {
+      setSavingShiftId(shiftId);
       await updateShift(shiftId, { status: 'approved' });
       hapticSuccess();
       setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+      if (editingShiftId === shiftId) {
+        cancelEdit();
+      }
     } catch {
       hapticError();
+    } finally {
+      setSavingShiftId(null);
     }
   };
 
   const handleReject = async (shiftId: string) => {
     try {
+      setSavingShiftId(shiftId);
       await updateShift(shiftId, { status: 'rejected' });
       hapticSuccess();
       setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+      if (editingShiftId === shiftId) {
+        cancelEdit();
+      }
     } catch {
       hapticError();
+    } finally {
+      setSavingShiftId(null);
     }
   };
 
@@ -396,7 +447,7 @@ function ApproveTab() {
     return (
       <div className="text-center py-12">
         <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-        <p className="text-tg-text font-medium mb-1">Всё чисто</p>
+        <p className="text-tg-text font-medium mb-1">Все чисто</p>
         <p className="text-tg-hint text-sm">Нет смен, ожидающих утверждения</p>
       </div>
     );
@@ -405,9 +456,7 @@ function ApproveTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-tg-hint text-sm">
-          Ожидают утверждения: {shifts.length}
-        </p>
+        <p className="text-tg-hint text-sm">Ожидают утверждения: {shifts.length}</p>
         <button
           onClick={fetchShifts}
           className="text-tg-primary text-xs font-medium flex items-center gap-1"
@@ -416,59 +465,151 @@ function ApproveTab() {
           Обновить
         </button>
       </div>
-      {shifts.map((shift) => (
-        <div
-          key={shift.id}
-          className="bg-tg-secondary-bg rounded-xl p-4"
-        >
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-tg-text font-medium text-sm">
-                {userNames[shift.user_id] || 'Сотрудник'}
-              </p>
-              <p className="text-tg-hint text-xs">
-                {formatDate(shift.date)} · {formatTime(shift.start_time)} — {formatTime(shift.end_time)}
-              </p>
+
+      {shifts.map((shift) => {
+        const isEditing = editingShiftId === shift.id && draft;
+        const isSaving = savingShiftId === shift.id;
+
+        return (
+          <div key={shift.id} className="bg-tg-secondary-bg rounded-xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-tg-text font-medium text-sm">
+                  {userNames[shift.user_id] || 'Сотрудник'}
+                </p>
+                <p className="text-tg-hint text-xs">
+                  {formatDate(shift.date)} · {formatTime(shift.start_time)} — {formatTime(shift.end_time)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-tg-text font-semibold text-sm">{formatCurrency(shift.salary_earned)}</p>
+                <p className="text-tg-hint text-xs">{formatHours(shift.total_hours)}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-tg-text font-semibold text-sm">
-                {formatCurrency(shift.salary_earned)}
-              </p>
-              <p className="text-tg-hint text-xs">
-                {formatHours(shift.total_hours)}
-              </p>
+
+            {isEditing ? (
+              <div className="space-y-3 bg-tg-bg rounded-xl p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Начало</label>
+                    <input
+                      type="time"
+                      value={draft.start_time}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, start_time: e.target.value } : prev))}
+                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Конец</label>
+                    <input
+                      type="time"
+                      value={draft.end_time}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, end_time: e.target.value } : prev))}
+                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Часы кассы</label>
+                    <input
+                      type="number"
+                      value={draft.cashier_hours}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, cashier_hours: e.target.value } : prev))}
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Выручка</label>
+                    <input
+                      type="number"
+                      value={draft.revenue}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, revenue: e.target.value } : prev))}
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-tg-hint mb-1">Комментарий</label>
+                  <textarea
+                    value={draft.comment}
+                    onChange={(e) => setDraft((prev) => (prev ? { ...prev, comment: e.target.value } : prev))}
+                    rows={2}
+                    placeholder="Комментарий к смене"
+                    className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEdit(shift.id)}
+                    disabled={isSaving}
+                    className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                  >
+                    {isSaving ? (
+                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Сохранить правки
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={isSaving}
+                    className="flex-1 bg-tg-secondary-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            ) : shift.comment ? (
+              <p className="text-tg-hint text-xs bg-tg-bg rounded-lg px-3 py-2">{shift.comment}</p>
+            ) : null}
+
+            {!isEditing && (
+              <button
+                onClick={() => startEdit(shift)}
+                className="w-full bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform"
+              >
+                <Pencil className="w-4 h-4" />
+                Исправить перед утверждением
+              </button>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleApprove(shift.id)}
+                disabled={isSaving || Boolean(editingShiftId === shift.id && draft)}
+                className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Утвердить
+              </button>
+              <button
+                onClick={() => handleReject(shift.id)}
+                disabled={isSaving}
+                className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform disabled:opacity-60"
+              >
+                <XCircle className="w-4 h-4" />
+                Отклонить
+              </button>
             </div>
           </div>
-
-          {shift.comment && (
-            <p className="text-tg-hint text-xs mb-3 bg-tg-bg rounded-lg px-3 py-2">
-              {shift.comment}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleApprove(shift.id)}
-              className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-            >
-              <CheckCircle className="w-4 h-4" />
-              Утвердить
-            </button>
-            <button
-              onClick={() => handleReject(shift.id)}
-              className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform"
-            >
-              <XCircle className="w-4 h-4" />
-              Отклонить
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
-
-// ─── Team Tab ───────────────────────────────────────────────────────────────
 
 const ROLE_OPTIONS = [
   { value: 'barista', label: 'Бариста' },
@@ -520,9 +661,9 @@ function TeamTab() {
         role: editRole as any,
       });
       hapticSuccess();
-      setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
       setEditingUser(null);
-    } catch (err: any) {
+    } catch {
       hapticError();
     } finally {
       setSaving(false);
@@ -541,9 +682,7 @@ function TeamTab() {
 
   return (
     <div className="space-y-3">
-      <p className="text-tg-hint text-sm mb-2">
-        Сотрудников: {users.length}
-      </p>
+      <p className="text-tg-hint text-sm mb-2">Сотрудников: {users.length}</p>
 
       {users.map((u) => (
         <div key={u.id} className="bg-tg-secondary-bg rounded-xl p-4">
@@ -606,7 +745,7 @@ function TeamTab() {
                 <div>
                   <p className="text-tg-text font-medium text-sm">{u.name}</p>
                   <p className="text-tg-hint text-xs">
-                    {ROLE_OPTIONS.find(r => r.value === u.role)?.label || u.role} · {formatCurrency(u.hourly_rate)}/ч
+                    {ROLE_OPTIONS.find((r) => r.value === u.role)?.label || u.role} · {formatCurrency(u.hourly_rate)}/ч
                   </p>
                 </div>
               </div>
@@ -623,8 +762,6 @@ function TeamTab() {
     </div>
   );
 }
-
-// ─── Adjust Tab ─────────────────────────────────────────────────────────────
 
 function AdjustTab({ venueId }: { venueId: string }) {
   const [userId, setUserId] = useState('');
@@ -689,7 +826,6 @@ function AdjustTab({ venueId }: { venueId: string }) {
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* User selector */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Сотрудник</label>
           <select
@@ -704,7 +840,6 @@ function AdjustTab({ venueId }: { venueId: string }) {
           </select>
         </div>
 
-        {/* Type toggle */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Тип</label>
           <div className="flex gap-2">
@@ -712,9 +847,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
               type="button"
               onClick={() => setType('bonus')}
               className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-                type === 'bonus'
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-tg-secondary-bg text-tg-hint'
+                type === 'bonus' ? 'bg-emerald-500 text-white' : 'bg-tg-secondary-bg text-tg-hint'
               }`}
             >
               <Gift className="w-4 h-4" />
@@ -724,9 +857,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
               type="button"
               onClick={() => setType('penalty')}
               className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-                type === 'penalty'
-                  ? 'bg-rose-500 text-white'
-                  : 'bg-tg-secondary-bg text-tg-hint'
+                type === 'penalty' ? 'bg-rose-500 text-white' : 'bg-tg-secondary-bg text-tg-hint'
               }`}
             >
               <AlertTriangle className="w-4 h-4" />
@@ -735,7 +866,6 @@ function AdjustTab({ venueId }: { venueId: string }) {
           </div>
         </div>
 
-        {/* Amount */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Сумма (₽)</label>
           <input
@@ -749,7 +879,6 @@ function AdjustTab({ venueId }: { venueId: string }) {
           />
         </div>
 
-        {/* Reason */}
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Причина</label>
           <textarea
@@ -762,7 +891,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
         </div>
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
-        {success && <p className="text-emerald-400 text-sm">Создано!</p>}
+        {success && <p className="text-emerald-400 text-sm">Создано</p>}
 
         <button
           type="submit"
@@ -783,11 +912,10 @@ function AdjustTab({ venueId }: { venueId: string }) {
   );
 }
 
-// ─── Audit Tab ──────────────────────────────────────────────────────────────
-
 const ACTION_LABELS: Record<string, string> = {
   shift_created: 'Создал смену',
   shift_approved: 'Утвердил смену',
+  shift_rejected: 'Отклонил смену',
   shift_edited: 'Отредактировал смену',
   user_created: 'Создал сотрудника',
   bonus_added: 'Начислил бонус',
@@ -842,11 +970,11 @@ function AuditTab() {
           <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
             log.action.includes('approved') || log.action.includes('created')
               ? 'bg-emerald-50 dark:bg-emerald-900/20'
-              : log.action.includes('penalty')
+              : log.action.includes('penalty') || log.action.includes('rejected')
               ? 'bg-rose-50 dark:bg-rose-900/20'
               : 'bg-blue-50 dark:bg-blue-900/20'
           }`}>
-            {log.action.includes('penalty') ? (
+            {log.action.includes('penalty') || log.action.includes('rejected') ? (
               <AlertTriangle className="w-4 h-4 text-rose-500" />
             ) : log.action.includes('bonus') ? (
               <Gift className="w-4 h-4 text-emerald-500" />
@@ -856,8 +984,7 @@ function AuditTab() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-tg-text text-sm">
-              <span className="font-medium">{log.user_name || 'Пользователь'}</span>
-              {' '}
+              <span className="font-medium">{log.user_name || 'Пользователь'}</span>{' '}
               <span className="text-tg-hint">{ACTION_LABELS[log.action] || log.action}</span>
               {log.target_user_name && (
                 <> <span className="text-tg-hint">для</span> <span className="font-medium">{log.target_user_name}</span></>

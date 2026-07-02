@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, Clock } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { Shift } from '../utils/api';
 import { formatDate, formatTime, formatCurrency, formatHours } from '../utils/helpers';
 
@@ -11,30 +11,36 @@ export default function ShiftCard({ shift }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const isApproved = shift.status === 'approved';
+  const isRejected = shift.status === 'rejected';
+  const statusLabel = isApproved ? 'Одобрено' : isRejected ? 'Отклонено' : 'На проверке';
 
   return (
     <div
       className="glass-card rounded-xl overflow-hidden transition-all duration-200 cursor-pointer"
       onClick={() => setExpanded(!expanded)}
     >
-      {/* Collapsed header */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-            isApproved
-              ? 'bg-emerald-50 dark:bg-emerald-900/20'
-              : 'bg-amber-50 dark:bg-amber-900/20'
-          }`}>
-            {isApproved
-              ? <CheckCircle className="w-5 h-5 text-emerald-500" />
-              : <Clock className="w-5 h-5 text-amber-500" />
-            }
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              isApproved
+                ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                : isRejected
+                ? 'bg-rose-50 dark:bg-rose-900/20'
+                : 'bg-amber-50 dark:bg-amber-900/20'
+            }`}
+          >
+            {isApproved ? (
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
+            ) : isRejected ? (
+              <XCircle className="w-5 h-5 text-rose-500" />
+            ) : (
+              <Clock className="w-5 h-5 text-amber-500" />
+            )}
           </div>
           <div>
             <p className="text-tg-text font-medium text-sm">{formatDate(shift.date)}</p>
-            <p className="text-tg-hint text-xs">
-              {isApproved ? 'Одобрено' : 'На проверке'}
-            </p>
+            <p className={`text-xs ${isRejected ? 'text-rose-400' : 'text-tg-hint'}`}>{statusLabel}</p>
           </div>
         </div>
         <div className="text-right">
@@ -46,10 +52,11 @@ export default function ShiftCard({ shift }: Props) {
         </div>
       </div>
 
-      {/* Expanded details */}
-      <div className={`overflow-hidden transition-all duration-200 ${
-        expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-      }`}>
+      <div
+        className={`overflow-hidden transition-all duration-200 ${
+          expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
         <div className="px-4 pb-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
           <div className="flex justify-between text-sm">
             <span className="text-tg-hint">Приход</span>

@@ -15,6 +15,7 @@ from app.schemas import (
     UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
+    PayrollSummaryOut, PayrollSummaryRow,
 )
 from app.auth import validate_init_data, extract_user_from_init_data
 from app.utils import calculate_hours, calculate_salary
@@ -210,15 +211,21 @@ async def update_shift(
     await session.refresh(shift)
 
     # Audit log
+    action = "shift_edited"
+    if shift_data.status == "approved":
+        action = "shift_approved"
+    elif shift_data.status == "rejected":
+        action = "shift_rejected"
+
     log = AuditLog(
         user_id=user.id,
         target_user_id=shift.user_id,
         venue_id=user.venue_id,
-        action="shift_approved" if shift_data.status == "approved" else "shift_edited",
+        action=action,
         entity_type="shift",
         entity_id=shift.id,
         old_value={"status": old_status} if shift_data.status else None,
-        new_value={"status": shift.status.value, "salary": str(shift.salary_earned)},
+        new_value={"status": shift.status, "salary": str(shift.salary_earned)},
     )
     session.add(log)
     await session.commit()
@@ -241,6 +248,160 @@ async def update_shift(
                 )
 
     return shift
+
+
+@router.get("/payroll/summary", response_model=PayrollSummaryOut)
+async def payroll_summary(
+    month: int | None = None,
+    year: int | None = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
+        raise HTTPException(status_code=403, detail="Only admins/seniors can view payroll summary")
+
+    now = datetime.now(timezone.utc)
+    m = month or now.month
+    y = year or now.year
+
+    users_result = await session.execute(
+        select(User)
+        .where(User.venue_id == user.venue_id, User.is_active == True)
+        .order_by(User.name)
+    )
+    venue_users = users_result.scalars().all()
+
+    shifts_result = await session.execute(
+        select(Shift, User)
+        .join(User, Shift.user_id == User.id)
+        .where(
+            Shift.venue_id == user.venue_id,
+            func.extract("month", Shift.date) == m,
+            func.extract("year", Shift.date) == y,
+        )
+        .order_by(User.name, Shift.date)
+    )
+    shifts_with_users = shifts_result.all()
+
+    adjustments_result = await session.execute(
+        select(Adjustment, User)
+        .join(User, Adjustment.user_id == User.id)
+        .where(
+            Adjustment.venue_id == user.venue_id,
+            Adjustment.month == m,
+            Adjustment.year == y,
+        )
+        .order_by(User.name)
+    )
+    adjustments_with_users = adjustments_result.all()
+
+    rows_by_user: dict[uuid.UUID, dict] = {
+        member.id: {
+            "user_id": member.id,
+            "user_name": member.name,
+            "approved_shifts_count": 0,
+            "total_hours": Decimal("0.00"),
+            "shift_payout": Decimal("0.00"),
+            "bonuses": Decimal("0.00"),
+            "penalties": Decimal("0.00"),
+        }
+        for member in venue_users
+    }
+
+    pending_shifts_count = 0
+    approved_shifts_count = 0
+
+    for shift, shift_user in shifts_with_users:
+        if shift.status == "pending":
+            pending_shifts_count += 1
+            continue
+
+        if shift.status != "approved":
+            continue
+
+        approved_shifts_count += 1
+        row = rows_by_user.setdefault(
+            shift.user_id,
+            {
+                "user_id": shift.user_id,
+                "user_name": shift_user.name,
+                "approved_shifts_count": 0,
+                "total_hours": Decimal("0.00"),
+                "shift_payout": Decimal("0.00"),
+                "bonuses": Decimal("0.00"),
+                "penalties": Decimal("0.00"),
+            },
+        )
+        row["approved_shifts_count"] += 1
+        row["total_hours"] += shift.total_hours
+        row["shift_payout"] += shift.salary_earned
+
+    for adjustment, adjustment_user in adjustments_with_users:
+        row = rows_by_user.setdefault(
+            adjustment.user_id,
+            {
+                "user_id": adjustment.user_id,
+                "user_name": adjustment_user.name,
+                "approved_shifts_count": 0,
+                "total_hours": Decimal("0.00"),
+                "shift_payout": Decimal("0.00"),
+                "bonuses": Decimal("0.00"),
+                "penalties": Decimal("0.00"),
+            },
+        )
+        if adjustment.type == AdjustmentType.bonus:
+            row["bonuses"] += adjustment.amount
+        else:
+            row["penalties"] += adjustment.amount
+
+    rows: list[PayrollSummaryRow] = []
+    total_hours = Decimal("0.00")
+    total_shift_payout = Decimal("0.00")
+    total_bonuses = Decimal("0.00")
+    total_penalties = Decimal("0.00")
+
+    for row in rows_by_user.values():
+        total_payout = row["shift_payout"] + row["bonuses"] - row["penalties"]
+        total_hours += row["total_hours"]
+        total_shift_payout += row["shift_payout"]
+        total_bonuses += row["bonuses"]
+        total_penalties += row["penalties"]
+
+        if (
+            row["approved_shifts_count"] == 0
+            and row["bonuses"] == Decimal("0.00")
+            and row["penalties"] == Decimal("0.00")
+        ):
+            continue
+
+        rows.append(
+            PayrollSummaryRow(
+                user_id=row["user_id"],
+                user_name=row["user_name"],
+                approved_shifts_count=row["approved_shifts_count"],
+                total_hours=row["total_hours"],
+                shift_payout=row["shift_payout"],
+                bonuses=row["bonuses"],
+                penalties=row["penalties"],
+                total_payout=total_payout,
+            )
+        )
+
+    rows.sort(key=lambda item: (-item.total_payout, item.user_name.lower()))
+
+    return PayrollSummaryOut(
+        month=m,
+        year=y,
+        employees_count=len(venue_users),
+        pending_shifts_count=pending_shifts_count,
+        approved_shifts_count=approved_shifts_count,
+        total_hours=total_hours,
+        total_shift_payout=total_shift_payout,
+        total_bonuses=total_bonuses,
+        total_penalties=total_penalties,
+        total_payout=total_shift_payout + total_bonuses - total_penalties,
+        rows=rows,
+    )
 
 
 # ─── Expenses ────────────────────────────────────────────────────────────────
@@ -520,6 +681,9 @@ async def export_csv(
     session: AsyncSession = Depends(get_session),
 ):
     """Export monthly payroll data as CSV for accounting."""
+    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
+        raise HTTPException(status_code=403, detail="Only admins/seniors can export payroll data")
+
     now = datetime.now(timezone.utc)
     m = month or now.month
     y = year or now.year

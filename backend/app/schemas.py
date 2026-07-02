@@ -119,6 +119,31 @@ class MonthlyStats(BaseModel):
     shifts_count: int = 0
 
 
+class PayrollSummaryRow(BaseModel):
+    user_id: uuid.UUID
+    user_name: str
+    approved_shifts_count: int = 0
+    total_hours: Decimal = Decimal("0.00")
+    shift_payout: Decimal = Decimal("0.00")
+    bonuses: Decimal = Decimal("0.00")
+    penalties: Decimal = Decimal("0.00")
+    total_payout: Decimal = Decimal("0.00")
+
+
+class PayrollSummaryOut(BaseModel):
+    month: int
+    year: int
+    employees_count: int = 0
+    pending_shifts_count: int = 0
+    approved_shifts_count: int = 0
+    total_hours: Decimal = Decimal("0.00")
+    total_shift_payout: Decimal = Decimal("0.00")
+    total_bonuses: Decimal = Decimal("0.00")
+    total_penalties: Decimal = Decimal("0.00")
+    total_payout: Decimal = Decimal("0.00")
+    rows: list[PayrollSummaryRow] = []
+
+
 # ─── Audit Log ──────────────────────────────────────────────────────────────
 
 class AuditLogOut(BaseModel):

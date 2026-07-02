@@ -67,7 +67,7 @@ export interface Shift {
   total_hours: string;
   salary_earned: string;
   revenue: string | null;
-  status: 'pending' | 'approved';
+  status: 'pending' | 'approved' | 'rejected';
   comment: string | null;
   created_at: string;
 }
@@ -85,6 +85,7 @@ export interface ShiftUpdate {
   start_time?: string;
   end_time?: string;
   cashier_hours?: number;
+  revenue?: number;
   comment?: string;
   status?: string;
 }
@@ -162,12 +163,45 @@ export interface MonthlyStats {
   shifts_count: number;
 }
 
+export interface PayrollSummaryRow {
+  user_id: string;
+  user_name: string;
+  approved_shifts_count: number;
+  total_hours: string;
+  shift_payout: string;
+  bonuses: string;
+  penalties: string;
+  total_payout: string;
+}
+
+export interface PayrollSummary {
+  month: number;
+  year: number;
+  employees_count: number;
+  pending_shifts_count: number;
+  approved_shifts_count: number;
+  total_hours: string;
+  total_shift_payout: string;
+  total_bonuses: string;
+  total_penalties: string;
+  total_payout: string;
+  rows: PayrollSummaryRow[];
+}
+
 export async function getMonthlyStats(month?: number, year?: number): Promise<MonthlyStats> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
   const qs = params.toString();
   return request<MonthlyStats>(`/stats/monthly${qs ? `?${qs}` : ''}`);
+}
+
+export async function getPayrollSummary(month?: number, year?: number): Promise<PayrollSummary> {
+  const params = new URLSearchParams();
+  if (month) params.set('month', String(month));
+  if (year) params.set('year', String(year));
+  const qs = params.toString();
+  return request<PayrollSummary>(`/payroll/summary${qs ? `?${qs}` : ''}`);
 }
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
@@ -283,10 +317,22 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // ─── Export ─────────────────────────────────────────────────────────────────
 
-export function getExportUrl(month?: number, year?: number): string {
+export async function downloadPayrollExport(month?: number, year?: number): Promise<Blob> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
   const qs = params.toString();
-  return `${API_BASE}/export/xlsx${qs ? `?${qs}` : ''}`;
+
+  const response = await fetch(`${API_BASE}/export/xlsx${qs ? `?${qs}` : ''}`, {
+    headers: {
+      'X-Init-Data': getInitData(),
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `HTTP ${response.status}`);
+  }
+
+  return response.blob();
 }
