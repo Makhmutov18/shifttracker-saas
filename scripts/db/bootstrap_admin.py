@@ -18,6 +18,16 @@ if str(BACKEND_DIR) not in sys.path:
 from app.models import Base, PayModel, User, UserRole, Venue  # noqa: E402
 
 
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgresql+asyncpg://"):
+        return url
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    return url
+
+
 def _env(name: str, default: str | None = None) -> str | None:
     value = os.getenv(name)
     if value is None or not value.strip():
@@ -65,7 +75,7 @@ def _parse_payment_model(raw: str) -> PayModel:
 
 
 async def bootstrap() -> None:
-    database_url = _require_env("DATABASE_URL")
+    database_url = _normalize_database_url(_require_env("DATABASE_URL"))
     telegram_id = _parse_telegram_id(_require_env("BOOTSTRAP_TELEGRAM_ID"))
     bootstrap_name_env = _env_present("BOOTSTRAP_NAME")
     bootstrap_name = _env("BOOTSTRAP_NAME", "Owner")

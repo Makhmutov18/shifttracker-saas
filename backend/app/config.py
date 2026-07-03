@@ -47,8 +47,12 @@ class Settings(BaseSettings):
         """Force asyncpg driver for SQLAlchemy async engine.
         Railway provides DATABASE_URL as postgresql://... which defaults to sync psycopg2.
         """
-        if v and v.startswith("postgresql://"):
+        if v.startswith("postgresql+asyncpg://"):
+            return v
+        if v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
         return v
 
     def __init__(self, **kwargs):

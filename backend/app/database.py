@@ -3,7 +3,18 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 from app.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgresql+asyncpg://"):
+        return url
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    return url
+
+
+engine = create_async_engine(_normalize_database_url(settings.DATABASE_URL), echo=settings.DEBUG)
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -21,23 +32,24 @@ async def get_session() -> AsyncSession:
 
 async def init_db():
     async with engine.begin() as conn:
-        # ─── Step 1: create_all first — ensures tables exist before ALTER ──
-        # Handle enum type cleanup before create_all so it can create fresh enums
+        # Ensure all mapped tables exist before any runtime compatibility SQL runs.
+        await conn.run_sync(Base.metadata.create_all)
+
         await conn.execute(text("""
             DO $$
             BEGIN
-                IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-                    ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(16);
-                    DROP TYPE user_role CASCADE;
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'users'
+                ) THEN
+                    UPDATE users SET role = 'admin' WHERE role = 'owner';
+                    UPDATE users SET role = 'barista' WHERE role = 'employee';
                 END IF;
             END $$;
         """))
-        await conn.execute(text("UPDATE users SET role = 'admin' WHERE role = 'owner'"))
-        await conn.execute(text("UPDATE users SET role = 'barista' WHERE role = 'employee'"))
 
-        await conn.run_sync(Base.metadata.create_all)
-
-        # ─── Step 2: ALTER TABLE migrations (each in its own DO block) ──────
+        # Runtime compatibility SQL must only run after create_all.
         await conn.execute(text("""
             DO $$ BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns
