@@ -10,8 +10,15 @@ env/
 node_modules/
 frontend/dist/
 
+# Backups / database dumps
+backups/
+*.dump
+*.sql
+*.backup
+
 # Environment
 .env
+.env.*
 backend/.env
 
 # IDE
