@@ -22,8 +22,10 @@ from app.utils import calculate_hours, calculate_salary
 from app.notifications import notify_shift_approved, notify_shift_rejected, notify_bonus_added, notify_penalty_added
 
 import uuid
+import logging
 
 router = APIRouter(prefix="/api", tags=["api"])
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -104,17 +106,26 @@ async def create_shift(
     await session.commit()
     await session.refresh(shift)
 
-    # Audit log
-    log = AuditLog(
-        user_id=user.id,
-        venue_id=user.venue_id,
-        action="shift_created",
-        entity_type="shift",
-        entity_id=shift.id,
-        new_value={"date": str(shift.date), "start_time": str(shift.start_time), "end_time": str(shift.end_time), "salary": str(shift.salary_earned)},
-    )
-    session.add(log)
-    await session.commit()
+    # Audit logging should not break a successfully saved shift.
+    try:
+        log = AuditLog(
+            user_id=user.id,
+            venue_id=user.venue_id,
+            action="shift_created",
+            entity_type="shift",
+            entity_id=shift.id,
+            new_value={
+                "date": str(shift.date),
+                "start_time": str(shift.start_time),
+                "end_time": str(shift.end_time),
+                "salary": str(shift.salary_earned),
+            },
+        )
+        session.add(log)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("Audit log write failed after successful shift creation", extra={"shift_id": str(shift.id)})
 
     return shift
 

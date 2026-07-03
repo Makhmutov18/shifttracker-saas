@@ -34,6 +34,18 @@ function extractErrorMessage(body: string, fallback: string, status: number): st
   return body.trim() || `${fallback}: HTTP ${status}`;
 }
 
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const initData = getInitData();
 

@@ -28,7 +28,13 @@ export default function App() {
       case 'dashboard':
         return <Dashboard user={user} onNavigate={setPage} />;
       case 'shift':
-        return <ShiftForm user={user} onBack={() => setPage('dashboard')} />;
+        return (
+          <ShiftForm
+            user={user}
+            onBack={() => setPage('dashboard')}
+            onOpenHistory={() => setPage('history')}
+          />
+        );
       case 'history':
         return <History user={user} />;
       case 'owner':

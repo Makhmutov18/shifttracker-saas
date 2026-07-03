@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import date, time
+from datetime import date, time, datetime
 from decimal import Decimal
 import uuid
 
@@ -80,7 +80,7 @@ class ShiftOut(BaseModel):
     revenue: Optional[Decimal] = None
     status: str
     comment: Optional[str]
-    created_at: str
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -102,7 +102,7 @@ class ExpenseOut(BaseModel):
     category: str
     comment: Optional[str]
     date: date
-    created_at: str
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -155,7 +155,7 @@ class AuditLogOut(BaseModel):
     entity_id: Optional[uuid.UUID] = None
     old_value: Optional[dict] = None
     new_value: Optional[dict] = None
-    created_at: str
+    created_at: datetime
     user_name: Optional[str] = None
     target_user_name: Optional[str] = None
 
@@ -180,7 +180,7 @@ class AdjustmentOut(BaseModel):
     created_by: uuid.UUID
     month: int
     year: int
-    created_at: str
+    created_at: datetime
     user_name: Optional[str] = None
     creator_name: Optional[str] = None
 
