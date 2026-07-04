@@ -25,6 +25,21 @@ function extractErrorMessage(body: string, fallback: string, status: number): st
       const detail = (parsed as Record<string, unknown>).detail;
       const message = (parsed as Record<string, unknown>).message;
       if (typeof detail === 'string' && detail.trim()) return detail;
+      if (Array.isArray(detail) && detail.length > 0) {
+        const validationMessage = detail
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const msg = (item as Record<string, unknown>).msg;
+            const loc = (item as Record<string, unknown>).loc;
+            const formattedLoc = Array.isArray(loc) ? loc.join(' -> ') : '';
+            if (typeof msg === 'string' && formattedLoc) return `${formattedLoc}: ${msg}`;
+            if (typeof msg === 'string') return msg;
+            return null;
+          })
+          .filter((item): item is string => Boolean(item))
+          .join('; ');
+        if (validationMessage) return validationMessage;
+      }
       if (typeof message === 'string' && message.trim()) return message;
     }
   } catch {
@@ -69,7 +84,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const body = await readResponseBody(response);
 
   if (!response.ok) {
-    throw new Error(extractErrorMessage(body, 'Не удалось выполнить запрос', response.status));
+    throw new Error(extractErrorMessage(body, 'Не удалось выполнить действие. Попробуйте ещё раз.', response.status));
   }
 
   if (!body) {
@@ -83,7 +98,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 }
 
-// ─── User ───────────────────────────────────────────────────────────────────
+// User
 
 export interface Venue {
   id: string;
@@ -107,7 +122,7 @@ export async function getMe(): Promise<User> {
   return request<User>('/me');
 }
 
-// ─── Shifts ─────────────────────────────────────────────────────────────────
+// Shifts
 
 export interface Shift {
   id: string;
@@ -169,7 +184,7 @@ export async function updateShift(id: string, data: ShiftUpdate): Promise<Shift>
   });
 }
 
-// ─── Expenses ───────────────────────────────────────────────────────────────
+// Expenses
 
 export interface Expense {
   id: string;
@@ -204,7 +219,7 @@ export async function getExpenses(month?: number, year?: number): Promise<Expens
   return request<Expense[]>(`/expenses${qs ? `?${qs}` : ''}`);
 }
 
-// ─── Stats ──────────────────────────────────────────────────────────────────
+// Stats
 
 export interface MonthlyStats {
   total_earned: string;
@@ -257,7 +272,7 @@ export async function getPayrollSummary(month?: number, year?: number): Promise<
   return request<PayrollSummary>(`/payroll/summary${qs ? `?${qs}` : ''}`);
 }
 
-// ─── Admin ──────────────────────────────────────────────────────────────────
+// Admin
 
 export interface AdminCreateUserRequest {
   first_name: string;
@@ -280,7 +295,7 @@ export async function createUser(data: AdminCreateUserRequest): Promise<AdminCre
   });
 }
 
-// ─── Audit Logs ─────────────────────────────────────────────────────────────
+// Audit Logs
 
 export interface AuditLog {
   id: string;
@@ -304,7 +319,7 @@ export async function getAuditLogs(page?: number, limit?: number): Promise<Audit
   return request<AuditLog[]>(`/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
-// ─── Adjustments ────────────────────────────────────────────────────────────
+// Adjustments
 
 export interface Adjustment {
   id: string;
@@ -342,7 +357,7 @@ export async function getAdjustments(month?: number, year?: number): Promise<Adj
   return request<Adjustment[]>(`/adjustments${qs ? `?${qs}` : ''}`);
 }
 
-// ─── Users (admin) ─────────────────────────────────────────────────────────
+// Users (admin)
 
 export async function getUsers(): Promise<User[]> {
   return request<User[]>('/admin/users');
@@ -368,7 +383,7 @@ export async function deleteUser(userId: string): Promise<void> {
   await request(`/admin/users/${userId}`, { method: 'DELETE' });
 }
 
-// ─── Export ─────────────────────────────────────────────────────────────────
+// Export
 
 export async function downloadPayrollExport(month?: number, year?: number): Promise<Blob> {
   const params = new URLSearchParams();

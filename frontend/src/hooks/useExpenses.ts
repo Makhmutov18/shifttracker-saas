@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getExpenses, Expense } from '../utils/api';
+import { useCallback, useEffect, useState } from 'react';
+import { Expense, getErrorMessage, getExpenses } from '../utils/api';
 import { getCurrentMonth, getCurrentYear } from '../utils/helpers';
 
 export function useExpenses(month?: number, year?: number) {
@@ -16,8 +16,8 @@ export function useExpenses(month?: number, year?: number) {
       setError(null);
       const data = await getExpenses(m, y);
       setExpenses(data);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки расходов');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Не удалось загрузить расходы.'));
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { Shift } from '../utils/api';
-import { formatDate, formatTime, formatCurrency, formatHours } from '../utils/helpers';
+import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
 
 interface Props {
   shift: Shift;
@@ -12,7 +12,14 @@ export default function ShiftCard({ shift }: Props) {
 
   const isApproved = shift.status === 'approved';
   const isRejected = shift.status === 'rejected';
-  const statusLabel = isApproved ? 'Одобрено' : isRejected ? 'Отклонено' : 'На проверке';
+  const isPending = shift.status === 'pending';
+  const statusLabel = isApproved
+    ? 'Утверждена'
+    : isRejected
+    ? 'Отклонена'
+    : isPending
+    ? 'На подтверждении'
+    : 'Статус уточняется';
 
   return (
     <div

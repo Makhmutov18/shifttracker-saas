@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getShifts, Shift } from '../utils/api';
+import { useCallback, useEffect, useState } from 'react';
+import { getErrorMessage, getShifts, Shift } from '../utils/api';
 import { getCurrentMonth, getCurrentYear } from '../utils/helpers';
 
 export function useShifts(month?: number, year?: number) {
@@ -16,8 +16,8 @@ export function useShifts(month?: number, year?: number) {
       setError(null);
       const data = await getShifts(m, y);
       setShifts(data);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки смен');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Не удалось загрузить смены.'));
     } finally {
       setLoading(false);
     }

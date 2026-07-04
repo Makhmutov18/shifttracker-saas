@@ -81,6 +81,20 @@ async def create_shift(
             detail="You can only create shifts for today or yesterday",
         )
 
+    existing_shift_result = await session.execute(
+        select(Shift.id).where(
+            Shift.user_id == user.id,
+            Shift.date == shift_data.date,
+            Shift.status.in_(("pending", "approved")),
+        )
+    )
+    existing_shift_id = existing_shift_result.scalar_one_or_none()
+    if existing_shift_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Смена за этот день уже создана. Дождитесь подтверждения или обратитесь к администратору.",
+        )
+
     # Calculate hours and salary
     total_hours = calculate_hours(shift_data.start_time, shift_data.end_time)
     salary_earned = calculate_salary(
@@ -189,6 +203,8 @@ async def update_shift(
     if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
         raise HTTPException(status_code=403, detail="Only admins/seniors can update shifts")
 
+    old_status = shift.status
+
     if shift_data.start_time is not None:
         shift.start_time = shift_data.start_time
     if shift_data.end_time is not None:
@@ -228,35 +244,42 @@ async def update_shift(
     elif shift_data.status == "rejected":
         action = "shift_rejected"
 
-    log = AuditLog(
-        user_id=user.id,
-        target_user_id=shift.user_id,
-        venue_id=user.venue_id,
-        action=action,
-        entity_type="shift",
-        entity_id=shift.id,
-        old_value={"status": old_status} if shift_data.status else None,
-        new_value={"status": shift.status, "salary": str(shift.salary_earned)},
-    )
-    session.add(log)
-    await session.commit()
+    try:
+        log = AuditLog(
+            user_id=user.id,
+            target_user_id=shift.user_id,
+            venue_id=user.venue_id,
+            action=action,
+            entity_type="shift",
+            entity_id=shift.id,
+            old_value={"status": old_status} if shift_data.status else None,
+            new_value={"status": shift.status, "salary": str(shift.salary_earned)},
+        )
+        session.add(log)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("Audit log write failed after successful shift update", extra={"shift_id": str(shift.id)})
 
     # Send notification to shift owner
     if shift_data.status and shift.user_id:
-        shift_owner = await session.get(User, shift.user_id)
-        if shift_owner and shift_owner.telegram_id:
-            if shift_data.status == "approved":
-                await notify_shift_approved(
-                    shift_owner.telegram_id,
-                    str(shift.date),
-                    str(shift.salary_earned),
-                )
-            elif shift_data.status == "rejected":
-                await notify_shift_rejected(
-                    shift_owner.telegram_id,
-                    str(shift.date),
-                    shift_data.comment or "",
-                )
+        try:
+            shift_owner = await session.get(User, shift.user_id)
+            if shift_owner and shift_owner.telegram_id:
+                if shift_data.status == "approved":
+                    await notify_shift_approved(
+                        shift_owner.telegram_id,
+                        str(shift.date),
+                        str(shift.salary_earned),
+                    )
+                elif shift_data.status == "rejected":
+                    await notify_shift_rejected(
+                        shift_owner.telegram_id,
+                        str(shift.date),
+                        shift_data.comment or "",
+                    )
+        except Exception:
+            logger.exception("Shift notification failed after successful shift update", extra={"shift_id": str(shift.id)})
 
     return shift
 
