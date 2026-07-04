@@ -5,6 +5,7 @@ import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import ShiftCard from '../components/ShiftCard';
 import { getMonthName, getCurrentMonth, getCurrentYear, formatCurrency, formatHours } from '../utils/helpers';
+import { hasPermission } from '../utils/permissions';
 
 interface Props {
   user: User;
@@ -24,10 +25,7 @@ export default function History({ user }: Props) {
 
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
   const { expenses, loading: expensesLoading, error: expensesError } = useExpenses(month, year);
-  const canManagePayroll = useMemo(
-    () => user.role === 'owner' || user.role === 'admin' || user.role === 'senior',
-    [user.role]
-  );
+  const canManagePayroll = useMemo(() => hasPermission(user, 'can_view_team_payroll'), [user]);
 
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 

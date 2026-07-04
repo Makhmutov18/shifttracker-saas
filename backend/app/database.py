@@ -104,18 +104,27 @@ async def init_db():
         """))
 
         await conn.execute(text("""
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'users' AND column_name = 'pay_model') THEN
-                    ALTER TABLE users ADD COLUMN pay_model VARCHAR(16) NOT NULL DEFAULT 'hourly';
-                END IF;
-            END $$;
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'pay_model') THEN
+                ALTER TABLE users ADD COLUMN pay_model VARCHAR(16) NOT NULL DEFAULT 'hourly';
+            END IF;
+        END $$;
         """))
 
         await conn.execute(text("""
-            DO $$ BEGIN
-                IF EXISTS (SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'users' AND column_name = 'auth_code') THEN
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'permissions') THEN
+                ALTER TABLE users ADD COLUMN permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
+            END IF;
+        END $$;
+        """))
+
+        await conn.execute(text("""
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'auth_code') THEN
                     ALTER TABLE users DROP COLUMN auth_code;
                 END IF;
             END $$;

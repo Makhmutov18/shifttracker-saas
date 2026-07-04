@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import BottomNav from './components/BottomNav';
+import { canAccessOwnerPanel } from './utils/permissions';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
@@ -21,7 +22,7 @@ export default function App() {
   if (error) return <ErrorScreen message={error} />;
   if (!user) return <ErrorScreen message="Не удалось загрузить пользователя" />;
 
-  const isAdmin = ['owner', 'admin', 'senior'].includes(user.role);
+  const isAdmin = canAccessOwnerPanel(user);
 
   const renderPage = () => {
     switch (page) {
@@ -38,7 +39,7 @@ export default function App() {
       case 'history':
         return <History user={user} />;
       case 'owner':
-        return <OwnerPanel user={user} />;
+        return canAccessOwnerPanel(user) ? <OwnerPanel user={user} /> : <Dashboard user={user} onNavigate={setPage} />;
       case 'profile':
         return <Profile user={user} onBack={() => setPage('dashboard')} />;
       default:

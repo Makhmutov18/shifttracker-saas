@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle } from 'lucide-react';
 import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours, getMonthName, getCurrentMonth, getCurrentYear } from '../utils/helpers';
+import { canAccessOwnerPanel } from '../utils/permissions';
 
 interface Props {
   user: UserType;
@@ -27,7 +28,7 @@ export default function Profile({ user, onBack }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
-  const isAdminContext = ['owner', 'admin', 'senior'].includes(user.role);
+  const isAdminContext = canAccessOwnerPanel(user);
 
   useEffect(() => {
     const fetchData = async () => {

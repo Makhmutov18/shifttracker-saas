@@ -2,7 +2,7 @@ import secrets
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
 from typing import Optional
@@ -13,6 +13,7 @@ from app.models import User, UserRole, AuditLog, PayModel
 from app.schemas import AdminCreateUser, AdminCreateUserResponse, UserOut
 from app.auth import validate_init_data, extract_user_from_init_data
 from app.config import settings
+from app.permissions import has_permission, validate_permission_map
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,8 @@ async def get_admin_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not has_permission(user, "can_manage_team"):
+        raise HTTPException(status_code=403, detail="Team management access required")
 
     return user
 
@@ -64,12 +65,18 @@ async def create_user(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
 
+    try:
+        permissions = validate_permission_map(body.permissions)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     new_user = User(
         name=body.first_name,
         role=role,
         venue_id=admin.venue_id,
         hourly_rate=body.hourly_rate,
         revenue_percentage=body.revenue_percentage,
+        permissions=permissions,
         pay_model=PayModel(body.pay_model),
         invite_token=invite_token,
         is_active=False,
@@ -129,6 +136,7 @@ class AdminUpdateUser(BaseModel):
     revenue_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
     pay_model: Optional[str] = Field(None, pattern="^(hourly|revenue|hybrid)$")
     is_active: Optional[bool] = None
+    permissions: Optional[dict[str, bool]] = None
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -151,6 +159,24 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if body.role is not None and user.id == admin.id and body.role not in ("owner", "admin"):
+        other_admins_result = await session.execute(
+            select(func.count())
+            .select_from(User)
+            .where(
+                User.venue_id == admin.venue_id,
+                User.id != admin.id,
+                User.role.in_((UserRole.owner, UserRole.admin)),
+                User.is_active == True,
+            )
+        )
+        other_admins_count = other_admins_result.scalar_one() or 0
+        if other_admins_count == 0:
+            raise HTTPException(status_code=400, detail="Cannot remove the last owner/admin access from yourself")
+
+    if body.permissions is not None and user.id == admin.id and admin.role != UserRole.owner:
+        raise HTTPException(status_code=403, detail="Cannot change your own permissions")
+
     old_values = {}
     if body.name is not None:
         old_values["name"] = user.name
@@ -170,6 +196,12 @@ async def update_user(
     if body.is_active is not None:
         old_values["is_active"] = user.is_active
         user.is_active = body.is_active
+    if body.permissions is not None:
+        old_values["permissions"] = user.permissions
+        try:
+            user.permissions = validate_permission_map(body.permissions)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     await session.commit()
     await session.refresh(user)

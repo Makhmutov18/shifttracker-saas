@@ -1,3 +1,5 @@
+import type { PermissionMap } from './permissions';
+
 const API_BASE = '/api';
 
 function getInitData(): string {
@@ -113,6 +115,7 @@ export interface User {
   venue_id: string;
   hourly_rate: string;
   revenue_percentage: string;
+  permissions: PermissionMap;
   pay_model: 'hourly' | 'revenue' | 'hybrid';
   is_active: boolean;
   venue?: Venue;
@@ -280,6 +283,7 @@ export interface AdminCreateUserRequest {
   hourly_rate: number;
   revenue_percentage: number;
   pay_model: 'hourly' | 'revenue' | 'hybrid';
+  permissions?: PermissionMap;
 }
 
 export interface AdminCreateUserResponse {
@@ -370,6 +374,7 @@ export interface AdminUpdateUser {
   revenue_percentage?: number;
   pay_model?: 'hourly' | 'revenue' | 'hybrid';
   is_active?: boolean;
+  permissions?: PermissionMap;
 }
 
 export async function updateUser(userId: string, data: AdminUpdateUser): Promise<User> {

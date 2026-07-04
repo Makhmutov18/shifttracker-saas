@@ -28,6 +28,14 @@ import {
 } from '../utils/api';
 import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
+import {
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  PermissionMap,
+  getDefaultPermissionsForRole,
+  hasPermission,
+  normalizePermissionMap,
+} from '../utils/permissions';
 
 interface Props {
   user: User;
@@ -43,8 +51,69 @@ type ShiftDraft = {
   comment: string;
 };
 
+type PermissionToggleProps = {
+  value: PermissionMap;
+  onChange: (value: PermissionMap) => void;
+  disabled?: boolean;
+};
+
+function PermissionsChecklist({ value, onChange, disabled = false }: PermissionToggleProps) {
+  return (
+    <div className="space-y-2 rounded-2xl border border-black/5 bg-tg-bg p-3">
+      <p className="text-xs font-medium text-tg-hint uppercase tracking-wide">Права доступа</p>
+      <div className="grid gap-2">
+        {PERMISSION_KEYS.map((key) => (
+          <label
+            key={key}
+            className={`flex items-center justify-between gap-3 rounded-xl border border-black/5 px-3 py-2.5 text-sm ${
+              disabled ? 'opacity-60' : 'bg-white'
+            }`}
+          >
+            <span className="text-tg-text">{PERMISSION_LABELS[key]}</span>
+            <input
+              type="checkbox"
+              checked={Boolean(value[key])}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  [key]: event.target.checked,
+                })
+              }
+              className="h-4 w-4 rounded border-gray-300 text-tg-primary focus:ring-tg-primary"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function OwnerPanel({ user }: Props) {
   const [tab, setTab] = useState<Tab>('invite');
+  const canApprove = hasPermission(user, 'can_approve_shifts') || hasPermission(user, 'can_edit_team_shifts');
+  const canManageTeam = hasPermission(user, 'can_manage_team');
+  const canManageAdjustments = hasPermission(user, 'can_manage_adjustments');
+  const canViewAudit = canManageTeam;
+
+  const visibleTabs: { id: Tab; label: string; icon: React.ReactNode; visible: boolean }[] = [
+    { id: 'invite', label: 'Пригласить', icon: <UserPlus className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
+    { id: 'approve', label: 'Утвердить', icon: <CheckCircle className="w-4 h-4 inline mr-1" />, visible: canApprove },
+    { id: 'adjust', label: 'Бонусы', icon: <Gift className="w-4 h-4 inline mr-1" />, visible: canManageAdjustments },
+    { id: 'audit', label: 'История', icon: <History className="w-4 h-4 inline mr-1" />, visible: canViewAudit },
+    { id: 'team', label: 'Команда', icon: <Users className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
+  ];
+
+  const activeTabs = visibleTabs.filter((item) => item.visible);
+
+  useEffect(() => {
+    if (activeTabs.length === 0) {
+      return;
+    }
+    if (!activeTabs.some((item) => item.id === tab)) {
+      setTab(activeTabs[0].id);
+    }
+  }, [activeTabs, tab]);
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
@@ -54,58 +123,25 @@ export default function OwnerPanel({ user }: Props) {
       </div>
 
       <div className="flex bg-tg-secondary-bg rounded-xl p-1 mb-6 overflow-x-auto">
-        <button
-          onClick={() => setTab('invite')}
-          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'invite' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
-          }`}
-        >
-          <UserPlus className="w-4 h-4 inline mr-1" />
-          Пригласить
-        </button>
-        <button
-          onClick={() => setTab('approve')}
-          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'approve' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
-          }`}
-        >
-          <CheckCircle className="w-4 h-4 inline mr-1" />
-          Утвердить
-        </button>
-        <button
-          onClick={() => setTab('adjust')}
-          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'adjust' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
-          }`}
-        >
-          <Gift className="w-4 h-4 inline mr-1" />
-          Бонусы
-        </button>
-        <button
-          onClick={() => setTab('audit')}
-          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'audit' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
-          }`}
-        >
-          <History className="w-4 h-4 inline mr-1" />
-          История
-        </button>
-        <button
-          onClick={() => setTab('team')}
-          className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'team' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
-          }`}
-        >
-          <Users className="w-4 h-4 inline mr-1" />
-          Команда
-        </button>
+        {activeTabs.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setTab(item.id)}
+            className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              tab === item.id ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      {tab === 'invite' && <InviteTab />}
-      {tab === 'approve' && <ApproveTab />}
-      {tab === 'adjust' && <AdjustTab venueId={user.venue_id} />}
-      {tab === 'audit' && <AuditTab />}
-      {tab === 'team' && <TeamTab />}
+      {tab === 'invite' && canManageTeam && <InviteTab />}
+      {tab === 'approve' && canApprove && <ApproveTab />}
+      {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
+      {tab === 'audit' && canViewAudit && <AuditTab />}
+      {tab === 'team' && canManageTeam && <TeamTab user={user} />}
     </div>
   );
 }
@@ -116,6 +152,7 @@ function InviteTab() {
   const [hourlyRate, setHourlyRate] = useState('');
   const [payModel, setPayModel] = useState<'hourly' | 'revenue' | 'hybrid'>('hourly');
   const [revenuePercentage, setRevenuePercentage] = useState('');
+  const [permissions, setPermissions] = useState<PermissionMap>(() => getDefaultPermissionsForRole('barista'));
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AdminCreateUserResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +181,7 @@ function InviteTab() {
         hourly_rate: rate || 0,
         pay_model: payModel,
         revenue_percentage: parseFloat(revenuePercentage) || 0,
+        permissions,
       });
       setResult(res);
       setFirstName('');
@@ -202,7 +240,10 @@ function InviteTab() {
               <button
                 key={r.value}
                 type="button"
-                onClick={() => setRole(r.value)}
+                onClick={() => {
+                  setRole(r.value);
+                  setPermissions(getDefaultPermissionsForRole(r.value));
+                }}
                 className={`py-3 rounded-xl text-sm font-medium transition-all ${
                   role === r.value ? 'bg-tg-primary text-white' : 'bg-tg-secondary-bg text-tg-hint'
                 }`}
@@ -213,19 +254,7 @@ function InviteTab() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Почасовая ставка (₽)</label>
-          <input
-            type="number"
-            value={hourlyRate}
-            onChange={(e) => setHourlyRate(e.target.value)}
-            placeholder="Например: 350"
-            min="0"
-            step="0.01"
-            disabled={payModel === 'revenue'}
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow disabled:opacity-50"
-          />
-        </div>
+        <PermissionsChecklist value={permissions} onChange={setPermissions} />
 
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Модель оплаты</label>
@@ -629,13 +658,14 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Админ' },
 ];
 
-function TeamTab() {
+function TeamTab({ user }: { user: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
+  const [editPermissions, setEditPermissions] = useState<PermissionMap>(getDefaultPermissionsForRole('barista'));
   const [saving, setSaving] = useState(false);
 
   const fetchUsers = async () => {
@@ -659,6 +689,10 @@ function TeamTab() {
     setEditName(user.name);
     setEditRate(user.hourly_rate);
     setEditRole(user.role);
+    setEditPermissions({
+      ...getDefaultPermissionsForRole(user.role),
+      ...normalizePermissionMap(user.permissions),
+    });
   };
 
   const saveEdit = async () => {
@@ -669,6 +703,7 @@ function TeamTab() {
         name: editName,
         hourly_rate: parseFloat(editRate) || 0,
         role: editRole as any,
+        permissions: editingUser.id === user.id && user.role !== 'owner' ? undefined : editPermissions,
       });
       hapticSuccess();
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -716,13 +751,22 @@ function TeamTab() {
               />
               <select
                 value={editRole}
-                onChange={(e) => setEditRole(e.target.value)}
+                onChange={(e) => {
+                  const nextRole = e.target.value as User['role'];
+                  setEditRole(nextRole);
+                  setEditPermissions(getDefaultPermissionsForRole(nextRole));
+                }}
                 className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none appearance-none"
               >
                 {ROLE_OPTIONS.map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
+              <PermissionsChecklist
+                value={editPermissions}
+                onChange={setEditPermissions}
+                disabled={user.role !== 'owner' && editingUser?.id === user.id}
+              />
               <div className="flex gap-2">
                 <button
                   onClick={saveEdit}

@@ -87,6 +87,9 @@ class User(Base):
     revenue_percentage: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, default=Decimal("0.00")
     )
+    permissions: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
     pay_model: Mapped[PayModel] = mapped_column(
         SAEnum(PayModel, name="pay_model"), nullable=False, default=PayModel.hourly
     )

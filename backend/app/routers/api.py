@@ -11,6 +11,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 
 from app.database import get_session
 from app.models import User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType
+from app.permissions import has_permission
 from app.schemas import (
     UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
@@ -172,8 +173,8 @@ async def list_pending_shifts(
     session: AsyncSession = Depends(get_session),
 ):
     """Admin/senior: list all pending shifts for the venue."""
-    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
-        raise HTTPException(status_code=403, detail="Only admins/seniors can view pending shifts")
+    if not (has_permission(user, "can_approve_shifts") or has_permission(user, "can_edit_team_shifts")):
+        raise HTTPException(status_code=403, detail="Only users with shift approval rights can view pending shifts")
 
     query = select(Shift).where(
         Shift.venue_id == user.venue_id,
@@ -200,8 +201,8 @@ async def update_shift(
         raise HTTPException(status_code=404, detail="Shift not found")
 
     # Only admin/senior can approve/update shifts
-    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
-        raise HTTPException(status_code=403, detail="Only admins/seniors can update shifts")
+    if not (has_permission(user, "can_approve_shifts") or has_permission(user, "can_edit_team_shifts")):
+        raise HTTPException(status_code=403, detail="Only users with shift edit rights can update shifts")
 
     old_status = shift.status
 
@@ -291,8 +292,8 @@ async def payroll_summary(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
-        raise HTTPException(status_code=403, detail="Only admins/seniors can view payroll summary")
+    if not has_permission(user, "can_view_team_payroll"):
+        raise HTTPException(status_code=403, detail="Only users with payroll access can view payroll summary")
 
     now = datetime.now(timezone.utc)
     m = month or now.month
@@ -604,8 +605,8 @@ async def create_adjustment(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
-        raise HTTPException(status_code=403, detail="Only admins/seniors can create adjustments")
+    if not has_permission(user, "can_manage_adjustments"):
+        raise HTTPException(status_code=403, detail="Only users with adjustment access can create adjustments")
 
     now = datetime.now(timezone.utc)
     adjustment = Adjustment(
@@ -716,8 +717,8 @@ async def export_csv(
     session: AsyncSession = Depends(get_session),
 ):
     """Export monthly payroll data as CSV for accounting."""
-    if user.role not in (UserRole.owner, UserRole.admin, UserRole.senior):
-        raise HTTPException(status_code=403, detail="Only admins/seniors can export payroll data")
+    if not has_permission(user, "can_export_payroll"):
+        raise HTTPException(status_code=403, detail="Only users with payroll export access can export payroll data")
 
     now = datetime.now(timezone.utc)
     m = month or now.month

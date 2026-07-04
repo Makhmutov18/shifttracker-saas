@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     venue_id: uuid.UUID
     hourly_rate: Decimal
     revenue_percentage: Decimal = Decimal("0.00")
+    permissions: dict[str, bool] = Field(default_factory=dict)
     pay_model: str = "hourly"
     is_active: bool
     venue: Optional[VenueOut] = None
@@ -39,6 +40,7 @@ class AdminCreateUser(BaseModel):
     hourly_rate: Decimal = Field(default=Decimal("0.00"), ge=0)
     revenue_percentage: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
     pay_model: str = Field(default="hourly", pattern="^(hourly|revenue|hybrid)$")
+    permissions: dict[str, bool] = Field(default_factory=dict)
 
 
 class AdminCreateUserResponse(BaseModel):
