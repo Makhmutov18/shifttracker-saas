@@ -20,6 +20,14 @@ export default function ShiftCard({ shift }: Props) {
     : isPending
     ? 'На подтверждении'
     : 'Статус уточняется';
+  const payoutLabel = isApproved
+    ? 'К выплате'
+    : isPending
+    ? 'Предварительно'
+    : isRejected
+    ? 'Не входит в выплату'
+    : 'Сумма';
+  const amountClass = isApproved ? 'text-tg-text' : 'text-tg-hint';
 
   return (
     <div
@@ -51,7 +59,8 @@ export default function ShiftCard({ shift }: Props) {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-tg-text font-semibold text-sm">{formatCurrency(shift.salary_earned)}</p>
+          <p className={`font-semibold text-sm ${amountClass}`}>{formatCurrency(shift.salary_earned)}</p>
+          <p className="text-[11px] text-tg-hint">{payoutLabel}</p>
           <p className="text-tg-hint text-xs">{formatHours(shift.total_hours)}</p>
         </div>
         <div className="ml-2 text-tg-hint">

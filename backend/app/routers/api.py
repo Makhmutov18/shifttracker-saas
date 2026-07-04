@@ -503,6 +503,7 @@ async def monthly_stats(
         func.count(Shift.id),
     ).where(
         Shift.user_id == user.id,
+        Shift.status == "approved",
         func.extract("month", Shift.date) == m,
         func.extract("year", Shift.date) == y,
     )
@@ -728,6 +729,7 @@ async def export_csv(
         .join(User, Shift.user_id == User.id)
         .where(
             Shift.venue_id == user.venue_id,
+            Shift.status == "approved",
             func.extract("month", Shift.date) == m,
             func.extract("year", Shift.date) == y,
         )
