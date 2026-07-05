@@ -89,7 +89,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<User['role'], PermissionMap> = {
 };
 
 export function getDefaultPermissionsForRole(role: User['role']): PermissionMap {
-  return { ...ROLE_DEFAULT_PERMISSIONS[role] };
+  return { ...(ROLE_DEFAULT_PERMISSIONS[role] ?? ROLE_DEFAULT_PERMISSIONS.barista) };
 }
 
 export function normalizePermissionMap(permissions?: Record<string, boolean> | null): PermissionMap {

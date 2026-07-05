@@ -59,7 +59,41 @@ type PermissionToggleProps = {
   disabled?: boolean;
 };
 
+type OwnerPanelBoundaryProps = {
+  children: React.ReactNode;
+};
+
+type OwnerPanelBoundaryState = {
+  hasError: boolean;
+};
+
+class OwnerPanelBoundary extends React.Component<OwnerPanelBoundaryProps, OwnerPanelBoundaryState> {
+  state: OwnerPanelBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('OwnerPanel render failed', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+          Не удалось открыть этот раздел. Обновите экран и попробуйте ещё раз.
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function PermissionsChecklist({ value, onChange, disabled = false }: PermissionToggleProps) {
+  const safeValue = value ?? {};
+
   return (
     <div className="space-y-3 rounded-2xl border border-tg-border bg-tg-secondary-bg p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-tg-hint">Права доступа</p>
@@ -74,11 +108,11 @@ function PermissionsChecklist({ value, onChange, disabled = false }: PermissionT
             <span className="text-tg-text">{PERMISSION_LABELS[key]}</span>
             <input
               type="checkbox"
-              checked={Boolean(value[key])}
+              checked={Boolean(safeValue[key])}
               disabled={disabled}
               onChange={(event) =>
                 onChange({
-                  ...value,
+                  ...safeValue,
                   [key]: event.target.checked,
                 })
               }
@@ -139,11 +173,13 @@ export default function OwnerPanel({ user }: Props) {
         ))}
       </div>
 
-      {tab === 'invite' && canManageTeam && <InviteTab />}
-      {tab === 'approve' && canApprove && <ApproveTab />}
-      {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
-      {tab === 'audit' && canViewAudit && <AuditTab />}
-      {tab === 'team' && canManageTeam && <TeamTab user={user} />}
+      <OwnerPanelBoundary>
+        {tab === 'invite' && canManageTeam && <InviteTab />}
+        {tab === 'approve' && canApprove && <ApproveTab />}
+        {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
+        {tab === 'audit' && canViewAudit && <AuditTab />}
+        {tab === 'team' && canManageTeam && <TeamTab user={user} />}
+      </OwnerPanelBoundary>
     </div>
   );
 }
@@ -474,6 +510,15 @@ function TeamTab({ user }: { user: User }) {
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (users.length === 0) {
+    return (
+      <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5">
+        <p className="text-sm font-medium text-tg-text">Сотрудников пока нет</p>
+        <p className="mt-1 text-sm text-tg-hint">Добавьте сотрудника через вкладку приглашения, и он появится здесь.</p>
       </div>
     );
   }

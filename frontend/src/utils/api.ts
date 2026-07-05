@@ -122,8 +122,61 @@ export interface User {
   venue?: Venue;
 }
 
+const USER_ROLES = ['owner', 'admin', 'senior', 'barista', 'cook', 'senior_cook'] as const;
+const PAY_MODELS = ['hourly', 'revenue', 'hybrid'] as const;
+
+function normalizeUserRole(role: unknown): User['role'] {
+  return USER_ROLES.includes(role as User['role']) ? (role as User['role']) : 'barista';
+}
+
+function normalizePayModel(payModel: unknown): User['pay_model'] {
+  return PAY_MODELS.includes(payModel as User['pay_model']) ? (payModel as User['pay_model']) : 'hourly';
+}
+
+function normalizePermissions(permissions: unknown): PermissionMap {
+  if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) {
+    return {};
+  }
+
+  return permissions as PermissionMap;
+}
+
+function normalizeUser(raw: unknown): User {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: typeof source.id === 'string' ? source.id : '',
+    telegram_id: typeof source.telegram_id === 'number' ? source.telegram_id : null,
+    name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Сотрудник',
+    position: typeof source.position === 'string' ? source.position : null,
+    role: normalizeUserRole(source.role),
+    venue_id: typeof source.venue_id === 'string' ? source.venue_id : '',
+    hourly_rate: source.hourly_rate == null ? '0' : String(source.hourly_rate),
+    revenue_percentage: source.revenue_percentage == null ? '0' : String(source.revenue_percentage),
+    permissions: normalizePermissions(source.permissions),
+    pay_model: normalizePayModel(source.pay_model ?? source.payment_model),
+    is_active:
+      typeof source.is_active === 'boolean'
+        ? source.is_active
+        : typeof source.active === 'boolean'
+        ? source.active
+        : true,
+    venue:
+      source.venue && typeof source.venue === 'object'
+        ? {
+            id: typeof (source.venue as Record<string, unknown>).id === 'string' ? ((source.venue as Record<string, unknown>).id as string) : '',
+            name:
+              typeof (source.venue as Record<string, unknown>).name === 'string'
+                ? ((source.venue as Record<string, unknown>).name as string)
+                : '',
+          }
+        : undefined,
+  };
+}
+
 export async function getMe(): Promise<User> {
-  return request<User>('/me');
+  const user = await request<User>('/me');
+  return normalizeUser(user);
 }
 
 // Shifts
@@ -369,7 +422,8 @@ export async function getUsers(includeInactive = false): Promise<User[]> {
   const params = new URLSearchParams();
   if (includeInactive) params.set('include_inactive', 'true');
   const qs = params.toString();
-  return request<User[]>(`/admin/users${qs ? `?${qs}` : ''}`);
+  const users = await request<User[]>(`/admin/users${qs ? `?${qs}` : ''}`);
+  return Array.isArray(users) ? users.map(normalizeUser) : [];
 }
 
 export interface AdminUpdateUser {
@@ -384,10 +438,11 @@ export interface AdminUpdateUser {
 }
 
 export async function updateUser(userId: string, data: AdminUpdateUser): Promise<User> {
-  return request<User>(`/admin/users/${userId}`, {
+  const user = await request<User>(`/admin/users/${userId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
+  return normalizeUser(user);
 }
 
 export async function deleteUser(userId: string): Promise<void> {
