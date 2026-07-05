@@ -74,7 +74,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
       </div>
 
       {/* Profile card */}
-      <div className="bg-tg-secondary-bg rounded-2xl p-5 mb-4">
+      <div className="bg-tg-secondary-bg rounded-2xl p-5 mb-4 border border-tg-border shadow-sm">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 rounded-full bg-tg-primary flex items-center justify-center text-white text-xl font-bold">
             {user.name.charAt(0).toUpperCase()}
@@ -108,7 +108,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         </div>
       </div>
 
-      <div className="bg-tg-secondary-bg rounded-2xl p-4 mb-4">
+      <div className="bg-tg-secondary-bg rounded-2xl p-4 mb-4 border border-tg-border shadow-sm">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Тема</p>
@@ -141,36 +141,36 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
           <div className="h-32 bg-tg-secondary-bg rounded-2xl" />
         </div>
       ) : stats && (
-        <div className="bg-gradient-to-br from-tg-primary to-blue-600 rounded-2xl p-5 text-white mb-4">
+        <div className="bg-gradient-to-br from-tg-primary to-blue-600 rounded-2xl p-5 text-white mb-4 border border-tg-border shadow-sm">
           <p className="text-sm opacity-80 mb-1">К выплате за {getMonthName(getCurrentMonth())}</p>
           <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
           <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="bg-white/10 rounded-xl p-3">
+            <div className="bg-white/10 rounded-xl p-3 border border-white/15">
               <p className="text-xs opacity-70">Часы</p>
               <p className="font-semibold">{formatHours(stats.total_hours)}</p>
             </div>
-            <div className="bg-white/10 rounded-xl p-3">
+            <div className="bg-white/10 rounded-xl p-3 border border-white/15">
               <p className="text-xs opacity-70">Смены</p>
               <p className="font-semibold">{stats.shifts_count}</p>
             </div>
             {parseFloat(String(stats.total_bonuses)) > 0 ? (
-              <div className="bg-white/10 rounded-xl p-3">
+              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
                 <p className="text-xs opacity-70">Бонусы</p>
                 <p className="font-semibold text-emerald-200">+{formatCurrency(stats.total_bonuses)}</p>
               </div>
             ) : (
-              <div className="bg-white/10 rounded-xl p-3">
+              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
                 <p className="text-xs opacity-70">Бонусы</p>
                 <p className="font-semibold">Бонусов нет</p>
               </div>
             )}
             {parseFloat(String(stats.total_penalties)) > 0 ? (
-              <div className="bg-white/10 rounded-xl p-3">
+              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
                 <p className="text-xs opacity-70">Штрафы</p>
                 <p className="font-semibold text-rose-200">-{formatCurrency(stats.total_penalties)}</p>
               </div>
             ) : (
-              <div className="bg-white/10 rounded-xl p-3">
+              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
                 <p className="text-xs opacity-70">Штрафы</p>
                 <p className="font-semibold">Штрафов нет</p>
               </div>

@@ -85,7 +85,7 @@ export default function StatsWidget({ stats, loading }: Props) {
         {items.map((item) => (
           <div
             key={item.label}
-            className={`${item.bg} rounded-xl p-4`}
+            className={`${item.bg} rounded-xl p-4 border border-tg-border shadow-sm`}
           >
             <div className={`${item.color} mb-2`}>{item.icon}</div>
             <p className="text-tg-hint text-xs mb-1">{item.label}</p>

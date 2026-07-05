@@ -128,3 +128,9 @@ textarea:focus {
 input[type='checkbox'] {
   accent-color: var(--tg-primary);
 }
+
+[class~='bg-tg-secondary-bg'] {
+  border: 1px solid var(--tg-border);
+  border-color: var(--tg-border);
+  box-shadow: var(--tg-shadow);
+}

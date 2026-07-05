@@ -20,7 +20,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
       {/* Profile header */}
       <div
         onClick={() => onNavigate('profile')}
-        className="flex items-center justify-between mb-6 cursor-pointer active:scale-[0.98] transition-transform"
+        className="flex items-center justify-between mb-6 cursor-pointer active:scale-[0.98] transition-transform rounded-2xl border border-tg-border bg-tg-secondary-bg p-4 shadow-sm"
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold">
