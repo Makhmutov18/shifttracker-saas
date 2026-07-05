@@ -15,19 +15,21 @@ type Tab = 'shifts' | 'expenses';
 
 export default function History({ user }: Props) {
   const [tab, setTab] = useState<Tab>('shifts');
-  const [month, setMonth] = useState(getCurrentMonth());
-  const [year] = useState(getCurrentYear());
+  const [viewDate, setViewDate] = useState(() => ({
+    month: getCurrentMonth(),
+    year: getCurrentYear(),
+  }));
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
+  const { month, year } = viewDate;
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
   const { expenses, loading: expensesLoading, error: expensesError } = useExpenses(month, year);
   const canManagePayroll = useMemo(() => hasPermission(user, 'can_view_team_payroll'), [user]);
-
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const isCurrentPeriod = month === getCurrentMonth() && year === getCurrentYear();
 
   useEffect(() => {
     if (!canManagePayroll) {
@@ -45,7 +47,7 @@ export default function History({ user }: Props) {
         setSummary(data);
       } catch (error) {
         setSummary(null);
-        setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить payroll summary');
+        setSummaryError(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ payroll summary');
       } finally {
         setSummaryLoading(false);
       }
@@ -68,30 +70,65 @@ export default function History({ user }: Props) {
       link.remove();
       URL.revokeObjectURL(url);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Не удалось скачать отчет');
+      setExportError(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ РѕС‚С‡РµС‚');
     } finally {
       setExportLoading(false);
     }
   };
 
+  const shiftMonth = (delta: number) => {
+    setViewDate((current) => {
+      const nextDate = new Date(current.year, current.month - 1 + delta, 1);
+      return {
+        month: nextDate.getMonth() + 1,
+        year: nextDate.getFullYear(),
+      };
+    });
+  };
+
+  const resetToCurrent = () => {
+    setViewDate({
+      month: getCurrentMonth(),
+      year: getCurrentYear(),
+    });
+  };
+
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      <h1 className="text-lg font-semibold mb-4">История</h1>
+      <h1 className="text-lg font-semibold mb-4">РСЃС‚РѕСЂРёСЏ</h1>
 
-      <div className="flex gap-1 overflow-x-auto pb-3 mb-4 scrollbar-none">
-        {months.map((m) => (
+      <div className="mb-4 space-y-2">
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-tg-secondary-bg p-2">
           <button
-            key={m}
-            onClick={() => setMonth(m)}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              m === month
-                ? 'bg-tg-primary text-tg-button-text'
-                : 'bg-tg-secondary-bg text-tg-hint'
-            }`}
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-tg-bg text-tg-text"
+            aria-label="РџСЂРµРґС‹РґСѓС‰РёР№ РјРµСЃСЏС†"
           >
-            {getMonthName(m)}
+            в†ђ
           </button>
-        ))}
+          <div className="min-w-0 flex-1 text-center">
+            <p className="text-sm font-medium text-tg-text">
+              {getMonthName(month)} {year}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-tg-bg text-tg-text"
+            aria-label="РЎР»РµРґСѓСЋС‰РёР№ РјРµСЃСЏС†"
+          >
+            в†’
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={resetToCurrent}
+          disabled={isCurrentPeriod}
+          className="w-full rounded-xl bg-tg-secondary-bg px-4 py-2.5 text-sm font-medium text-tg-text disabled:opacity-60"
+        >
+          РўРµРєСѓС‰РёР№ РјРµСЃСЏС†
+        </button>
       </div>
 
       {canManagePayroll && (
@@ -107,14 +144,14 @@ export default function History({ user }: Props) {
             </div>
           ) : summaryError ? (
             <div className="bg-tg-secondary-bg rounded-2xl p-4">
-              <p className="text-sm font-medium text-tg-text">Payroll summary недоступен</p>
+              <p className="text-sm font-medium text-tg-text">Payroll summary ??????????</p>
               <p className="text-xs text-red-400 mt-1">{summaryError}</p>
             </div>
           ) : summary ? (
             <div className="bg-tg-secondary-bg rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
-                  <p className="text-sm text-tg-hint">Payroll summary за {getMonthName(month)}</p>
+                  <p className="text-sm text-tg-hint">Payroll summary ?? {getMonthName(month)} {year}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Wallet className="w-4 h-4 text-tg-primary" />
                     <p className="text-xl font-semibold text-tg-text">
@@ -123,26 +160,26 @@ export default function History({ user }: Props) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-tg-hint">Сотрудников</p>
+                  <p className="text-xs text-tg-hint">???????????</p>
                   <p className="text-sm font-medium text-tg-text">{summary.employees_count}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-tg-bg rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Подтверждено смен</p>
+                  <p className="text-xs text-tg-hint">???????????? ????</p>
                   <p className="text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
                 </div>
                 <div className="bg-tg-bg rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Ждут проверки</p>
+                  <p className="text-xs text-tg-hint">???? ????????</p>
                   <p className="text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
                 </div>
                 <div className="bg-tg-bg rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Часы</p>
+                  <p className="text-xs text-tg-hint">????</p>
                   <p className="text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
                 </div>
                 <div className="bg-tg-bg rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
+                  <p className="text-xs text-tg-hint">?????? / ??????</p>
                   <p className="text-sm font-semibold text-tg-text">
                     {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
                   </p>
@@ -156,7 +193,7 @@ export default function History({ user }: Props) {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
                         <p className="text-xs text-tg-hint">
-                          {row.approved_shifts_count} смен · {formatHours(row.total_hours)}
+                          {row.approved_shifts_count} ???? ? {formatHours(row.total_hours)}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-tg-text shrink-0">
@@ -180,7 +217,7 @@ export default function History({ user }: Props) {
             ) : (
               <Download className="w-4 h-4" />
             )}
-            Скачать отчет за {getMonthName(month)} (.xlsx)
+            ??????? ????? ?? {getMonthName(month)} {year} (.xlsx)
           </button>
           {exportError && <p className="text-xs text-red-400">{exportError}</p>}
         </div>
@@ -194,7 +231,7 @@ export default function History({ user }: Props) {
           }`}
         >
           <Clock className="w-4 h-4" />
-          Смены
+          ?????
         </button>
         <button
           onClick={() => setTab('expenses')}
@@ -203,7 +240,7 @@ export default function History({ user }: Props) {
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          Расходы
+          ???????
         </button>
       </div>
 
@@ -216,13 +253,13 @@ export default function History({ user }: Props) {
           </div>
         ) : shiftsError ? (
           <div className="text-center py-12">
-            <p className="text-red-400 text-sm mb-2">Ошибка загрузки</p>
+            <p className="text-red-400 text-sm mb-2">?????? ????????</p>
             <p className="text-tg-hint text-xs">{shiftsError}</p>
           </div>
         ) : shifts.length === 0 ? (
           <div className="text-center py-12">
             <Clock className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-            <p className="text-tg-hint text-sm">Пока нет смен за этот месяц</p>
+            <p className="text-tg-hint text-sm">???? ??? ???? ?? ???? ?????</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -239,13 +276,13 @@ export default function History({ user }: Props) {
         </div>
       ) : expensesError ? (
         <div className="text-center py-12">
-          <p className="text-red-400 text-sm mb-2">Ошибка загрузки</p>
+          <p className="text-red-400 text-sm mb-2">?????? ????????</p>
           <p className="text-tg-hint text-xs">{expensesError}</p>
         </div>
       ) : expenses.length === 0 ? (
         <div className="text-center py-12">
           <TrendingDown className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-          <p className="text-tg-hint text-sm">Нет расходов за этот месяц</p>
+          <p className="text-tg-hint text-sm">??? ???????? ?? ???? ?????</p>
         </div>
       ) : (
         <div className="space-y-2">

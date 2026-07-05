@@ -14,7 +14,7 @@ import { canAccessOwnerPanel } from './utils/permissions';
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
 export default function App() {
-  useTelegramTheme();
+  const { themeMode, setThemeMode } = useTelegramTheme();
   const { user, loading, error } = useUser();
   const [page, setPage] = useState<Page>('dashboard');
 
@@ -41,14 +41,21 @@ export default function App() {
       case 'owner':
         return canAccessOwnerPanel(user) ? <OwnerPanel user={user} /> : <Dashboard user={user} onNavigate={setPage} />;
       case 'profile':
-        return <Profile user={user} onBack={() => setPage('dashboard')} />;
+        return (
+          <Profile
+            user={user}
+            onBack={() => setPage('dashboard')}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+          />
+        );
       default:
         return <Dashboard user={user} onNavigate={setPage} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-tg-bg text-tg-text pb-20">
+    <div className="min-h-screen bg-tg-bg text-tg-text pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
       {renderPage()}
       <BottomNav
         currentPage={page}

@@ -73,7 +73,7 @@ export default function ShiftCard({ shift }: Props) {
           expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
-        <div className="px-4 pb-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+        <div className="px-4 pb-4 space-y-2 border-t border-tg-border pt-3">
           <div className="flex justify-between text-sm">
             <span className="text-tg-hint">Приход</span>
             <span className="text-tg-text font-medium">{formatTime(shift.start_time)}</span>
@@ -95,7 +95,7 @@ export default function ShiftCard({ shift }: Props) {
             </div>
           )}
           {shift.comment && (
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-2 border-t border-tg-border">
               <p className="text-tg-hint text-xs mb-1">Комментарий</p>
               <p className="text-tg-text text-sm">{shift.comment}</p>
             </div>

@@ -59,14 +59,14 @@ type PermissionToggleProps = {
 
 function PermissionsChecklist({ value, onChange, disabled = false }: PermissionToggleProps) {
   return (
-    <div className="space-y-2 rounded-2xl border border-black/5 bg-tg-bg p-3">
-      <p className="text-xs font-medium text-tg-hint uppercase tracking-wide">Права доступа</p>
+    <div className="space-y-3 rounded-2xl border border-tg-border bg-tg-secondary-bg p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-tg-hint">Права доступа</p>
       <div className="grid gap-2">
         {PERMISSION_KEYS.map((key) => (
           <label
             key={key}
-            className={`flex items-center justify-between gap-3 rounded-xl border border-black/5 px-3 py-2.5 text-sm ${
-              disabled ? 'opacity-60' : 'bg-white'
+            className={`flex items-center justify-between gap-3 rounded-xl border border-tg-border px-3 py-3 text-sm ${
+              disabled ? 'opacity-60' : 'bg-tg-bg'
             }`}
           >
             <span className="text-tg-text">{PERMISSION_LABELS[key]}</span>

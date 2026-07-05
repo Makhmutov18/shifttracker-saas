@@ -3,25 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --tg-bg: #fafafa;
-  --tg-text: #1a1a1a;
-  --tg-hint: #636366;
-  --tg-link: #2481cc;
-  --tg-primary: #2481cc;
-  --tg-button: #2481cc;
+  --tg-bg: #f6f3ed;
+  --tg-text: #16181d;
+  --tg-hint: #666a73;
+  --tg-link: #315dff;
+  --tg-primary: #315dff;
+  --tg-button: #315dff;
   --tg-button-text: #ffffff;
-  --tg-secondary-bg: #ececee;
+  --tg-secondary-bg: #ece7dd;
+  --tg-card-bg: rgba(255, 255, 255, 0.88);
+  --tg-control-bg: rgba(255, 255, 255, 0.98);
+  --tg-control-border: rgba(15, 23, 42, 0.08);
+  --tg-border: rgba(15, 23, 42, 0.08);
+  --tg-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
+[data-theme='dark'],
 .dark {
-  --tg-bg: #000000;
-  --tg-text: #f5f5f7;
-  --tg-hint: #98989d;
-  --tg-link: #64b5f6;
-  --tg-primary: #64b5f6;
-  --tg-button: #64b5f6;
-  --tg-button-text: #000000;
-  --tg-secondary-bg: #1c1c1e;
+  --tg-bg: #0f1218;
+  --tg-text: #f5f7fa;
+  --tg-hint: #9aa3af;
+  --tg-link: #7ba7ff;
+  --tg-primary: #7ba7ff;
+  --tg-button: #7ba7ff;
+  --tg-button-text: #0d1017;
+  --tg-secondary-bg: #171c26;
+  --tg-card-bg: rgba(20, 24, 32, 0.94);
+  --tg-control-bg: rgba(18, 22, 30, 0.98);
+  --tg-control-border: rgba(255, 255, 255, 0.1);
+  --tg-border: rgba(255, 255, 255, 0.1);
+  --tg-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 16px 36px rgba(0, 0, 0, 0.25);
 }
 
 * {
@@ -39,10 +50,16 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   background-color: var(--tg-bg);
   color: var(--tg-text);
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   letter-spacing: -0.01em;
+}
+
+[data-theme='dark'] body,
+.dark body {
+  color-scheme: dark;
 }
 
 /* Custom scrollbar */
@@ -64,22 +81,16 @@ body, button, input, select, textarea {
 
 /* Liquid Glass card style */
 .glass-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--tg-card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
-}
-
-.dark .glass-card {
-  background: rgba(28, 28, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--tg-border);
+  box-shadow: var(--tg-shadow);
 }
 
 /* Safe area for bottom nav */
 .safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
 }
 
 /* Hide scrollbar for month selector */
@@ -89,4 +100,31 @@ body, button, input, select, textarea {
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  color: var(--tg-text) !important;
+  background-color: var(--tg-control-bg) !important;
+  border-color: var(--tg-control-border) !important;
+  box-shadow: none;
+}
+
+input:not([type='checkbox']):not([type='radio'])::placeholder,
+textarea::placeholder {
+  color: var(--tg-hint) !important;
+  opacity: 0.8;
+}
+
+input:not([type='checkbox']):not([type='radio']):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--tg-primary) !important;
+  box-shadow: 0 0 0 2px rgba(49, 93, 255, 0.18);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--tg-primary);
 }

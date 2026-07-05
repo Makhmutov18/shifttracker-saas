@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, SunMedium } from 'lucide-react';
 import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours, getMonthName, getCurrentMonth, getCurrentYear } from '../utils/helpers';
 import { canAccessOwnerPanel } from '../utils/permissions';
+import type { ThemeMode } from '../hooks/useTelegramTheme';
 
 interface Props {
   user: UserType;
   onBack: () => void;
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -24,7 +27,13 @@ const PAY_MODEL_LABELS: Record<string, string> = {
   hybrid: 'Смешанная',
 };
 
-export default function Profile({ user, onBack }: Props) {
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+  { value: 'system', label: 'Системная', icon: <Monitor className="w-4 h-4" /> },
+  { value: 'light', label: 'Светлая', icon: <SunMedium className="w-4 h-4" /> },
+  { value: 'dark', label: 'Тёмная', icon: <Moon className="w-4 h-4" /> },
+];
+
+export default function Profile({ user, onBack, themeMode, onThemeModeChange }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +105,33 @@ export default function Profile({ user, onBack }: Props) {
             <Clock className="w-4 h-4" />
             <span>Модель: {PAY_MODEL_LABELS[user.pay_model] || user.pay_model}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-tg-secondary-bg rounded-2xl p-4 mb-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="text-sm font-medium text-tg-text">Тема</p>
+            <p className="text-xs text-tg-hint">Выберите системную, светлую или тёмную тему</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {THEME_OPTIONS.map((option) => {
+            const active = themeMode === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onThemeModeChange(option.value)}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
+                  active ? 'bg-tg-primary text-tg-button-text' : 'bg-tg-bg text-tg-text'
+                }`}
+              >
+                {option.icon}
+                <span className="text-[11px] leading-none">{option.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
