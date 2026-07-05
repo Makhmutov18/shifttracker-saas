@@ -19,7 +19,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
       <div
         onClick={() => onNavigate('profile')}
-        className="surface-card flex items-center justify-between mb-6 cursor-pointer rounded-[1.4rem] p-4 active:scale-[0.98] transition-transform"
+        className="glass-header flex items-center justify-between mb-6 cursor-pointer rounded-[1.4rem] p-4 active:scale-[0.98] transition-transform"
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold">

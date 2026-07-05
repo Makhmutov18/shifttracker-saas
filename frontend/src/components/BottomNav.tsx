@@ -22,7 +22,7 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
   const visibleItems = navItems.filter(item => !item.ownerOnly || isAdmin);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 glass-card border-t border-tg-border safe-area-bottom z-50">
+    <nav className="fixed bottom-0 left-0 right-0 glass-nav safe-area-bottom z-50">
       <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
         {visibleItems.map((item) => {
           const isActive = currentPage === item.page;

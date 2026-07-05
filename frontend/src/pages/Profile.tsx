@@ -72,7 +72,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         <h1 className="text-lg font-semibold text-tg-text">Профиль</h1>
       </div>
 
-      <div className="surface-card rounded-[1.4rem] p-5 mb-4">
+      <div className="glass-header rounded-[1.4rem] p-5 mb-4">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 rounded-full bg-tg-primary flex items-center justify-center text-white text-xl font-bold">
             {user.name.charAt(0).toUpperCase()}

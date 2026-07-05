@@ -104,6 +104,44 @@ body, button, input, select, textarea {
   box-shadow: var(--shadow-card);
 }
 
+.glass-nav {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(26px) saturate(1.25);
+  -webkit-backdrop-filter: blur(26px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.45),
+    0 -16px 34px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='dark'] .glass-nav,
+.dark .glass-nav {
+  background: rgba(17, 21, 29, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 -18px 36px rgba(0, 0, 0, 0.32);
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.34),
+    0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme='dark'] .glass-header,
+.dark .glass-header {
+  background: rgba(20, 24, 32, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 16px 30px rgba(0, 0, 0, 0.24);
+}
+
 /* Safe area for bottom nav */
 .safe-area-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
