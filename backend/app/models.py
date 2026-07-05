@@ -75,6 +75,7 @@ class User(Base):
     )
     telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    position: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="user_role"), nullable=False, default=UserRole.barista
     )

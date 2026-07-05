@@ -115,6 +115,15 @@ async def init_db():
         await conn.execute(text("""
         DO $$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'position') THEN
+                ALTER TABLE users ADD COLUMN position VARCHAR(255);
+            END IF;
+        END $$;
+        """))
+
+        await conn.execute(text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                 WHERE table_name = 'users' AND column_name = 'permissions') THEN
                 ALTER TABLE users ADD COLUMN permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
             END IF;

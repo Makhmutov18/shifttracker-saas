@@ -1,7 +1,7 @@
 import secrets
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
@@ -18,6 +18,47 @@ from app.permissions import has_permission, validate_permission_map
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _can_manage_team_access(user: User) -> bool:
+    return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
+
+
+async def _ensure_user_can_be_deactivated(
+    session: AsyncSession,
+    venue_id,
+    target_user: User,
+    admin_user: User,
+) -> None:
+    if target_user.id == admin_user.id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
+
+    active_users_result = await session.execute(
+        select(User).where(User.venue_id == venue_id, User.is_active == True)
+    )
+    active_users = active_users_result.scalars().all()
+
+    if target_user.role in (UserRole.owner, UserRole.admin):
+        remaining_owner_admins = [
+            user for user in active_users
+            if user.id != target_user.id and user.role in (UserRole.owner, UserRole.admin)
+        ]
+        if not remaining_owner_admins:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot deactivate the last owner/admin",
+            )
+
+    if _can_manage_team_access(target_user):
+        remaining_team_managers = [
+            user for user in active_users
+            if user.id != target_user.id and _can_manage_team_access(user)
+        ]
+        if not remaining_team_managers:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot deactivate the last user who can manage the team",
+            )
 
 
 async def get_admin_user(
@@ -72,6 +113,7 @@ async def create_user(
 
     new_user = User(
         name=body.first_name,
+        position=(body.position.strip() if body.position and body.position.strip() else None),
         role=role,
         venue_id=admin.venue_id,
         hourly_rate=body.hourly_rate,
@@ -95,7 +137,13 @@ async def create_user(
         action="user_created",
         entity_type="user",
         entity_id=new_user.id,
-        new_value={"name": new_user.name, "role": role.value, "hourly_rate": str(body.hourly_rate), "pay_model": body.pay_model},
+        new_value={
+            "name": new_user.name,
+            "position": new_user.position,
+            "role": role.value,
+            "hourly_rate": str(body.hourly_rate),
+            "pay_model": body.pay_model,
+        },
     )
     session.add(log)
     await session.commit()
@@ -115,14 +163,18 @@ async def create_user(
 @router.get("/users", response_model=list[UserOut])
 async def list_users(
     admin: User = Depends(get_admin_user),
+    include_inactive: bool = Query(False),
     session: AsyncSession = Depends(get_session),
 ):
-    """List all active users for the admin's venue."""
+    """List users for the admin's venue."""
     from sqlalchemy.orm import selectinload
+    filters = [User.venue_id == admin.venue_id]
+    if not include_inactive:
+        filters.append(User.is_active == True)
     result = await session.execute(
         select(User)
         .options(selectinload(User.venue))
-        .where(User.venue_id == admin.venue_id, User.is_active == True)
+        .where(*filters)
         .order_by(User.name)
     )
     users = result.scalars().all()
@@ -131,6 +183,7 @@ async def list_users(
 
 class AdminUpdateUser(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    position: Optional[str] = Field(None, max_length=255)
     role: Optional[str] = Field(None, pattern="^(owner|admin|senior|barista|cook|senior_cook)$")
     hourly_rate: Optional[Decimal] = Field(None, ge=0)
     revenue_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
@@ -181,6 +234,9 @@ async def update_user(
     if body.name is not None:
         old_values["name"] = user.name
         user.name = body.name
+    if body.position is not None:
+        old_values["position"] = user.position
+        user.position = body.position.strip() or None
     if body.role is not None:
         old_values["role"] = user.role.value
         user.role = UserRole(body.role)
@@ -195,6 +251,8 @@ async def update_user(
         user.pay_model = PayModel(body.pay_model)
     if body.is_active is not None:
         old_values["is_active"] = user.is_active
+        if body.is_active is False:
+            await _ensure_user_can_be_deactivated(session, admin.venue_id, user, admin)
         user.is_active = body.is_active
     if body.permissions is not None:
         old_values["permissions"] = user.permissions
@@ -242,8 +300,7 @@ async def deactivate_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.id == admin.id:
-        raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
+    await _ensure_user_can_be_deactivated(session, admin.venue_id, user, admin)
 
     user.is_active = False
     await session.commit()

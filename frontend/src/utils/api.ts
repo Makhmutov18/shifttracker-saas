@@ -111,6 +111,7 @@ export interface User {
   id: string;
   telegram_id: number | null;
   name: string;
+  position: string | null;
   role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
   venue_id: string;
   hourly_rate: string;
@@ -279,6 +280,7 @@ export async function getPayrollSummary(month?: number, year?: number): Promise<
 
 export interface AdminCreateUserRequest {
   first_name: string;
+  position?: string;
   role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
   hourly_rate: number;
   revenue_percentage: number;
@@ -363,12 +365,16 @@ export async function getAdjustments(month?: number, year?: number): Promise<Adj
 
 // Users (admin)
 
-export async function getUsers(): Promise<User[]> {
-  return request<User[]>('/admin/users');
+export async function getUsers(includeInactive = false): Promise<User[]> {
+  const params = new URLSearchParams();
+  if (includeInactive) params.set('include_inactive', 'true');
+  const qs = params.toString();
+  return request<User[]>(`/admin/users${qs ? `?${qs}` : ''}`);
 }
 
 export interface AdminUpdateUser {
   name?: string;
+  position?: string;
   role?: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
   hourly_rate?: number;
   revenue_percentage?: number;

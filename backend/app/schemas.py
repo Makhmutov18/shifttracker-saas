@@ -20,6 +20,7 @@ class UserOut(BaseModel):
     id: uuid.UUID
     telegram_id: Optional[int] = None
     name: str
+    position: Optional[str] = None
     role: str
     venue_id: uuid.UUID
     hourly_rate: Decimal
@@ -36,6 +37,7 @@ class UserOut(BaseModel):
 
 class AdminCreateUser(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=255)
+    position: Optional[str] = Field(default=None, max_length=255)
     role: str = Field(default="barista", pattern="^(owner|admin|senior|barista|cook|senior_cook)$")
     hourly_rate: Decimal = Field(default=Decimal("0.00"), ge=0)
     revenue_percentage: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
