@@ -17,10 +17,9 @@ export default function Dashboard({ user, onNavigate }: Props) {
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      {/* Profile header */}
       <div
         onClick={() => onNavigate('profile')}
-        className="flex items-center justify-between mb-6 cursor-pointer active:scale-[0.98] transition-transform rounded-2xl border border-tg-border bg-tg-secondary-bg p-4 shadow-sm"
+        className="surface-card flex items-center justify-between mb-6 cursor-pointer rounded-[1.4rem] p-4 active:scale-[0.98] transition-transform"
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold">
@@ -29,27 +28,29 @@ export default function Dashboard({ user, onNavigate }: Props) {
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
             <p className="text-sm text-tg-hint">
-              {user.venue?.name || 'Заведение'} · {
-                user.pay_model === 'hourly'
-                  ? `${formatCurrency(user.hourly_rate)}/ч`
-                  : user.pay_model === 'revenue'
+              {user.venue?.name || 'Заведение'} ·{' '}
+              {user.pay_model === 'hourly'
+                ? `${formatCurrency(user.hourly_rate)}/ч`
+                : user.pay_model === 'revenue'
                   ? `${user.revenue_percentage}% от выручки`
-                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`
-              }
+                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`}
             </p>
           </div>
         </div>
+        <User className="w-5 h-5 text-tg-hint" />
       </div>
 
-      {/* Current date */}
       <p className="text-sm text-tg-hint mb-4">
-        {new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        {new Date().toLocaleDateString('ru-RU', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })}
       </p>
 
-      {/* Stats */}
       {stats && <StatsWidget stats={stats} loading={loading} />}
 
-      {/* Add shift button */}
       <button
         onClick={() => onNavigate('shift')}
         className="w-full mt-6 bg-tg-primary text-tg-button-text font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"

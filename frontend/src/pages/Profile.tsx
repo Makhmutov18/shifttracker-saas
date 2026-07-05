@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, SunMedium } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, SunMedium } from 'lucide-react';
 import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
-import { formatCurrency, formatHours, getMonthName, getCurrentMonth, getCurrentYear } from '../utils/helpers';
+import { formatCurrency, formatHours, getMonthName, getCurrentMonth } from '../utils/helpers';
 import { canAccessOwnerPanel } from '../utils/permissions';
 import type { ThemeMode } from '../hooks/useTelegramTheme';
 
@@ -65,16 +65,14 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-tg-secondary-bg transition-colors">
           <ArrowLeft className="w-5 h-5 text-tg-text" />
         </button>
-        <h1 className="text-lg font-semibold">Профиль</h1>
+        <h1 className="text-lg font-semibold text-tg-text">Профиль</h1>
       </div>
 
-      {/* Profile card */}
-      <div className="bg-tg-secondary-bg rounded-2xl p-5 mb-4 border border-tg-border shadow-sm">
+      <div className="surface-card rounded-[1.4rem] p-5 mb-4">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 rounded-full bg-tg-primary flex items-center justify-center text-white text-xl font-bold">
             {user.name.charAt(0).toUpperCase()}
@@ -96,9 +94,8 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
               {user.pay_model === 'hourly'
                 ? `${formatCurrency(user.hourly_rate)}/ч`
                 : user.pay_model === 'revenue'
-                ? `${user.revenue_percentage}% от выручки`
-                : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`
-              }
+                  ? `${user.revenue_percentage}% от выручки`
+                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`}
             </span>
           </div>
           <div className="flex items-center gap-2 text-tg-hint">
@@ -108,7 +105,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         </div>
       </div>
 
-      <div className="bg-tg-secondary-bg rounded-2xl p-4 mb-4 border border-tg-border shadow-sm">
+      <div className="surface-card rounded-[1.4rem] p-4 mb-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Тема</p>
@@ -124,7 +121,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
                 type="button"
                 onClick={() => onThemeModeChange(option.value)}
                 className={`flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
-                  active ? 'bg-tg-primary text-tg-button-text' : 'bg-tg-bg text-tg-text'
+                  active ? 'bg-tg-primary text-tg-button-text' : 'surface-muted text-tg-text'
                 }`}
               >
                 {option.icon}
@@ -135,13 +132,12 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         </div>
       </div>
 
-      {/* Monthly stats */}
       {loading ? (
         <div className="animate-pulse space-y-3 mb-4">
-          <div className="h-32 bg-tg-secondary-bg rounded-2xl" />
+          <div className="h-32 surface-card rounded-[1.4rem]" />
         </div>
-      ) : stats && (
-        <div className="bg-gradient-to-br from-tg-primary to-blue-600 rounded-2xl p-5 text-white mb-4 border border-tg-border shadow-sm">
+      ) : stats ? (
+        <div className="accent-card rounded-[1.4rem] p-5 text-white mb-4">
           <p className="text-sm opacity-80 mb-1">К выплате за {getMonthName(getCurrentMonth())}</p>
           <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
           <div className="grid grid-cols-2 gap-3 mt-4">
@@ -177,20 +173,19 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Adjustments */}
       {adjustments.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-medium text-tg-hint mb-2">Бонусы и штрафы за месяц</h3>
           <div className="space-y-2">
             {adjustments.map((adj) => (
-              <div key={adj.id} className="bg-tg-secondary-bg rounded-xl p-3 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  adj.type === 'bonus'
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20'
-                    : 'bg-rose-50 dark:bg-rose-900/20'
-                }`}>
+              <div key={adj.id} className="surface-card rounded-xl p-3 flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    adj.type === 'bonus' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'
+                  }`}
+                >
                   {adj.type === 'bonus' ? (
                     <Gift className="w-4 h-4 text-emerald-500" />
                   ) : (
@@ -204,10 +199,9 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
                     {new Date(adj.created_at).toLocaleDateString('ru-RU')}
                   </p>
                 </div>
-                <p className={`font-semibold text-sm ${
-                  adj.type === 'bonus' ? 'text-emerald-500' : 'text-rose-500'
-                }`}>
-                  {adj.type === 'bonus' ? '+' : '-'}{formatCurrency(adj.amount)}
+                <p className={`font-semibold text-sm ${adj.type === 'bonus' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {adj.type === 'bonus' ? '+' : '-'}
+                  {formatCurrency(adj.amount)}
                 </p>
               </div>
             ))}
@@ -216,7 +210,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
       )}
 
       {!isAdminContext && (
-        <div className="mt-4 rounded-2xl border border-dashed border-tg-secondary-bg/80 bg-tg-secondary-bg/40 p-4">
+        <div className="surface-muted mt-4 rounded-2xl p-4">
           <p className="text-sm text-tg-hint">
             История действий и общий журнал изменений доступны в разделе управления для администраторов.
           </p>

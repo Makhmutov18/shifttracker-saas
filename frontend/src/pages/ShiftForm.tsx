@@ -48,9 +48,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   }, [totalHours, user.hourly_rate, revenue, user.revenue_percentage, user.pay_model]);
 
   const handleSubmit = async () => {
-    if (submitting) {
-      return;
-    }
+    if (submitting) return;
 
     const isOvernight = startTime >= endTime;
     if (isOvernight && parseFloat(totalHours) > 16) {
@@ -89,14 +87,14 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      {saved && (
+      {saved ? (
         <div className="text-center py-12">
           <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-10 h-10 text-emerald-500" />
           </div>
           <h2 className="text-xl font-semibold text-tg-text mb-2">{successTitle}</h2>
           <p className="text-tg-hint text-sm mb-6">{successDescription}</p>
-          <div className="glass-card bg-gradient-to-br from-tg-primary/90 to-blue-600/90 rounded-2xl p-5 text-white mb-6">
+          <div className="accent-card rounded-[1.4rem] p-5 text-white mb-6">
             <p className="text-sm opacity-80 mb-1">Начислено</p>
             <p className="text-3xl font-bold">{formatCurrency(saved.salary)}</p>
             <p className="text-sm opacity-80 mt-1">{formatHours(saved.hours)}</p>
@@ -110,28 +108,26 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
             </button>
             <button
               onClick={onBack}
-              className="w-full bg-tg-secondary-bg text-tg-text font-semibold py-4 px-6 rounded-2xl active:scale-[0.98] transition-transform"
+              className="w-full surface-card text-tg-text font-semibold py-4 px-6 rounded-2xl active:scale-[0.98] transition-transform"
             >
               На главную
             </button>
           </div>
         </div>
-      )}
-
-      {!saved && (
+      ) : (
         <>
           <div className="flex items-center gap-3 mb-6">
             <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-tg-secondary-bg transition-colors">
               <ArrowLeft className="w-5 h-5 text-tg-text" />
             </button>
-            <h1 className="text-lg font-semibold">Новая смена</h1>
+            <h1 className="text-lg font-semibold text-tg-text">Новая смена</h1>
           </div>
 
-          <div className="flex gap-2 mb-5 rounded-2xl border border-tg-border bg-tg-secondary-bg p-1 shadow-sm">
+          <div className="surface-muted flex gap-2 mb-5 rounded-[1.35rem] p-1">
             <button
               onClick={() => setDate(getTodayDate())}
               className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all ${
-                date === getTodayDate() ? 'bg-tg-primary text-tg-button-text' : 'bg-tg-secondary-bg text-tg-text'
+                date === getTodayDate() ? 'bg-tg-primary text-tg-button-text' : 'text-tg-text'
               }`}
             >
               Сегодня
@@ -139,7 +135,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
             <button
               onClick={() => setDate(getYesterdayDate())}
               className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all ${
-                date === getYesterdayDate() ? 'bg-tg-primary text-tg-button-text' : 'bg-tg-secondary-bg text-tg-text'
+                date === getYesterdayDate() ? 'bg-tg-primary text-tg-button-text' : 'text-tg-text'
               }`}
             >
               Вчера
@@ -147,7 +143,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
           </div>
 
           <div className="space-y-4 mb-5">
-            <div>
+            <div className="surface-card rounded-[1.35rem] p-4">
               <label className="flex items-center gap-2 text-sm text-tg-hint mb-2">
                 <Clock className="w-4 h-4" />
                 Начало смены
@@ -156,10 +152,11 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-white text-[#111827] text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                className="w-full text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
               />
             </div>
-            <div>
+
+            <div className="surface-card rounded-[1.35rem] p-4">
               <label className="flex items-center gap-2 text-sm text-tg-hint mb-2">
                 <Clock className="w-4 h-4" />
                 Конец смены
@@ -168,12 +165,12 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full bg-white text-[#111827] text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                className="w-full text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
               />
             </div>
           </div>
 
-          <div className="bg-tg-secondary-bg rounded-xl p-4 mb-5 border border-tg-border shadow-sm">
+          <div className="surface-card rounded-[1.35rem] p-4 mb-5">
             <label className="flex items-center justify-between cursor-pointer">
               <div className="flex items-center gap-2">
                 <Coffee className="w-4 h-4 text-tg-hint" />
@@ -202,14 +199,14 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
                   min="0"
                   max="24"
                   placeholder="Количество часов"
-                  className="w-full bg-white text-[#111827] px-4 py-2.5 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
                 />
               </div>
             )}
           </div>
 
           {needsRevenue && (
-            <div className="mb-5 rounded-2xl border border-tg-border bg-tg-secondary-bg p-4 shadow-sm">
+            <div className="surface-card rounded-[1.35rem] p-4 mb-5">
               <label className="flex items-center gap-2 text-sm text-tg-hint mb-2">Выручка за смену (₽)</label>
               <input
                 type="number"
@@ -218,7 +215,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
                 min="0"
                 step="0.01"
                 placeholder="Введите выручку"
-                className="w-full bg-white text-[#111827] px-4 py-3 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
               />
               {user.pay_model === 'hybrid' && (
                 <p className="text-tg-hint text-xs mt-1">+ {formatCurrency(user.hourly_rate)}/ч × {formatHours(totalHours)}</p>
@@ -229,17 +226,17 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
             </div>
           )}
 
-          <div className="mb-5 rounded-2xl border border-tg-border bg-tg-secondary-bg p-4 shadow-sm">
+          <div className="surface-card rounded-[1.35rem] p-4 mb-5">
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Комментарий (необязательно)"
               rows={2}
-              className="w-full bg-white text-[#111827] px-4 py-3 rounded-xl text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
             />
           </div>
 
-          <div className="glass-card bg-gradient-to-br from-tg-primary/90 to-blue-600/90 rounded-2xl p-5 text-white mb-5 border border-tg-border">
+          <div className="accent-card rounded-[1.4rem] p-5 text-white mb-5">
             <p className="text-sm opacity-80 mb-1">Предварительный расчёт</p>
             <div className="flex items-baseline justify-between">
               <p className="text-3xl font-bold">{formatCurrency(salary)}</p>

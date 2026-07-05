@@ -16,6 +16,13 @@
   --tg-control-border: rgba(15, 23, 42, 0.08);
   --tg-border: rgba(15, 23, 42, 0.08);
   --tg-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px rgba(15, 23, 42, 0.04);
+  --surface: rgba(255, 255, 255, 0.94);
+  --surface-elevated: rgba(255, 255, 255, 0.98);
+  --surface-muted: #efe8dd;
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03), 0 12px 32px rgba(15, 23, 42, 0.05);
+  --text-primary: #16181d;
+  --text-secondary: #666a73;
 }
 
 [data-theme='dark'],
@@ -33,6 +40,13 @@
   --tg-control-border: rgba(255, 255, 255, 0.1);
   --tg-border: rgba(255, 255, 255, 0.1);
   --tg-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 16px 36px rgba(0, 0, 0, 0.25);
+  --surface: rgba(24, 28, 38, 0.96);
+  --surface-elevated: rgba(18, 22, 30, 0.98);
+  --surface-muted: rgba(33, 39, 52, 0.94);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 16px 36px rgba(0, 0, 0, 0.24);
+  --text-primary: #f5f7fa;
+  --text-secondary: #9aa3af;
 }
 
 * {
@@ -48,8 +62,10 @@ html, body, #root {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--tg-bg);
-  color: var(--tg-text);
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.5), transparent 36%),
+    var(--tg-bg);
+  color: var(--text-primary);
   color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -81,11 +97,11 @@ body, button, input, select, textarea {
 
 /* Liquid Glass card style */
 .glass-card {
-  background: var(--tg-card-bg);
+  background: var(--surface-elevated);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--tg-border);
-  box-shadow: var(--tg-shadow);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
 }
 
 /* Safe area for bottom nav */
@@ -129,8 +145,33 @@ input[type='checkbox'] {
   accent-color: var(--tg-primary);
 }
 
-[class~='bg-tg-secondary-bg'] {
-  border: 1px solid var(--tg-border);
-  border-color: var(--tg-border);
-  box-shadow: var(--tg-shadow);
+.surface-card {
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-muted {
+  background: var(--surface-muted);
+}
+
+.surface-elevated {
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+.accent-card {
+  background:
+    linear-gradient(135deg, rgba(49, 93, 255, 0.96), rgba(39, 78, 214, 0.94));
+  box-shadow:
+    0 10px 28px rgba(49, 93, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+[data-theme='dark'] .accent-card,
+.dark .accent-card {
+  background:
+    linear-gradient(135deg, rgba(88, 130, 255, 0.94), rgba(54, 91, 211, 0.9));
+  box-shadow:
+    0 12px 28px rgba(18, 24, 38, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }

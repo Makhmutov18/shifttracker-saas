@@ -46,10 +46,7 @@ export default function History({ user }: Props) {
     return Array.from({ length: 18 }, (_, index) => {
       const date = new Date(current.getFullYear(), current.getMonth() - index, 1);
       const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      return {
-        value,
-        label: formatMonthLabel(date),
-      };
+      return { value, label: formatMonthLabel(date) };
     });
   }, []);
 
@@ -119,7 +116,7 @@ export default function History({ user }: Props) {
       <h1 className="text-lg font-semibold mb-4 text-tg-text">История</h1>
 
       <div className="mb-4 space-y-2">
-        <div className="rounded-2xl border border-tg-border bg-tg-secondary-bg p-3 shadow-sm">
+        <div className="surface-card rounded-[1.35rem] p-3">
           <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint mb-2">Месяц</label>
           <select
             value={currentMonthValue}
@@ -133,11 +130,12 @@ export default function History({ user }: Props) {
             ))}
           </select>
         </div>
+
         <button
           type="button"
           onClick={resetToCurrent}
           disabled={isCurrentPeriod}
-          className="w-full rounded-xl border border-tg-border bg-tg-secondary-bg px-4 py-2.5 text-sm font-medium text-tg-text shadow-sm disabled:opacity-60"
+          className="surface-muted w-full rounded-xl px-4 py-2.5 text-sm font-medium text-tg-text disabled:opacity-60"
         >
           Текущий месяц
         </button>
@@ -146,7 +144,7 @@ export default function History({ user }: Props) {
       {canManagePayroll && (
         <div className="space-y-3 mb-4">
           {summaryLoading ? (
-            <div className="bg-tg-secondary-bg rounded-2xl p-4 animate-pulse border border-tg-border shadow-sm">
+            <div className="surface-card rounded-[1.35rem] p-4 animate-pulse">
               <div className="h-4 w-40 bg-tg-bg/70 rounded mb-3" />
               <div className="grid grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => (
@@ -155,20 +153,18 @@ export default function History({ user }: Props) {
               </div>
             </div>
           ) : summaryError ? (
-            <div className="bg-tg-secondary-bg rounded-2xl p-4 border border-tg-border shadow-sm">
+            <div className="surface-card rounded-[1.35rem] p-4">
               <p className="text-sm font-medium text-tg-text">Payroll summary недоступен</p>
               <p className="text-xs text-red-400 mt-1">{summaryError}</p>
             </div>
           ) : summary ? (
-            <div className="bg-tg-secondary-bg rounded-2xl p-4 border border-tg-border shadow-sm">
+            <div className="surface-card rounded-[1.35rem] p-4">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <p className="text-sm text-tg-hint">Payroll summary за {getMonthName(month)} {year}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Wallet className="w-4 h-4 text-tg-primary" />
-                    <p className="text-xl font-semibold text-tg-text">
-                      {formatCurrency(summary.total_payout)}
-                    </p>
+                    <p className="text-xl font-semibold text-tg-text">{formatCurrency(summary.total_payout)}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -178,19 +174,19 @@ export default function History({ user }: Props) {
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="bg-tg-bg rounded-xl p-3 border border-tg-border shadow-sm">
+                <div className="surface-muted rounded-xl p-3">
                   <p className="text-xs text-tg-hint">Утверждённые смены</p>
                   <p className="text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
                 </div>
-                <div className="bg-tg-bg rounded-xl p-3 border border-tg-border shadow-sm">
+                <div className="surface-muted rounded-xl p-3">
                   <p className="text-xs text-tg-hint">В ожидании</p>
                   <p className="text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
                 </div>
-                <div className="bg-tg-bg rounded-xl p-3 border border-tg-border shadow-sm">
+                <div className="surface-muted rounded-xl p-3">
                   <p className="text-xs text-tg-hint">Часы</p>
                   <p className="text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
                 </div>
-                <div className="bg-tg-bg rounded-xl p-3 border border-tg-border shadow-sm">
+                <div className="surface-muted rounded-xl p-3">
                   <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
                   <p className="text-sm font-semibold text-tg-text">
                     {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
@@ -203,7 +199,7 @@ export default function History({ user }: Props) {
                   {summary.rows.slice(0, 5).map((row) => (
                     <div
                       key={row.user_id}
-                      className="bg-tg-bg rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 border border-tg-border shadow-sm"
+                      className="surface-elevated rounded-xl px-3 py-3 flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
@@ -225,7 +221,7 @@ export default function History({ user }: Props) {
             type="button"
             onClick={handleExport}
             disabled={exportLoading}
-            className="w-full bg-tg-secondary-bg text-tg-text py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60 border border-tg-border shadow-sm"
+            className="surface-card w-full text-tg-text py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
           >
             {exportLoading ? (
               <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
@@ -238,11 +234,11 @@ export default function History({ user }: Props) {
         </div>
       )}
 
-      <div className="flex bg-tg-secondary-bg rounded-xl p-1 mb-4 border border-tg-border shadow-sm">
+      <div className="surface-muted flex rounded-xl p-1 mb-4">
         <button
           onClick={() => setTab('shifts')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'shifts' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
+            tab === 'shifts' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
           <Clock className="w-4 h-4" />
@@ -251,7 +247,7 @@ export default function History({ user }: Props) {
         <button
           onClick={() => setTab('expenses')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'expenses' ? 'bg-tg-bg text-tg-text shadow-sm' : 'text-tg-hint'
+            tab === 'expenses' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
           <CreditCard className="w-4 h-4" />
@@ -263,7 +259,7 @@ export default function History({ user }: Props) {
         shiftsLoading ? (
           <div className="space-y-3 animate-pulse">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl border border-tg-border shadow-sm" />
+              <div key={i} className="h-20 surface-card rounded-xl" />
             ))}
           </div>
         ) : shiftsError ? (
@@ -286,7 +282,7 @@ export default function History({ user }: Props) {
       ) : expensesLoading ? (
         <div className="space-y-3 animate-pulse">
           {[1, 2].map((i) => (
-            <div key={i} className="h-16 bg-tg-secondary-bg rounded-xl border border-tg-border shadow-sm" />
+            <div key={i} className="h-16 surface-card rounded-xl" />
           ))}
         </div>
       ) : expensesError ? (
@@ -302,16 +298,11 @@ export default function History({ user }: Props) {
       ) : (
         <div className="space-y-2">
           {expenses.map((expense) => (
-            <div
-              key={expense.id}
-              className="bg-tg-secondary-bg rounded-xl p-4 flex items-center justify-between border border-tg-border shadow-sm"
-            >
+            <div key={expense.id} className="surface-card rounded-xl p-4 flex items-center justify-between">
               <div>
                 <p className="text-tg-text font-medium text-sm">{expense.category}</p>
                 <p className="text-tg-hint text-xs">{expense.date}</p>
-                {expense.comment && (
-                  <p className="text-tg-hint text-xs mt-0.5">{expense.comment}</p>
-                )}
+                {expense.comment && <p className="text-tg-hint text-xs mt-0.5">{expense.comment}</p>}
               </div>
               <p className="text-rose-400 font-semibold text-sm">-{formatCurrency(expense.amount)}</p>
             </div>
