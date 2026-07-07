@@ -399,6 +399,357 @@ function InviteTab() {
   );
 }
 
+function ApproveTab() {
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ShiftDraft | null>(null);
+  const [savingShiftId, setSavingShiftId] = useState<string | null>(null);
+
+  const safeShifts = Array.isArray(shifts) ? shifts : [];
+  const safeUserNames = userNames ?? {};
+
+  const getShiftDateLabel = (date: string) => {
+    if (!date || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
+      return 'Дата не указана';
+    }
+    return formatDate(date);
+  };
+
+  const getShiftTimeLabel = (time: string) => {
+    return typeof time === 'string' && time.length >= 5 ? formatTime(time) : '00:00';
+  };
+
+  const getShiftAmount = (amount: string | number | null | undefined) => {
+    if (amount == null || amount === '') return formatCurrency(0);
+    return formatCurrency(amount);
+  };
+
+  const getShiftHours = (hours: string | number | null | undefined) => {
+    if (hours == null || hours === '') return formatHours(0);
+    return formatHours(hours);
+  };
+
+  const buildDraft = (shift: Shift): ShiftDraft => ({
+    start_time: typeof shift.start_time === 'string' ? shift.start_time.slice(0, 5) : '',
+    end_time: typeof shift.end_time === 'string' ? shift.end_time.slice(0, 5) : '',
+    cashier_hours: shift.cashier_hours ? String(shift.cashier_hours) : '',
+    revenue: shift.revenue ? String(shift.revenue) : '',
+    comment: shift.comment || '',
+  });
+
+  const fetchShifts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [shiftsResult, usersResult] = await Promise.allSettled([getPendingShifts(), getUsers(true)]);
+
+      if (shiftsResult.status === 'rejected') {
+        throw shiftsResult.reason;
+      }
+
+      const nextShifts = Array.isArray(shiftsResult.value) ? shiftsResult.value : [];
+      setShifts(nextShifts);
+
+      if (usersResult.status === 'fulfilled' && Array.isArray(usersResult.value)) {
+        setUserNames(
+          usersResult.value.reduce<Record<string, string>>((acc, current) => {
+            if (current?.id) {
+              acc[current.id] = current.name || 'Сотрудник';
+            }
+            return acc;
+          }, {})
+        );
+      } else {
+        setUserNames({});
+      }
+    } catch (err: any) {
+      setShifts([]);
+      setUserNames({});
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить смены на подтверждение');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShifts();
+    const interval = window.setInterval(fetchShifts, 30000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const startEdit = (shift: Shift) => {
+    if (!shift?.id) return;
+    setEditingShiftId(shift.id);
+    setDraft(buildDraft(shift));
+  };
+
+  const cancelEdit = () => {
+    setEditingShiftId(null);
+    setDraft(null);
+  };
+
+  const saveEdit = async (shiftId: string) => {
+    if (!draft || !shiftId) return;
+
+    try {
+      setSavingShiftId(shiftId);
+      setError(null);
+      const updated = await updateShift(shiftId, {
+        start_time: draft.start_time || undefined,
+        end_time: draft.end_time || undefined,
+        cashier_hours: draft.cashier_hours === '' ? undefined : parseFloat(draft.cashier_hours),
+        revenue: draft.revenue === '' ? undefined : parseFloat(draft.revenue),
+        comment: draft.comment.trim() || undefined,
+      });
+      setShifts((prev) => (Array.isArray(prev) ? prev.map((shift) => (shift.id === shiftId ? updated : shift)) : [updated]));
+      hapticSuccess();
+      cancelEdit();
+    } catch (err: any) {
+      hapticError();
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить правки');
+    } finally {
+      setSavingShiftId(null);
+    }
+  };
+
+  const handleApprove = async (shiftId: string) => {
+    if (!shiftId) return;
+
+    try {
+      setSavingShiftId(shiftId);
+      setError(null);
+      await updateShift(shiftId, { status: 'approved' });
+      hapticSuccess();
+      setShifts((prev) => (Array.isArray(prev) ? prev.filter((shift) => shift.id !== shiftId) : []));
+      if (editingShiftId === shiftId) {
+        cancelEdit();
+      }
+    } catch (err: any) {
+      hapticError();
+      setError(err instanceof Error ? err.message : 'Не удалось утвердить смену');
+    } finally {
+      setSavingShiftId(null);
+    }
+  };
+
+  const handleReject = async (shiftId: string) => {
+    if (!shiftId) return;
+
+    try {
+      setSavingShiftId(shiftId);
+      setError(null);
+      await updateShift(shiftId, { status: 'rejected' });
+      hapticSuccess();
+      setShifts((prev) => (Array.isArray(prev) ? prev.filter((shift) => shift.id !== shiftId) : []));
+      if (editingShiftId === shiftId) {
+        cancelEdit();
+      }
+    } catch (err: any) {
+      hapticError();
+      setError(err instanceof Error ? err.message : 'Не удалось отклонить смену');
+    } finally {
+      setSavingShiftId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 bg-tg-secondary-bg rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5 text-center">
+        <p className="text-sm font-medium text-red-400">Ошибка загрузки</p>
+        <p className="mt-1 text-sm text-tg-hint">{error}</p>
+        <button
+          onClick={fetchShifts}
+          className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-tg-primary"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Повторить
+        </button>
+      </div>
+    );
+  }
+
+  if (safeShifts.length === 0) {
+    return (
+      <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5 text-center">
+        <p className="text-sm font-medium text-tg-text">Нет смен на утверждение</p>
+        <p className="mt-1 text-sm text-tg-hint">Новые заявки сотрудников появятся здесь.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-tg-hint text-sm">Ожидают утверждения: {safeShifts.length}</p>
+        <button
+          onClick={fetchShifts}
+          className="text-tg-primary text-xs font-medium flex items-center gap-1"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Обновить
+        </button>
+      </div>
+
+      {safeShifts.map((shift, index) => {
+        const shiftId = shift?.id || `pending-${index}`;
+        const isEditing = editingShiftId === shiftId && Boolean(draft);
+        const isSaving = savingShiftId === shiftId;
+        const employeeName =
+          (shift?.user_id && safeUserNames[shift.user_id]) ||
+          'Сотрудник';
+
+        return (
+          <div key={shiftId} className="bg-tg-secondary-bg rounded-xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-tg-text font-medium text-sm">{employeeName}</p>
+                <p className="text-tg-hint text-xs">
+                  {getShiftDateLabel(shift?.date || '')} · {getShiftTimeLabel(shift?.start_time || '')} — {getShiftTimeLabel(shift?.end_time || '')}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-tg-text font-semibold text-sm">{getShiftAmount(shift?.salary_earned)}</p>
+                <p className="text-tg-hint text-xs">{getShiftHours(shift?.total_hours)}</p>
+              </div>
+            </div>
+
+            {isEditing ? (
+              <div className="space-y-3 bg-tg-bg rounded-xl p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Начало</label>
+                    <input
+                      type="time"
+                      value={draft?.start_time ?? ''}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, start_time: e.target.value } : prev))}
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Конец</label>
+                    <input
+                      type="time"
+                      value={draft?.end_time ?? ''}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, end_time: e.target.value } : prev))}
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Часы кассы</label>
+                    <input
+                      type="number"
+                      value={draft?.cashier_hours ?? ''}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, cashier_hours: e.target.value } : prev))}
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5 placeholder:text-gray-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-tg-hint mb-1">Выручка</label>
+                    <input
+                      type="number"
+                      value={draft?.revenue ?? ''}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, revenue: e.target.value } : prev))}
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5 placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-tg-hint mb-1">Комментарий</label>
+                  <textarea
+                    value={draft?.comment ?? ''}
+                    onChange={(e) => setDraft((prev) => (prev ? { ...prev, comment: e.target.value } : prev))}
+                    rows={2}
+                    placeholder="Комментарий к смене"
+                    className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEdit(shiftId)}
+                    disabled={isSaving}
+                    className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                  >
+                    {isSaving ? (
+                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Сохранить правки
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={isSaving}
+                    className="flex-1 bg-tg-secondary-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            ) : shift?.comment ? (
+              <p className="text-tg-hint text-xs bg-tg-bg rounded-lg px-3 py-2">{shift.comment}</p>
+            ) : null}
+
+            {!isEditing && Boolean(shift?.id) && (
+              <button
+                onClick={() => startEdit(shift)}
+                className="w-full bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform"
+              >
+                <Pencil className="w-4 h-4" />
+                Исправить перед утверждением
+              </button>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleApprove(shiftId)}
+                disabled={!shift?.id || isSaving || Boolean(editingShiftId === shiftId && draft)}
+                className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Утвердить
+              </button>
+              <button
+                onClick={() => handleReject(shiftId)}
+                disabled={!shift?.id || isSaving}
+                className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform disabled:opacity-60"
+              >
+                <XCircle className="w-4 h-4" />
+                Отклонить
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TeamTab({ user }: { user: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);

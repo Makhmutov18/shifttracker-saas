@@ -197,6 +197,32 @@ export interface Shift {
   created_at: string;
 }
 
+const SHIFT_STATUSES = ['pending', 'approved', 'rejected'] as const;
+
+function normalizeShiftStatus(status: unknown): Shift['status'] {
+  return SHIFT_STATUSES.includes(status as Shift['status']) ? (status as Shift['status']) : 'pending';
+}
+
+function normalizeShift(raw: unknown): Shift {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: typeof source.id === 'string' ? source.id : '',
+    user_id: typeof source.user_id === 'string' ? source.user_id : '',
+    venue_id: typeof source.venue_id === 'string' ? source.venue_id : '',
+    date: typeof source.date === 'string' && source.date.trim() ? source.date : '',
+    start_time: typeof source.start_time === 'string' ? source.start_time : '',
+    end_time: typeof source.end_time === 'string' ? source.end_time : '',
+    cashier_hours: source.cashier_hours == null ? null : String(source.cashier_hours),
+    total_hours: source.total_hours == null ? '0' : String(source.total_hours),
+    salary_earned: source.salary_earned == null ? '0' : String(source.salary_earned),
+    revenue: source.revenue == null ? null : String(source.revenue),
+    status: normalizeShiftStatus(source.status),
+    comment: typeof source.comment === 'string' ? source.comment : null,
+    created_at: typeof source.created_at === 'string' ? source.created_at : '',
+  };
+}
+
 export interface ShiftCreate {
   date: string;
   start_time: string;
@@ -216,10 +242,11 @@ export interface ShiftUpdate {
 }
 
 export async function createShift(data: ShiftCreate): Promise<Shift> {
-  return request<Shift>('/shifts', {
+  const shift = await request<Shift>('/shifts', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return normalizeShift(shift);
 }
 
 export async function getShifts(month?: number, year?: number): Promise<Shift[]> {
@@ -227,18 +254,21 @@ export async function getShifts(month?: number, year?: number): Promise<Shift[]>
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
   const qs = params.toString();
-  return request<Shift[]>(`/shifts${qs ? `?${qs}` : ''}`);
+  const shifts = await request<Shift[]>(`/shifts${qs ? `?${qs}` : ''}`);
+  return Array.isArray(shifts) ? shifts.map(normalizeShift) : [];
 }
 
 export async function getPendingShifts(): Promise<Shift[]> {
-  return request<Shift[]>('/shifts/pending');
+  const shifts = await request<Shift[]>('/shifts/pending');
+  return Array.isArray(shifts) ? shifts.map(normalizeShift) : [];
 }
 
 export async function updateShift(id: string, data: ShiftUpdate): Promise<Shift> {
-  return request<Shift>(`/shifts/${id}`, {
+  const shift = await request<Shift>(`/shifts/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
+  return normalizeShift(shift);
 }
 
 // Expenses
