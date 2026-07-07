@@ -40,8 +40,9 @@ import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/he
 import { hapticError, hapticSuccess } from '../utils/telegram';
 import {
   PERMISSION_KEYS,
-  PERMISSION_LABELS,
+  PermissionKey,
   PermissionMap,
+  canAccessOwnerPanel,
   getDefaultPermissionsForRole,
   hasPermission,
   normalizePermissionMap,
@@ -103,35 +104,125 @@ function PermissionsChecklist({ value, onChange, disabled = false }: PermissionT
   const safeValue = value ?? {};
 
   return (
-    <div className="space-y-3 rounded-2xl border border-tg-border bg-tg-secondary-bg p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-tg-hint">Права доступа</p>
-      <div className="grid gap-2">
-        {PERMISSION_KEYS.map((key) => (
-          <label
-            key={key}
-            className={`flex items-center justify-between gap-3 rounded-xl border border-tg-border px-3 py-3 text-sm ${
-              disabled ? 'opacity-60' : 'bg-tg-bg'
-            }`}
-          >
-            <span className="text-tg-text">{PERMISSION_LABELS[key]}</span>
-            <input
-              type="checkbox"
-              checked={Boolean(safeValue[key])}
-              disabled={disabled}
-              onChange={(event) =>
-                onChange({
-                  ...safeValue,
-                  [key]: event.target.checked,
-                })
-              }
-              className="h-4 w-4 rounded border-gray-300 text-tg-primary focus:ring-tg-primary"
-            />
-          </label>
-        ))}
-      </div>
+    <div className="grid gap-2">
+      {MANAGEMENT_PERMISSION_OPTIONS.map(({ key, label }) => (
+        <label
+          key={key}
+          className={`flex items-center justify-between gap-3 rounded-xl bg-tg-bg px-3 py-3 text-sm ${
+            disabled ? 'opacity-60' : 'hover:bg-tg-bg/90'
+          }`}
+        >
+          <span className="text-tg-text">{label}</span>
+          <input
+            type="checkbox"
+            checked={Boolean(safeValue[key])}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange({
+                ...safeValue,
+                [key]: event.target.checked,
+              })
+            }
+            className="h-4 w-4 rounded border-gray-300 text-tg-primary focus:ring-tg-primary"
+          />
+        </label>
+      ))}
     </div>
   );
 }
+
+function ManagementAccessSection({
+  enabled,
+  onEnabledChange,
+  permissions,
+  onPermissionsChange,
+  disabled = false,
+}: {
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  permissions: PermissionMap;
+  onPermissionsChange: (permissions: PermissionMap) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-tg-text">Доступ к управлению</p>
+          <p className="text-xs text-tg-hint">
+            Если выключено, сотрудник видит только свои смены, историю и профиль.
+          </p>
+        </div>
+        <label className={`inline-flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={disabled}
+            onChange={(event) => onEnabledChange(event.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-tg-primary focus:ring-tg-primary"
+          />
+          <span className="text-tg-text">{enabled ? 'Включён' : 'Обычный сотрудник'}</span>
+        </label>
+      </div>
+
+      {enabled ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-tg-hint">Права доступа</p>
+          <PermissionsChecklist value={permissions} onChange={onPermissionsChange} disabled={disabled} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EmployeeFormSection({
+  children,
+  title,
+  description,
+}: {
+  children: React.ReactNode;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-tg-text">{title}</p>
+        {description ? <p className="text-xs text-tg-hint">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function getEmptyManagementPermissions(): PermissionMap {
+  return PERMISSION_KEYS.reduce<PermissionMap>((acc, key) => {
+    acc[key] = false;
+    return acc;
+  }, {});
+}
+
+function getManagementEnabledState(role: User['role'], permissions?: PermissionMap) {
+  if (role === 'owner' || role === 'admin') {
+    return true;
+  }
+  return canAccessOwnerPanel({ role, permissions: permissions ?? {} });
+}
+
+function getManagementBadge(user: Pick<User, 'role' | 'permissions'>) {
+  return canAccessOwnerPanel(user) ? 'Есть доступ к управлению' : 'Обычный сотрудник';
+}
+
+const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
+  { key: 'can_approve_shifts', label: 'Утверждать смены' },
+  { key: 'can_view_team_shifts', label: 'Видеть смены команды' },
+  { key: 'can_edit_team_shifts', label: 'Редактировать смены команды' },
+  { key: 'can_view_team_payroll', label: 'Видеть выплаты' },
+  { key: 'can_export_payroll', label: 'Экспортировать payroll' },
+  { key: 'can_manage_team', label: 'Управлять командой и точками' },
+  { key: 'can_manage_adjustments', label: 'Управлять корректировками' },
+  { key: 'can_manage_expenses', label: 'Управлять расходами' },
+];
 
 export default function OwnerPanel({ user }: Props) {
   const [tab, setTab] = useState<Tab>('invite');
@@ -196,14 +287,15 @@ export default function OwnerPanel({ user }: Props) {
 
 function InviteTab() {
   const [firstName, setFirstName] = useState('');
-  const [position, setPosition] = useState(POSITION_DEFAULTS.barista);
+  const [position, setPosition] = useState('');
   const [role, setRole] = useState<'barista' | 'admin' | 'senior' | 'cook' | 'senior_cook'>('barista');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venueId, setVenueId] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [payModel, setPayModel] = useState<'hourly' | 'revenue' | 'hybrid'>('hourly');
   const [revenuePercentage, setRevenuePercentage] = useState('');
-  const [permissions, setPermissions] = useState<PermissionMap>(() => getDefaultPermissionsForRole('barista'));
+  const [permissions, setPermissions] = useState<PermissionMap>(() => getEmptyManagementPermissions());
+  const [managementEnabled, setManagementEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AdminCreateUserResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -247,14 +339,16 @@ function InviteTab() {
         hourly_rate: rate || 0,
         pay_model: payModel,
         revenue_percentage: parseFloat(revenuePercentage) || 0,
-        permissions,
+        permissions: managementEnabled ? permissions : getEmptyManagementPermissions(),
       });
       setResult(res);
       setFirstName('');
-      setPosition(POSITION_DEFAULTS[role]);
+      setPosition('');
       setVenueId((current) => current || venues[0]?.id || '');
       setHourlyRate('');
       setRevenuePercentage('');
+      setPermissions(getEmptyManagementPermissions());
+      setManagementEnabled(false);
     } catch (err: any) {
       setError(err.message || 'Ошибка при создании пользователя');
     } finally {
@@ -282,131 +376,107 @@ function InviteTab() {
   };
 
   return (
-    <div>
+    <div className="space-y-4">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Имя сотрудника</label>
-          <input
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="Например: Анна"
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Должность</label>
-          <input
-            type="text"
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            placeholder="Бариста, повар, кассир, администратор зала"
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Точка</label>
-          <select
-            value={venueId}
-            onChange={(e) => setVenueId(e.target.value)}
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
-          >
-            {venues.length === 0 ? (
-              <option value="">Основная точка</option>
-            ) : (
-              venues.map((venue) => (
-                <option key={venue.id} value={venue.id}>
-                  {getVenueLabel(venue)}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Уровень доступа</label>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { value: 'barista' as const, label: 'Бариста' },
-              { value: 'cook' as const, label: 'Повар' },
-              { value: 'senior' as const, label: 'Старший' },
-              { value: 'senior_cook' as const, label: 'Шеф-повар' },
-              { value: 'admin' as const, label: 'Администратор' },
-            ].map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                onClick={() => {
-                  setRole(r.value);
-                  setPermissions(getDefaultPermissionsForRole(r.value));
-                  setPosition(POSITION_DEFAULTS[r.value]);
-                }}
-                className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                  role === r.value ? 'bg-tg-primary text-white' : 'bg-tg-secondary-bg text-tg-hint'
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">Модель оплаты</label>
-          <div className="flex gap-2">
-            {[
-              { value: 'hourly' as const, label: 'Почасовая' },
-              { value: 'revenue' as const, label: 'От выручки' },
-              { value: 'hybrid' as const, label: 'Смешанная' },
-            ].map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setPayModel(m.value)}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                  payModel === m.value ? 'bg-tg-primary text-white' : 'bg-tg-secondary-bg text-tg-hint'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-tg-hint mb-1.5">
-            Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(payModel)}</span>
-          </label>
-          <input
-            type="number"
-            value={hourlyRate}
-            onChange={(e) => setHourlyRate(e.target.value)}
-            placeholder="Например: 250"
-            min="0"
-            step="0.01"
-            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
-          />
-        </div>
-
-        {payModel !== 'hourly' && (
+        <EmployeeFormSection title="Основное" description="Только базовые данные сотрудника. Управленческий доступ можно включить отдельно ниже.">
           <div>
-            <label className="block text-sm text-tg-hint mb-1.5">% от выручки</label>
+            <label className="block text-sm text-tg-hint mb-1.5">Имя сотрудника</label>
             <input
-              type="number"
-              value={revenuePercentage}
-              onChange={(e) => setRevenuePercentage(e.target.value)}
-              placeholder="Например: 2"
-              min="0"
-              max="100"
-              step="0.1"
-              className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Например: Анна"
+              className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
             />
           </div>
-        )}
 
-        <PermissionsChecklist value={permissions} onChange={setPermissions} />
+          <div>
+            <label className="block text-sm text-tg-hint mb-1.5">Должность</label>
+            <input
+              type="text"
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              placeholder="Бариста, повар, кассир, администратор зала"
+              className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-tg-hint mb-1.5">Точка</label>
+            <select
+              value={venueId}
+              onChange={(e) => setVenueId(e.target.value)}
+              className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+            >
+              {venues.length === 0 ? (
+                <option value="">Основная точка</option>
+              ) : (
+                venues.map((venue) => (
+                  <option key={venue.id} value={venue.id}>
+                    {getVenueLabel(venue)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        </EmployeeFormSection>
+
+        <EmployeeFormSection title="Оплата">
+          <div>
+            <label className="block text-sm text-tg-hint mb-1.5">Модель оплаты</label>
+            <select
+              value={payModel}
+              onChange={(e) => setPayModel(e.target.value as User['pay_model'])}
+              className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+            >
+              <option value="hourly">Почасовая</option>
+              <option value="revenue">От выручки</option>
+              <option value="hybrid">Смешанная</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-tg-hint mb-1.5">
+              Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(payModel)}</span>
+            </label>
+            <input
+              type="number"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+              placeholder="Например: 250"
+              min="0"
+              step="0.01"
+              className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+            />
+          </div>
+
+          {payModel !== 'hourly' && (
+            <div>
+              <label className="block text-sm text-tg-hint mb-1.5">% от выручки</label>
+              <input
+                type="number"
+                value={revenuePercentage}
+                onChange={(e) => setRevenuePercentage(e.target.value)}
+                placeholder="Например: 2"
+                min="0"
+                max="100"
+                step="0.1"
+                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+              />
+            </div>
+          )}
+        </EmployeeFormSection>
+
+        <ManagementAccessSection
+          enabled={managementEnabled}
+          onEnabledChange={(enabled) => {
+            setManagementEnabled(enabled);
+            setRole(enabled ? 'senior' : 'barista');
+            setPermissions(enabled ? getDefaultPermissionsForRole('senior') : getEmptyManagementPermissions());
+          }}
+          permissions={permissions}
+          onPermissionsChange={setPermissions}
+        />
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
@@ -1065,6 +1135,7 @@ function TeamTab({ user }: { user: User }) {
   const [editPayModel, setEditPayModel] = useState<User['pay_model']>('hourly');
   const [editRevenuePercentage, setEditRevenuePercentage] = useState('');
   const [editPermissions, setEditPermissions] = useState<PermissionMap>(getDefaultPermissionsForRole('barista'));
+  const [editManagementEnabled, setEditManagementEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusUserId, setStatusUserId] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
@@ -1101,10 +1172,12 @@ function TeamTab({ user }: { user: User }) {
     setEditRole(target.role);
     setEditPayModel(target.pay_model);
     setEditRevenuePercentage(target.revenue_percentage);
-    setEditPermissions({
+    const nextPermissions = {
       ...getDefaultPermissionsForRole(target.role),
       ...normalizePermissionMap(target.permissions),
-    });
+    };
+    setEditPermissions(nextPermissions);
+    setEditManagementEnabled(getManagementEnabledState(target.role, nextPermissions));
   };
 
   const saveEdit = async () => {
@@ -1121,7 +1194,12 @@ function TeamTab({ user }: { user: User }) {
         role: editRole,
         pay_model: editPayModel,
         revenue_percentage: editPayModel === 'hourly' ? 0 : parseFloat(editRevenuePercentage) || 0,
-        permissions: editingUser.id === user.id && user.role !== 'owner' ? undefined : editPermissions,
+        permissions:
+          editingUser.id === user.id && user.role !== 'owner'
+            ? undefined
+            : editManagementEnabled
+            ? editPermissions
+            : getEmptyManagementPermissions(),
       });
       hapticSuccess();
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -1203,128 +1281,109 @@ function TeamTab({ user }: { user: User }) {
 
         {editingUser ? (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">Имя сотрудника</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-                placeholder="Например: Анна"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">Должность</label>
-              <input
-                type="text"
-                value={editPosition}
-                onChange={(e) => setEditPosition(e.target.value)}
-                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-                placeholder="Бариста, повар, кассир, администратор зала"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">Точка</label>
-              <select
-                value={editVenueId}
-                onChange={(e) => setEditVenueId(e.target.value)}
-                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-              >
-                {venues.length === 0 ? (
-                  <option value={editingUser.venue_id || ''}>{getVenueName(editingUser.venue)}</option>
-                ) : (
-                  venues.map((venue) => (
-                    <option key={venue.id} value={venue.id}>
-                      {getVenueLabel(venue)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">Уровень доступа</label>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLE_OPTIONS.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => {
-                      const nextRole = r.value as User['role'];
-                      setEditRole(nextRole);
-                      setEditPermissions(getDefaultPermissionsForRole(nextRole));
-                      setEditPosition(POSITION_DEFAULTS[nextRole]);
-                    }}
-                    className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                      editRole === r.value ? 'bg-tg-primary text-white' : 'bg-tg-bg text-tg-hint'
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-tg-hint">Должность показывает роль человека в команде, а права задаются отдельно.</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">Модель оплаты</label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'hourly' as const, label: 'Почасовая' },
-                  { value: 'revenue' as const, label: 'От выручки' },
-                  { value: 'hybrid' as const, label: 'Смешанная' },
-                ].map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setEditPayModel(m.value)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                      editPayModel === m.value ? 'bg-tg-primary text-white' : 'bg-tg-bg text-tg-hint'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm text-tg-hint">
-                Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(editPayModel)}</span>
-              </label>
-              <input
-                type="number"
-                value={editRate}
-                onChange={(e) => setEditRate(e.target.value)}
-                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-                placeholder="Например: 250"
-                min="0"
-                step="0.01"
-              />
-            </div>
-
-            {editPayModel !== 'hourly' && (
+            <EmployeeFormSection title="Основное">
               <div className="space-y-1.5">
-                <label className="block text-sm text-tg-hint">% от выручки</label>
+                <label className="block text-sm text-tg-hint">Имя сотрудника</label>
                 <input
-                  type="number"
-                  value={editRevenuePercentage}
-                  onChange={(e) => setEditRevenuePercentage(e.target.value)}
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
                   className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-                  placeholder="Например: 2"
-                  min="0"
-                  max="100"
-                  step="0.1"
+                  placeholder="Например: Анна"
                 />
               </div>
-            )}
 
-            <PermissionsChecklist
-              value={editPermissions}
-              onChange={setEditPermissions}
-              disabled={user.role !== 'owner' && editingUser.id === user.id}
+              <div className="space-y-1.5">
+                <label className="block text-sm text-tg-hint">Должность</label>
+                <input
+                  type="text"
+                  value={editPosition}
+                  onChange={(e) => setEditPosition(e.target.value)}
+                  className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                  placeholder="Бариста, повар, кассир, администратор зала"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm text-tg-hint">Точка</label>
+                <select
+                  value={editVenueId}
+                  onChange={(e) => setEditVenueId(e.target.value)}
+                  className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                >
+                  {venues.length === 0 ? (
+                    <option value={editingUser.venue_id || ''}>{getVenueName(editingUser.venue)}</option>
+                  ) : (
+                    venues.map((venue) => (
+                      <option key={venue.id} value={venue.id}>
+                        {getVenueLabel(venue)}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </EmployeeFormSection>
+
+            <EmployeeFormSection title="Оплата">
+              <div className="space-y-1.5">
+                <label className="block text-sm text-tg-hint">Модель оплаты</label>
+                <select
+                  value={editPayModel}
+                  onChange={(e) => setEditPayModel(e.target.value as User['pay_model'])}
+                  className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                >
+                  <option value="hourly">Почасовая</option>
+                  <option value="revenue">От выручки</option>
+                  <option value="hybrid">Смешанная</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm text-tg-hint">
+                  Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(editPayModel)}</span>
+                </label>
+                <input
+                  type="number"
+                  value={editRate}
+                  onChange={(e) => setEditRate(e.target.value)}
+                  className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                  placeholder="Например: 250"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              {editPayModel !== 'hourly' && (
+                <div className="space-y-1.5">
+                  <label className="block text-sm text-tg-hint">% от выручки</label>
+                  <input
+                    type="number"
+                    value={editRevenuePercentage}
+                    onChange={(e) => setEditRevenuePercentage(e.target.value)}
+                    className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                    placeholder="Например: 2"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+              )}
+            </EmployeeFormSection>
+
+            <ManagementAccessSection
+              enabled={editManagementEnabled}
+              onEnabledChange={(enabled) => {
+                const locked = editingUser.role === 'owner' || (editingUser.id === user.id && user.role !== 'owner');
+                if (locked) {
+                  return;
+                }
+                setEditManagementEnabled(enabled);
+                setEditRole(enabled ? 'senior' : 'barista');
+                setEditPermissions(enabled ? getDefaultPermissionsForRole('senior') : getEmptyManagementPermissions());
+              }}
+              permissions={editPermissions}
+              onPermissionsChange={setEditPermissions}
+              disabled={editingUser.role === 'owner' || (editingUser.id === user.id && user.role !== 'owner')}
             />
 
             <div className="flex gap-2">
@@ -1369,7 +1428,7 @@ function TeamTab({ user }: { user: User }) {
                 <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
                   <p>Точка: {getVenueName(u.venue)}</p>
                   <p>Должность: {getPositionLabel(u)}</p>
-                  <p>Уровень доступа: {ROLE_LABELS[u.role] ?? u.role}</p>
+                  <p>{getManagementBadge(u)}</p>
                   <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
                   <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
                   {u.pay_model !== 'hourly' && Number(u.revenue_percentage) > 0 && (
@@ -1419,15 +1478,6 @@ function TeamTab({ user }: { user: User }) {
   );
 }
 
-const ROLE_LABELS: Record<User['role'], string> = {
-  owner: 'Владелец',
-  admin: 'Администратор',
-  senior: 'Старший',
-  barista: 'Бариста',
-  cook: 'Повар',
-  senior_cook: 'Шеф-повар',
-};
-
 const POSITION_DEFAULTS: Record<User['role'], string> = {
   owner: 'Владелец',
   admin: 'Администратор',
@@ -1436,14 +1486,6 @@ const POSITION_DEFAULTS: Record<User['role'], string> = {
   cook: 'Повар',
   senior_cook: 'Шеф-повар',
 };
-
-const ROLE_OPTIONS = [
-  { value: 'barista', label: 'Бариста' },
-  { value: 'cook', label: 'Повар' },
-  { value: 'senior', label: 'Старший' },
-  { value: 'senior_cook', label: 'Шеф-повар' },
-  { value: 'admin', label: 'Администратор' },
-] as const;
 
 const PAY_MODEL_LABELS: Record<User['pay_model'], string> = {
   hourly: 'Почасовая',
