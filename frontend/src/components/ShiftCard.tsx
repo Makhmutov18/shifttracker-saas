@@ -75,11 +75,11 @@ export default function ShiftCard({ shift }: Props) {
       >
         <div className="px-4 pb-4 space-y-2 border-t border-tg-border pt-3">
           <div className="flex justify-between text-sm">
-            <span className="text-tg-hint">Приход</span>
+            <span className="text-tg-hint">Начало смены</span>
             <span className="text-tg-text font-medium">{formatTime(shift.start_time)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-tg-hint">Уход</span>
+            <span className="text-tg-hint">Конец смены</span>
             <span className="text-tg-text font-medium">{formatTime(shift.end_time)}</span>
           </div>
           {shift.cashier_hours && parseFloat(shift.cashier_hours) > 0 && (

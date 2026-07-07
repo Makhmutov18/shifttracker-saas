@@ -33,6 +33,15 @@ def _can_manage_all_venue_shifts(user: User) -> bool:
     return user.role in (UserRole.owner, UserRole.admin)
 
 
+def _can_view_team_history_scope(user: User) -> bool:
+    return (
+        _can_manage_all_venue_shifts(user)
+        or has_permission(user, "can_view_team_payroll")
+        or has_permission(user, "can_approve_shifts")
+        or has_permission(user, "can_edit_team_shifts")
+    )
+
+
 async def get_current_user(
     init_data: str = Header(..., alias="X-Init-Data"),
     session: AsyncSession = Depends(get_session),
@@ -160,11 +169,29 @@ async def list_shifts(
     m = month or now.month
     y = year or now.year
 
-    query = select(Shift).where(
-        Shift.user_id == user.id,
-        func.extract("month", Shift.date) == m,
-        func.extract("year", Shift.date) == y,
-    ).order_by(Shift.date.desc(), Shift.start_time.desc())
+    query = (
+        select(Shift)
+        .outerjoin(User, Shift.user_id == User.id)
+        .options(selectinload(Shift.user), selectinload(Shift.venue))
+        .where(
+            func.extract("month", Shift.date) == m,
+            func.extract("year", Shift.date) == y,
+        )
+    )
+
+    if _can_manage_all_venue_shifts(user):
+        pass
+    elif _can_view_team_history_scope(user):
+        query = query.where(
+            or_(
+                Shift.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+    else:
+        query = query.where(Shift.user_id == user.id)
+
+    query = query.order_by(Shift.date.desc(), Shift.start_time.desc())
 
     result = await session.execute(query)
     shifts = result.scalars().all()
@@ -326,35 +353,52 @@ async def payroll_summary(
     m = month or now.month
     y = year or now.year
 
-    users_result = await session.execute(
-        select(User)
-        .where(User.venue_id == user.venue_id, User.is_active == True)
-        .order_by(User.name)
-    )
-    venue_users = users_result.scalars().all()
+    users_query = select(User).where(User.is_active == True)
+    if not _can_manage_all_venue_shifts(user):
+        users_query = users_query.where(User.venue_id == user.venue_id)
+    users_query = users_query.order_by(User.name)
 
-    shifts_result = await session.execute(
+    users_result = await session.execute(users_query)
+    scoped_users = users_result.scalars().all()
+
+    shifts_query = (
         select(Shift, User)
         .join(User, Shift.user_id == User.id)
         .where(
-            Shift.venue_id == user.venue_id,
             func.extract("month", Shift.date) == m,
             func.extract("year", Shift.date) == y,
         )
-        .order_by(User.name, Shift.date)
     )
+    if not _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(
+            or_(
+                Shift.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+    shifts_query = shifts_query.order_by(User.name, Shift.date)
+
+    shifts_result = await session.execute(shifts_query)
     shifts_with_users = shifts_result.all()
 
-    adjustments_result = await session.execute(
+    adjustments_query = (
         select(Adjustment, User)
         .join(User, Adjustment.user_id == User.id)
         .where(
-            Adjustment.venue_id == user.venue_id,
             Adjustment.month == m,
             Adjustment.year == y,
         )
-        .order_by(User.name)
     )
+    if not _can_manage_all_venue_shifts(user):
+        adjustments_query = adjustments_query.where(
+            or_(
+                Adjustment.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+    adjustments_query = adjustments_query.order_by(User.name)
+
+    adjustments_result = await session.execute(adjustments_query)
     adjustments_with_users = adjustments_result.all()
 
     rows_by_user: dict[uuid.UUID, dict] = {
@@ -367,7 +411,7 @@ async def payroll_summary(
             "bonuses": Decimal("0.00"),
             "penalties": Decimal("0.00"),
         }
-        for member in venue_users
+        for member in scoped_users
     }
 
     pending_shifts_count = 0
@@ -451,10 +495,12 @@ async def payroll_summary(
 
     rows.sort(key=lambda item: (-item.total_payout, item.user_name.lower()))
 
+    employees_count = sum(1 for row in rows if row.approved_shifts_count > 0)
+
     return PayrollSummaryOut(
         month=m,
         year=y,
-        employees_count=len(venue_users),
+        employees_count=employees_count,
         pending_shifts_count=pending_shifts_count,
         approved_shifts_count=approved_shifts_count,
         total_hours=total_hours,
@@ -751,31 +797,43 @@ async def export_csv(
     m = month or now.month
     y = year or now.year
 
-    # Get all shifts for the venue in this month
+    # Get all approved shifts in scope for this month
     shifts_query = (
         select(Shift, User)
         .join(User, Shift.user_id == User.id)
         .where(
-            Shift.venue_id == user.venue_id,
             Shift.status == "approved",
             func.extract("month", Shift.date) == m,
             func.extract("year", Shift.date) == y,
         )
-        .order_by(User.name, Shift.date)
     )
+    if not _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(
+            or_(
+                Shift.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+    shifts_query = shifts_query.order_by(User.name, Shift.date)
     result = await session.execute(shifts_query)
     shifts_with_users = result.all()
 
-    # Get adjustments for this month
+    # Get adjustments for this month in the same scope
     adj_query = (
         select(Adjustment, User)
         .join(User, Adjustment.user_id == User.id)
         .where(
-            Adjustment.venue_id == user.venue_id,
             Adjustment.month == m,
             Adjustment.year == y,
         )
     )
+    if not _can_manage_all_venue_shifts(user):
+        adj_query = adj_query.where(
+            or_(
+                Adjustment.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
     adj_result = await session.execute(adj_query)
     adjustments_with_users = adj_result.all()
 
