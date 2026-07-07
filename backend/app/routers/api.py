@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
@@ -27,6 +27,10 @@ import logging
 
 router = APIRouter(prefix="/api", tags=["api"])
 logger = logging.getLogger(__name__)
+
+
+def _can_manage_all_venue_shifts(user: User) -> bool:
+    return user.role in (UserRole.owner, UserRole.admin)
 
 
 async def get_current_user(
@@ -176,10 +180,22 @@ async def list_pending_shifts(
     if not (has_permission(user, "can_approve_shifts") or has_permission(user, "can_edit_team_shifts")):
         raise HTTPException(status_code=403, detail="Only users with shift approval rights can view pending shifts")
 
-    query = select(Shift).where(
-        Shift.venue_id == user.venue_id,
-        Shift.status == "pending",
-    ).order_by(Shift.date.desc(), Shift.start_time.desc())
+    query = (
+        select(Shift)
+        .outerjoin(User, Shift.user_id == User.id)
+        .options(selectinload(Shift.user), selectinload(Shift.venue))
+        .where(Shift.status == "pending")
+    )
+
+    if not _can_manage_all_venue_shifts(user):
+        query = query.where(
+            or_(
+                Shift.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+
+    query = query.order_by(Shift.date.desc(), Shift.start_time.desc())
 
     result = await session.execute(query)
     shifts = result.scalars().all()
@@ -193,9 +209,20 @@ async def update_shift(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    result = await session.execute(
-        select(Shift).where(Shift.id == shift_id, Shift.venue_id == user.venue_id)
+    query = (
+        select(Shift)
+        .outerjoin(User, Shift.user_id == User.id)
+        .where(Shift.id == shift_id)
     )
+    if not _can_manage_all_venue_shifts(user):
+        query = query.where(
+            or_(
+                Shift.venue_id == user.venue_id,
+                User.venue_id == user.venue_id,
+            )
+        )
+
+    result = await session.execute(query)
     shift = result.scalar_one_or_none()
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")

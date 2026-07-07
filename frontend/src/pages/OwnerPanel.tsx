@@ -450,12 +450,14 @@ function ApproveTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userVenues, setUserVenues] = useState<Record<string, string>>({});
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ShiftDraft | null>(null);
   const [savingShiftId, setSavingShiftId] = useState<string | null>(null);
 
   const safeShifts = Array.isArray(shifts) ? shifts : [];
   const safeUserNames = userNames ?? {};
+  const safeUserVenues = userVenues ?? {};
 
   const getShiftDateLabel = (date: string) => {
     if (!date || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
@@ -508,12 +510,22 @@ function ApproveTab() {
             return acc;
           }, {})
         );
+        setUserVenues(
+          usersResult.value.reduce<Record<string, string>>((acc, current) => {
+            if (current?.id) {
+              acc[current.id] = current.venue?.name || 'Основная точка';
+            }
+            return acc;
+          }, {})
+        );
       } else {
         setUserNames({});
+        setUserVenues({});
       }
     } catch (err: any) {
       setShifts([]);
       setUserNames({});
+      setUserVenues({});
       setError(err instanceof Error ? err.message : 'Не удалось загрузить смены на подтверждение');
     } finally {
       setLoading(false);
@@ -656,12 +668,16 @@ function ApproveTab() {
         const employeeName =
           (shift?.user_id && safeUserNames[shift.user_id]) ||
           'Сотрудник';
+        const venueName =
+          (shift?.user_id && safeUserVenues[shift.user_id]) ||
+          'Основная точка';
 
         return (
           <div key={shiftId} className="bg-tg-secondary-bg rounded-xl p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-tg-text font-medium text-sm">{employeeName}</p>
+                <p className="text-tg-hint text-xs">{venueName}</p>
                 <p className="text-tg-hint text-xs">
                   {getShiftDateLabel(shift?.date || '')} · {getShiftTimeLabel(shift?.start_time || '')} — {getShiftTimeLabel(shift?.end_time || '')}
                 </p>
