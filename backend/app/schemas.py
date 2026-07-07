@@ -52,7 +52,7 @@ class AdminCreateUser(BaseModel):
     venue_id: Optional[uuid.UUID] = None
     hourly_rate: Decimal = Field(default=Decimal("0.00"), ge=0)
     revenue_percentage: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
-    pay_model: str = Field(default="hourly", pattern="^(hourly|revenue|hybrid)$")
+    pay_model: str = Field(default="hourly", pattern="^(hourly|fixed_shift|revenue|hybrid)$")
     permissions: dict[str, bool] = Field(default_factory=dict)
 
 

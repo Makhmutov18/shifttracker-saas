@@ -133,19 +133,22 @@ export interface User {
   hourly_rate: string;
   revenue_percentage: string;
   permissions: PermissionMap;
-  pay_model: 'hourly' | 'revenue' | 'hybrid';
+  pay_model: 'hourly' | 'fixed_shift' | 'revenue' | 'hybrid';
   is_active: boolean;
   venue?: Venue;
 }
 
 const USER_ROLES = ['owner', 'admin', 'senior', 'barista', 'cook', 'senior_cook'] as const;
-const PAY_MODELS = ['hourly', 'revenue', 'hybrid'] as const;
+const PAY_MODELS = ['hourly', 'fixed_shift', 'revenue', 'hybrid'] as const;
 
 function normalizeUserRole(role: unknown): User['role'] {
   return USER_ROLES.includes(role as User['role']) ? (role as User['role']) : 'barista';
 }
 
 function normalizePayModel(payModel: unknown): User['pay_model'] {
+  if (payModel === 'fixed' || payModel === 'shift') {
+    return 'fixed_shift';
+  }
   return PAY_MODELS.includes(payModel as User['pay_model']) ? (payModel as User['pay_model']) : 'hourly';
 }
 
@@ -378,7 +381,7 @@ export interface AdminCreateUserRequest {
   venue_id?: string;
   hourly_rate: number;
   revenue_percentage: number;
-  pay_model: 'hourly' | 'revenue' | 'hybrid';
+  pay_model: 'hourly' | 'fixed_shift' | 'revenue' | 'hybrid';
   permissions?: PermissionMap;
 }
 
@@ -511,7 +514,7 @@ export interface AdminUpdateUser {
   venue_id?: string;
   hourly_rate?: number;
   revenue_percentage?: number;
-  pay_model?: 'hourly' | 'revenue' | 'hybrid';
+  pay_model?: 'hourly' | 'fixed_shift' | 'revenue' | 'hybrid';
   is_active?: boolean;
   permissions?: PermissionMap;
 }

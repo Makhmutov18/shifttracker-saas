@@ -22,7 +22,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<{ hours: string; salary: string; status: Shift['status'] } | null>(null);
 
-  const needsRevenue = user.pay_model !== 'hourly';
+  const needsRevenue = user.pay_model === 'revenue' || user.pay_model === 'hybrid';
 
   const totalHours = useMemo(() => {
     const [sh, sm] = startTime.split(':').map(Number);
@@ -40,12 +40,13 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
     const revPct = parseFloat(user.revenue_percentage) || 0;
 
     const hourlyPart = hours * rate;
-    const revenuePart = user.pay_model !== 'hourly' ? (rev * revPct) / 100 : 0;
+    const revenuePart = needsRevenue ? (rev * revPct) / 100 : 0;
 
     if (user.pay_model === 'hourly') return hourlyPart.toFixed(2);
+    if (user.pay_model === 'fixed_shift') return rate.toFixed(2);
     if (user.pay_model === 'revenue') return revenuePart.toFixed(2);
     return (hourlyPart + revenuePart).toFixed(2);
-  }, [totalHours, user.hourly_rate, revenue, user.revenue_percentage, user.pay_model]);
+  }, [totalHours, user.hourly_rate, revenue, user.revenue_percentage, user.pay_model, needsRevenue]);
 
   const handleSubmit = async () => {
     if (submitting) return;

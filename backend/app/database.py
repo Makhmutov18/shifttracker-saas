@@ -37,6 +37,19 @@ async def init_db():
 
         await conn.execute(text("""
             DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_type
+                    WHERE typname = 'pay_model'
+                ) THEN
+                    ALTER TYPE pay_model ADD VALUE IF NOT EXISTS 'fixed_shift';
+                END IF;
+            END $$;
+        """))
+
+        await conn.execute(text("""
+            DO $$
             DECLARE
                 has_admin_role boolean := false;
                 has_barista_role boolean := false;

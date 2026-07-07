@@ -46,6 +46,7 @@ class AdjustmentType(str, enum.Enum):
 
 class PayModel(str, enum.Enum):
     hourly = "hourly"
+    fixed_shift = "fixed_shift"
     revenue = "revenue"
     hybrid = "hybrid"
 

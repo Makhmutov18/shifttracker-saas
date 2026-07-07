@@ -367,7 +367,7 @@ class AdminUpdateUser(BaseModel):
     venue_id: Optional[uuid.UUID] = None
     hourly_rate: Optional[Decimal] = Field(None, ge=0)
     revenue_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
-    pay_model: Optional[str] = Field(None, pattern="^(hourly|revenue|hybrid)$")
+    pay_model: Optional[str] = Field(None, pattern="^(hourly|fixed_shift|revenue|hybrid)$")
     is_active: Optional[bool] = None
     permissions: Optional[dict[str, bool]] = None
 

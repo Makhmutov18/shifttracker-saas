@@ -292,7 +292,7 @@ function InviteTab() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venueId, setVenueId] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
-  const [payModel, setPayModel] = useState<'hourly' | 'revenue' | 'hybrid'>('hourly');
+  const [payModel, setPayModel] = useState<User['pay_model']>('hourly');
   const [revenuePercentage, setRevenuePercentage] = useState('');
   const [permissions, setPermissions] = useState<PermissionMap>(() => getEmptyManagementPermissions());
   const [managementEnabled, setManagementEnabled] = useState(false);
@@ -338,7 +338,7 @@ function InviteTab() {
         venue_id: venueId || undefined,
         hourly_rate: rate || 0,
         pay_model: payModel,
-        revenue_percentage: parseFloat(revenuePercentage) || 0,
+        revenue_percentage: payModel === 'revenue' || payModel === 'hybrid' ? parseFloat(revenuePercentage) || 0 : 0,
         permissions: managementEnabled ? permissions : getEmptyManagementPermissions(),
       });
       setResult(res);
@@ -430,15 +430,16 @@ function InviteTab() {
               className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
             >
               <option value="hourly">Почасовая</option>
+              <option value="fixed_shift">Фикс за смену</option>
               <option value="revenue">От выручки</option>
-              <option value="hybrid">Смешанная</option>
+              <option value="hybrid">Почасовая + процент</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm text-tg-hint mb-1.5">
-              Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(payModel)}</span>
-            </label>
+              <label className="block text-sm text-tg-hint mb-1.5">
+              {getRateFieldLabel(payModel)} <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(payModel)}</span>
+              </label>
             <input
               type="number"
               value={hourlyRate}
@@ -450,7 +451,7 @@ function InviteTab() {
             />
           </div>
 
-          {payModel !== 'hourly' && (
+          {(payModel === 'revenue' || payModel === 'hybrid') && (
             <div>
               <label className="block text-sm text-tg-hint mb-1.5">% от выручки</label>
               <input
@@ -1193,7 +1194,7 @@ function TeamTab({ user }: { user: User }) {
         hourly_rate: parseFloat(editRate) || 0,
         role: editRole,
         pay_model: editPayModel,
-        revenue_percentage: editPayModel === 'hourly' ? 0 : parseFloat(editRevenuePercentage) || 0,
+        revenue_percentage: editPayModel === 'revenue' || editPayModel === 'hybrid' ? parseFloat(editRevenuePercentage) || 0 : 0,
         permissions:
           editingUser.id === user.id && user.role !== 'owner'
             ? undefined
@@ -1333,14 +1334,15 @@ function TeamTab({ user }: { user: User }) {
                   className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
                 >
                   <option value="hourly">Почасовая</option>
+                  <option value="fixed_shift">Фикс за смену</option>
                   <option value="revenue">От выручки</option>
-                  <option value="hybrid">Смешанная</option>
+                  <option value="hybrid">Почасовая + процент</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">
-                  Ставка <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(editPayModel)}</span>
+                  {getRateFieldLabel(editPayModel)} <span className="ml-2 text-xs text-tg-hint/80">{getRateLabel(editPayModel)}</span>
                 </label>
                 <input
                   type="number"
@@ -1353,7 +1355,7 @@ function TeamTab({ user }: { user: User }) {
                 />
               </div>
 
-              {editPayModel !== 'hourly' && (
+              {(editPayModel === 'revenue' || editPayModel === 'hybrid') && (
                 <div className="space-y-1.5">
                   <label className="block text-sm text-tg-hint">% от выручки</label>
                   <input
@@ -1431,7 +1433,7 @@ function TeamTab({ user }: { user: User }) {
                   <p>{getManagementBadge(u)}</p>
                   <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
                   <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
-                  {u.pay_model !== 'hourly' && Number(u.revenue_percentage) > 0 && (
+                  {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
                     <p>Процент от выручки: {u.revenue_percentage}%</p>
                   )}
                 </div>
@@ -1489,12 +1491,14 @@ const POSITION_DEFAULTS: Record<User['role'], string> = {
 
 const PAY_MODEL_LABELS: Record<User['pay_model'], string> = {
   hourly: 'Почасовая',
+  fixed_shift: 'Фикс за смену',
   revenue: 'От выручки',
-  hybrid: 'Смешанная',
+  hybrid: 'Почасовая + процент',
 };
 
 const PAY_MODEL_HINTS: Record<User['pay_model'], string> = {
   hourly: '₽/час',
+  fixed_shift: '₽/смена',
   revenue: 'индивидуально',
   hybrid: '₽/час + %',
 };
@@ -1505,6 +1509,16 @@ function getPositionLabel(user: Pick<User, 'position' | 'role'>) {
 
 function getRateLabel(payModel: User['pay_model']) {
   return PAY_MODEL_HINTS[payModel];
+}
+
+function getRateFieldLabel(payModel: User['pay_model']) {
+  if (payModel === 'fixed_shift') {
+    return 'Ставка за смену, ₽';
+  }
+  if (payModel === 'hourly' || payModel === 'hybrid') {
+    return 'Ставка в час, ₽';
+  }
+  return 'Ставка';
 }
 
 function getVenueName(venue?: Venue) {

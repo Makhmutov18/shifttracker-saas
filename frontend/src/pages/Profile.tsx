@@ -23,8 +23,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 const PAY_MODEL_LABELS: Record<string, string> = {
   hourly: 'Почасовая',
+  fixed_shift: 'Фикс за смену',
   revenue: '% от выручки',
-  hybrid: 'Смешанная',
+  hybrid: 'Почасовая + %',
 };
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
@@ -32,6 +33,19 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[
   { value: 'light', label: 'Светлая', icon: <SunMedium className="w-4 h-4" /> },
   { value: 'dark', label: 'Тёмная', icon: <Moon className="w-4 h-4" /> },
 ];
+
+function getPayModelSummary(user: UserType) {
+  if (user.pay_model === 'hourly') {
+    return `${formatCurrency(user.hourly_rate)}/ч`;
+  }
+  if (user.pay_model === 'fixed_shift') {
+    return `${formatCurrency(user.hourly_rate)}/смена`;
+  }
+  if (user.pay_model === 'revenue') {
+    return `${user.revenue_percentage}% от выручки`;
+  }
+  return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`;
+}
 
 export default function Profile({ user, onBack, themeMode, onThemeModeChange }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
@@ -90,13 +104,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
           </div>
           <div className="flex items-center gap-2 text-tg-hint">
             <Wallet className="w-4 h-4" />
-            <span>
-              {user.pay_model === 'hourly'
-                ? `${formatCurrency(user.hourly_rate)}/ч`
-                : user.pay_model === 'revenue'
-                  ? `${user.revenue_percentage}% от выручки`
-                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`}
-            </span>
+            <span>{getPayModelSummary(user)}</span>
           </div>
           <div className="flex items-center gap-2 text-tg-hint">
             <Clock className="w-4 h-4" />

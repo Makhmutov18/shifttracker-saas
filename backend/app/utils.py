@@ -29,13 +29,17 @@ def calculate_salary(
     """
     Calculate salary based on pay model.
     - hourly: total_hours * hourly_rate
+    - fixed_shift: hourly_rate as fixed payout per shift
     - revenue: revenue * revenue_percentage / 100
     - hybrid: (total_hours * hourly_rate) + (revenue * revenue_percentage / 100)
     """
     hourly_part = (total_hours * hourly_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    fixed_shift_part = hourly_rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     if pay_model == "hourly":
         return hourly_part
+    elif pay_model == "fixed_shift":
+        return fixed_shift_part
     elif pay_model == "revenue":
         if revenue and revenue_percentage:
             return (revenue * revenue_percentage / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

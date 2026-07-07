@@ -12,6 +12,19 @@ interface Props {
   onNavigate: (page: Page) => void;
 }
 
+function getPayModelSummary(user: UserType) {
+  if (user.pay_model === 'hourly') {
+    return `${formatCurrency(user.hourly_rate)}/ч`;
+  }
+  if (user.pay_model === 'fixed_shift') {
+    return `${formatCurrency(user.hourly_rate)}/смена`;
+  }
+  if (user.pay_model === 'revenue') {
+    return `${user.revenue_percentage}% от выручки`;
+  }
+  return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`;
+}
+
 export default function Dashboard({ user, onNavigate }: Props) {
   const { stats, loading } = useStats();
 
@@ -28,12 +41,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
             <p className="text-sm text-tg-hint">
-              {user.venue?.name || 'Заведение'} ·{' '}
-              {user.pay_model === 'hourly'
-                ? `${formatCurrency(user.hourly_rate)}/ч`
-                : user.pay_model === 'revenue'
-                  ? `${user.revenue_percentage}% от выручки`
-                  : `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`}
+              {user.venue?.name || 'Заведение'} · {getPayModelSummary(user)}
             </p>
           </div>
         </div>
