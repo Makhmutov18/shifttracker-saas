@@ -57,6 +57,9 @@ class Venue(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        default=True, server_default="true"
+    )
 
     # Relationships
     users: Mapped[list["User"]] = relationship("User", back_populates="venue")

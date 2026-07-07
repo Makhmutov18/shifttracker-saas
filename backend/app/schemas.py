@@ -10,8 +10,18 @@ import uuid
 class VenueOut(BaseModel):
     id: uuid.UUID
     name: str
+    is_active: bool = True
 
     model_config = {"from_attributes": True}
+
+
+class VenueCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
+
+class VenueUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    is_active: Optional[bool] = None
 
 
 # ─── User ────────────────────────────────────────────────────────────────────
@@ -39,6 +49,7 @@ class AdminCreateUser(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=255)
     position: Optional[str] = Field(default=None, max_length=255)
     role: str = Field(default="barista", pattern="^(owner|admin|senior|barista|cook|senior_cook)$")
+    venue_id: Optional[uuid.UUID] = None
     hourly_rate: Decimal = Field(default=Decimal("0.00"), ge=0)
     revenue_percentage: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
     pay_model: str = Field(default="hourly", pattern="^(hourly|revenue|hybrid)$")

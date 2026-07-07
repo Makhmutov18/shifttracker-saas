@@ -86,7 +86,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2 text-tg-hint">
             <MapPin className="w-4 h-4" />
-            <span>{user.venue?.name || '—'}</span>
+            <span>{user.venue?.name || 'Основная точка'}</span>
           </div>
           <div className="flex items-center gap-2 text-tg-hint">
             <Wallet className="w-4 h-4" />

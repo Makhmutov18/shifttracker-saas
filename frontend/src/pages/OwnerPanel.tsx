@@ -1,12 +1,15 @@
 ﻿import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  Building2,
   Check,
   CheckCircle,
   Copy,
   Gift,
   History,
+  MapPin,
   Pencil,
+  Plus,
   RefreshCw,
   ShieldCheck,
   UserPlus,
@@ -19,14 +22,19 @@ import {
   AuditLog,
   Shift,
   User,
+  Venue,
   createAdjustment,
   createUser,
+  createVenue,
+  deactivateVenue,
   deleteUser,
   getAuditLogs,
   getPendingShifts,
   getUsers,
+  getVenues,
   updateShift,
   updateUser,
+  updateVenue,
 } from '../utils/api';
 import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
@@ -43,7 +51,7 @@ interface Props {
   user: User;
 }
 
-type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team';
+type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
 
 type ShiftDraft = {
   start_time: string;
@@ -138,6 +146,7 @@ export default function OwnerPanel({ user }: Props) {
     { id: 'adjust', label: 'Бонусы', icon: <Gift className="w-4 h-4 inline mr-1" />, visible: canManageAdjustments },
     { id: 'audit', label: 'История', icon: <History className="w-4 h-4 inline mr-1" />, visible: canViewAudit },
     { id: 'team', label: 'Команда', icon: <Users className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
+    { id: 'venues', label: 'Точки', icon: <Building2 className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
   ];
 
   const activeTabs = visibleTabs.filter((item) => item.visible);
@@ -179,6 +188,7 @@ export default function OwnerPanel({ user }: Props) {
         {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
         {tab === 'audit' && canViewAudit && <AuditTab />}
         {tab === 'team' && canManageTeam && <TeamTab user={user} />}
+        {tab === 'venues' && canManageTeam && <VenuesTab />}
       </OwnerPanelBoundary>
     </div>
   );
@@ -188,6 +198,8 @@ function InviteTab() {
   const [firstName, setFirstName] = useState('');
   const [position, setPosition] = useState(POSITION_DEFAULTS.barista);
   const [role, setRole] = useState<'barista' | 'admin' | 'senior' | 'cook' | 'senior_cook'>('barista');
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [venueId, setVenueId] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [payModel, setPayModel] = useState<'hourly' | 'revenue' | 'hybrid'>('hourly');
   const [revenuePercentage, setRevenuePercentage] = useState('');
@@ -196,6 +208,19 @@ function InviteTab() {
   const [result, setResult] = useState<AdminCreateUserResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const fetchVenues = async () => {
+      try {
+        const data = await getVenues();
+        setVenues(data);
+        setVenueId((current) => current || data[0]?.id || '');
+      } catch {
+        setVenues([]);
+      }
+    };
+    fetchVenues();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +243,7 @@ function InviteTab() {
         first_name: firstName.trim(),
         position: position.trim() || POSITION_DEFAULTS[role],
         role,
+        venue_id: venueId || undefined,
         hourly_rate: rate || 0,
         pay_model: payModel,
         revenue_percentage: parseFloat(revenuePercentage) || 0,
@@ -226,6 +252,7 @@ function InviteTab() {
       setResult(res);
       setFirstName('');
       setPosition(POSITION_DEFAULTS[role]);
+      setVenueId((current) => current || venues[0]?.id || '');
       setHourlyRate('');
       setRevenuePercentage('');
     } catch (err: any) {
@@ -277,6 +304,25 @@ function InviteTab() {
             placeholder="Бариста, повар, кассир, администратор зала"
             className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm text-tg-hint mb-1.5">Точка</label>
+          <select
+            value={venueId}
+            onChange={(e) => setVenueId(e.target.value)}
+            className="w-full bg-tg-secondary-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-tg-primary/50 transition-shadow"
+          >
+            {venues.length === 0 ? (
+              <option value="">Основная точка</option>
+            ) : (
+              venues.map((venue) => (
+                <option key={venue.id} value={venue.id}>
+                  {getVenueLabel(venue)}
+                </option>
+              ))
+            )}
+          </select>
         </div>
 
         <div>
@@ -750,12 +796,254 @@ function ApproveTab() {
   );
 }
 
+function VenuesTab() {
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [newVenueName, setNewVenueName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [editingVenueId, setEditingVenueId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [statusVenueId, setStatusVenueId] = useState<string | null>(null);
+
+  const fetchVenuesList = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getVenues(true);
+      setVenues(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setVenues([]);
+      setError(err.message || 'Не удалось загрузить точки');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVenuesList();
+  }, []);
+
+  const handleCreateVenue = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newVenueName.trim()) {
+      setError('Введите название точки');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      setSuccess(null);
+      const created = await createVenue({ name: newVenueName.trim() });
+      setVenues((prev) => [created, ...prev]);
+      setNewVenueName('');
+      setSuccess(`Точка "${created.name}" добавлена`);
+      hapticSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Не удалось создать точку');
+      hapticError();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRenameVenue = async (venueId: string) => {
+    if (!editingName.trim()) {
+      setError('Введите название точки');
+      return;
+    }
+
+    try {
+      setStatusVenueId(venueId);
+      setError(null);
+      setSuccess(null);
+      const updated = await updateVenue(venueId, { name: editingName.trim() });
+      setVenues((prev) => prev.map((venue) => (venue.id === venueId ? updated : venue)));
+      setEditingVenueId(null);
+      setEditingName('');
+      setSuccess(`Точка "${updated.name}" обновлена`);
+      hapticSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Не удалось обновить точку');
+      hapticError();
+    } finally {
+      setStatusVenueId(null);
+    }
+  };
+
+  const handleToggleVenue = async (venue: Venue) => {
+    const nextActive = !venue.is_active;
+    const confirmed = nextActive
+      ? true
+      : window.confirm(`Деактивировать точку "${venue.name}"?`);
+
+    if (!confirmed) return;
+
+    try {
+      setStatusVenueId(venue.id);
+      setError(null);
+      setSuccess(null);
+      if (nextActive) {
+        const updated = await updateVenue(venue.id, { is_active: true });
+        setVenues((prev) => prev.map((item) => (item.id === venue.id ? updated : item)));
+        setSuccess(`Точка "${updated.name}" активирована`);
+      } else {
+        await deactivateVenue(venue.id);
+        setVenues((prev) => prev.map((item) => (item.id === venue.id ? { ...item, is_active: false } : item)));
+        setSuccess(`Точка "${venue.name}" деактивирована`);
+      }
+      hapticSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Не удалось изменить статус точки');
+      hapticError();
+    } finally {
+      setStatusVenueId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleCreateVenue} className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-tg-primary" />
+          <p className="text-sm font-medium text-tg-text">Новая точка</p>
+        </div>
+        <input
+          type="text"
+          value={newVenueName}
+          onChange={(e) => setNewVenueName(e.target.value)}
+          placeholder="Например: Кафе на Баумана"
+          className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-3 text-sm outline-none"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full bg-tg-primary text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          {submitting ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Plus className="w-4 h-4" />}
+          Добавить точку
+        </button>
+      </form>
+
+      {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{error}</p>}
+      {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
+
+      {venues.length === 0 ? (
+        <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5">
+          <p className="text-sm font-medium text-tg-text">Точки ещё не добавлены</p>
+          <p className="mt-1 text-sm text-tg-hint">Создайте первую точку, чтобы распределять по ней сотрудников.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {venues.map((venue) => {
+            const isEditing = editingVenueId === venue.id;
+            const isBusy = statusVenueId === venue.id;
+            return (
+              <div key={venue.id} className={`rounded-2xl p-4 ${venue.is_active ? 'bg-tg-secondary-bg' : 'bg-tg-secondary-bg/60 opacity-85'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                        placeholder="Название точки"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-tg-text">{venue.name}</p>
+                        <span className={`text-[11px] px-2 py-1 rounded-full ${venue.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-300'}`}>
+                          {venue.is_active ? 'Активна' : 'Неактивна'}
+                        </span>
+                      </div>
+                    )}
+                    {!isEditing && <p className="mt-2 text-xs text-tg-hint">Статус точки можно менять без удаления истории сотрудников и смен.</p>}
+                  </div>
+                  {!isEditing && (
+                    <button
+                      onClick={() => {
+                        setEditingVenueId(venue.id);
+                        setEditingName(venue.name);
+                      }}
+                      className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+                      aria-label={`Редактировать ${venue.name}`}
+                    >
+                      <Pencil className="w-4 h-4 text-tg-hint" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={() => handleRenameVenue(venue.id)}
+                        disabled={isBusy}
+                        className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        <Check className="w-4 h-4" />
+                        Сохранить
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingVenueId(null);
+                          setEditingName('');
+                        }}
+                        disabled={isBusy}
+                        className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                      >
+                        Отмена
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleToggleVenue(venue)}
+                      disabled={isBusy}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${
+                        venue.is_active ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'
+                      }`}
+                    >
+                      {isBusy ? (
+                        <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
+                      ) : venue.is_active ? (
+                        <XCircle className="w-3.5 h-3.5" />
+                      ) : (
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      )}
+                      {venue.is_active ? 'Деактивировать' : 'Активировать'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TeamTab({ user }: { user: User }) {
   const [users, setUsers] = useState<User[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editPosition, setEditPosition] = useState('');
+  const [editVenueId, setEditVenueId] = useState('');
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState<User['role']>('barista');
   const [editPayModel, setEditPayModel] = useState<User['pay_model']>('hourly');
@@ -770,10 +1058,15 @@ function TeamTab({ user }: { user: User }) {
     try {
       setLoading(true);
       setTeamError(null);
-      const data = await getUsers(true);
-      setUsers(data);
+      const [usersData, venuesData] = await Promise.allSettled([getUsers(true), getVenues(true)]);
+      if (usersData.status === 'rejected') {
+        throw usersData.reason;
+      }
+      setUsers(usersData.value);
+      setVenues(venuesData.status === 'fulfilled' ? venuesData.value : []);
     } catch (err: any) {
       setTeamError(err.message || 'Не удалось загрузить сотрудников');
+      setVenues([]);
     } finally {
       setLoading(false);
     }
@@ -787,6 +1080,7 @@ function TeamTab({ user }: { user: User }) {
     setEditingUser(target);
     setEditName(target.name);
     setEditPosition(getPositionLabel(target));
+    setEditVenueId(target.venue_id || target.venue?.id || '');
     setEditRate(target.hourly_rate);
     setEditRole(target.role);
     setEditPayModel(target.pay_model);
@@ -806,6 +1100,7 @@ function TeamTab({ user }: { user: User }) {
       const updated = await updateUser(editingUser.id, {
         name: editName.trim(),
         position: editPosition.trim() || getPositionLabel(editingUser),
+        venue_id: editVenueId || undefined,
         hourly_rate: parseFloat(editRate) || 0,
         role: editRole,
         pay_model: editPayModel,
@@ -912,6 +1207,25 @@ function TeamTab({ user }: { user: User }) {
                 className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
                 placeholder="Бариста, повар, кассир, администратор зала"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm text-tg-hint">Точка</label>
+              <select
+                value={editVenueId}
+                onChange={(e) => setEditVenueId(e.target.value)}
+                className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+              >
+                {venues.length === 0 ? (
+                  <option value={editingUser.venue_id || ''}>{getVenueName(editingUser.venue)}</option>
+                ) : (
+                  venues.map((venue) => (
+                    <option key={venue.id} value={venue.id}>
+                      {getVenueLabel(venue)}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -1037,6 +1351,7 @@ function TeamTab({ user }: { user: User }) {
                   </span>
                 </div>
                 <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
+                  <p>Точка: {getVenueName(u.venue)}</p>
                   <p>Должность: {getPositionLabel(u)}</p>
                   <p>Уровень доступа: {ROLE_LABELS[u.role] ?? u.role}</p>
                   <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
@@ -1106,6 +1421,14 @@ const POSITION_DEFAULTS: Record<User['role'], string> = {
   senior_cook: 'Шеф-повар',
 };
 
+const ROLE_OPTIONS = [
+  { value: 'barista', label: 'Бариста' },
+  { value: 'cook', label: 'Повар' },
+  { value: 'senior', label: 'Старший' },
+  { value: 'senior_cook', label: 'Шеф-повар' },
+  { value: 'admin', label: 'Администратор' },
+] as const;
+
 const PAY_MODEL_LABELS: Record<User['pay_model'], string> = {
   hourly: 'Почасовая',
   revenue: 'От выручки',
@@ -1124,6 +1447,15 @@ function getPositionLabel(user: Pick<User, 'position' | 'role'>) {
 
 function getRateLabel(payModel: User['pay_model']) {
   return PAY_MODEL_HINTS[payModel];
+}
+
+function getVenueName(venue?: Venue) {
+  return venue?.name?.trim() || 'Основная точка';
+}
+
+function getVenueLabel(venue: Venue) {
+  const name = getVenueName(venue);
+  return venue.is_active ? name : `${name} (неактивна)`;
 }
 
 function AdjustTab({ venueId }: { venueId: string }) {

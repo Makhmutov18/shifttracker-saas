@@ -77,9 +77,18 @@ async def init_db():
 
         # Runtime compatibility SQL must only run after create_all.
         await conn.execute(text("""
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'users' AND column_name = 'is_active') THEN
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'venues' AND column_name = 'is_active') THEN
+                ALTER TABLE venues ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+            END IF;
+        END $$;
+        """))
+
+        await conn.execute(text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'is_active') THEN
                     ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT false;
                 END IF;
             END $$;

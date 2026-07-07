@@ -105,6 +105,22 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export interface Venue {
   id: string;
   name: string;
+  is_active: boolean;
+}
+
+function normalizeVenue(raw: unknown): Venue {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: typeof source.id === 'string' ? source.id : '',
+    name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Основная точка',
+    is_active:
+      typeof source.is_active === 'boolean'
+        ? source.is_active
+        : typeof source.active === 'boolean'
+        ? source.active
+        : true,
+  };
 }
 
 export interface User {
@@ -163,13 +179,7 @@ function normalizeUser(raw: unknown): User {
         : true,
     venue:
       source.venue && typeof source.venue === 'object'
-        ? {
-            id: typeof (source.venue as Record<string, unknown>).id === 'string' ? ((source.venue as Record<string, unknown>).id as string) : '',
-            name:
-              typeof (source.venue as Record<string, unknown>).name === 'string'
-                ? ((source.venue as Record<string, unknown>).name as string)
-                : '',
-          }
+        ? normalizeVenue(source.venue)
         : undefined,
   };
 }
@@ -365,6 +375,7 @@ export interface AdminCreateUserRequest {
   first_name: string;
   position?: string;
   role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
+  venue_id?: string;
   hourly_rate: number;
   revenue_percentage: number;
   pay_model: 'hourly' | 'revenue' | 'hybrid';
@@ -382,6 +393,43 @@ export async function createUser(data: AdminCreateUserRequest): Promise<AdminCre
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+export interface VenueCreateRequest {
+  name: string;
+}
+
+export interface VenueUpdateRequest {
+  name?: string;
+  is_active?: boolean;
+}
+
+export async function getVenues(includeInactive = false): Promise<Venue[]> {
+  const params = new URLSearchParams();
+  if (includeInactive) params.set('include_inactive', 'true');
+  const qs = params.toString();
+  const venues = await request<Venue[]>(`/admin/venues${qs ? `?${qs}` : ''}`);
+  return Array.isArray(venues) ? venues.map(normalizeVenue) : [];
+}
+
+export async function createVenue(data: VenueCreateRequest): Promise<Venue> {
+  const venue = await request<Venue>('/admin/venues', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return normalizeVenue(venue);
+}
+
+export async function updateVenue(venueId: string, data: VenueUpdateRequest): Promise<Venue> {
+  const venue = await request<Venue>(`/admin/venues/${venueId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return normalizeVenue(venue);
+}
+
+export async function deactivateVenue(venueId: string): Promise<void> {
+  await request(`/admin/venues/${venueId}`, { method: 'DELETE' });
 }
 
 // Audit Logs
@@ -460,6 +508,7 @@ export interface AdminUpdateUser {
   name?: string;
   position?: string;
   role?: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
+  venue_id?: string;
   hourly_rate?: number;
   revenue_percentage?: number;
   pay_model?: 'hourly' | 'revenue' | 'hybrid';
