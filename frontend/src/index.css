@@ -126,10 +126,27 @@ body, button, input, select, textarea {
 }
 
 .dock-shell {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: end;
+  padding: 0.45rem;
   border-radius: 1.65rem;
+}
+
+.dock-side {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.dock-side-left {
+  justify-content: flex-start;
+}
+
+.dock-side-right {
+  justify-content: flex-end;
 }
 
 .dock-item {
@@ -174,30 +191,32 @@ body, button, input, select, textarea {
   box-shadow: inset 0 0 0 1px rgba(49, 93, 255, 0.12);
 }
 
-.dock-item-primary {
-  flex: 1.05 1 0;
-  min-height: 4.8rem;
-  transform: translateY(-0.45rem);
+.dock-center {
+  flex: 0 0 auto;
+  width: 4.85rem;
+  min-height: 4.9rem;
+  transform: translateY(-0.55rem);
+  justify-content: center;
   background: linear-gradient(180deg, rgba(49, 93, 255, 0.98), rgba(39, 77, 214, 0.94));
   color: var(--tg-button-text);
   box-shadow:
-    0 14px 24px rgba(49, 93, 255, 0.26),
+    0 16px 28px rgba(49, 93, 255, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.dock-item-primary.dock-item-active {
+.dock-center.dock-item-active {
   background: linear-gradient(180deg, rgba(49, 93, 255, 0.98), rgba(39, 77, 214, 0.94));
   color: var(--tg-button-text);
   box-shadow:
-    0 14px 24px rgba(49, 93, 255, 0.3),
+    0 16px 28px rgba(49, 93, 255, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.dock-item-primary .dock-item-label {
+.dock-center .dock-item-label {
   letter-spacing: 0.01em;
 }
 
-.dock-item-primary .dock-item-icon {
+.dock-center .dock-item-icon {
   transform: translateY(-0.01rem);
 }
 
@@ -208,8 +227,8 @@ body, button, input, select, textarea {
   box-shadow: inset 0 0 0 1px rgba(123, 167, 255, 0.18);
 }
 
-[data-theme='dark'] .dock-item-primary,
-.dark .dock-item-primary {
+[data-theme='dark'] .dock-center,
+.dark .dock-center {
   background: linear-gradient(180deg, rgba(123, 167, 255, 0.96), rgba(83, 125, 232, 0.92));
   color: #0d1017;
   box-shadow:
@@ -217,8 +236,8 @@ body, button, input, select, textarea {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-[data-theme='dark'] .dock-item-primary.dock-item-active,
-.dark .dock-item-primary.dock-item-active {
+[data-theme='dark'] .dock-center.dock-item-active,
+.dark .dock-center.dock-item-active {
   background: linear-gradient(180deg, rgba(123, 167, 255, 0.98), rgba(83, 125, 232, 0.94));
   color: #0d1017;
 }
@@ -240,6 +259,35 @@ body, button, input, select, textarea {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.05),
     0 16px 30px rgba(0, 0, 0, 0.24);
+}
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-elevated);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 92%, var(--tg-primary) 8%), var(--surface-elevated));
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--tg-primary) 16%, transparent), transparent 42%);
+  pointer-events: none;
+}
+
+.hero-card > * {
+  position: relative;
+}
+
+[data-theme='dark'] .hero-card,
+.dark .hero-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 88%, var(--tg-primary) 12%), var(--surface-elevated));
 }
 
 /* Safe area for bottom nav */
