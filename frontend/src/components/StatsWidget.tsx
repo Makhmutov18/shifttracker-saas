@@ -70,7 +70,7 @@ export default function StatsWidget({ stats, loading }: Props) {
         <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-sm opacity-90">
           <Clock className="w-4 h-4" />
           <span>{formatHours(stats.total_hours)}</span>
-          <span className="opacity-60">·</span>
+          <span className="opacity-60">В·</span>
           <span>{stats.shifts_count} смен</span>
         </div>
       </div>
