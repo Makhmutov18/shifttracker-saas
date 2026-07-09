@@ -40,6 +40,9 @@ Avoid emoji in product UI.
 Prefer lucide line-icons.
 Avoid heavy borders and cheap Bootstrap-like cards.
 Use neutral surfaces, soft shadows and clear spacing.
+Any UI or design change must be checked in both light and dark themes.
+Do not use hardcoded colors when existing CSS variables or surface classes can be reused.
+Keep Telegram Mini App bottom nav safe area in mind when adjusting spacing and lists.
 
 ## Checks
 For frontend-only tasks:

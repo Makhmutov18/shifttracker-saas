@@ -1880,9 +1880,12 @@ function AdjustTab({ venueId }: { venueId: string }) {
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  venue_updated: 'Точка обновлена',
+  user_updated: 'Сотрудник обновлён',
+  shift_approved: 'Смена утверждена',
+  shift_rejected: 'Смена отклонена',
+  shift_updated: 'Смена отредактирована',
   shift_created: 'Создал смену',
-  shift_approved: 'Утвердил смену',
-  shift_rejected: 'Отклонил смену',
   shift_edited: 'Отредактировал смену',
   user_created: 'Создал сотрудника',
   bonus_added: 'Начислил бонус',
@@ -1920,54 +1923,101 @@ function AuditTab() {
 
   if (logs.length === 0) {
     return (
-      <div className="text-center py-12">
+      <div className="surface-card rounded-2xl px-4 py-10 text-center">
         <History className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-        <p className="text-tg-hint text-sm">Пока нет записей</p>
+        <p className="text-sm font-medium text-tg-text">История действий пока пуста</p>
+        <p className="mt-1 text-xs text-tg-hint">Когда здесь появятся изменения, они будут сгруппированы по датам.</p>
       </div>
     );
   }
 
+  const groupedLogs = logs.reduce<Record<string, AuditLog[]>>((acc, log) => {
+    const dateKey = (() => {
+      const parsed = new Date(log.created_at);
+      if (Number.isNaN(parsed.getTime())) {
+        return 'Без даты';
+      }
+      return parsed.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    })();
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(log);
+    return acc;
+  }, {});
+
   return (
-    <div className="space-y-2">
-      {logs.map((log) => (
-        <div
-          key={log.id}
-          className="bg-tg-secondary-bg rounded-xl p-3 flex items-start gap-3"
-        >
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-            log.action.includes('approved') || log.action.includes('created')
-              ? 'bg-emerald-50 dark:bg-emerald-900/20'
-              : log.action.includes('penalty') || log.action.includes('rejected')
-              ? 'bg-rose-50 dark:bg-rose-900/20'
-              : 'bg-blue-50 dark:bg-blue-900/20'
-          }`}>
-            {log.action.includes('penalty') || log.action.includes('rejected') ? (
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-            ) : log.action.includes('bonus') ? (
-              <Gift className="w-4 h-4 text-emerald-500" />
-            ) : (
-              <History className="w-4 h-4 text-blue-500" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-tg-text text-sm">
-              <span className="font-medium">{log.user_name || 'Пользователь'}</span>{' '}
-              <span className="text-tg-hint">{ACTION_LABELS[log.action] || log.action}</span>
-              {log.target_user_name && (
-                <> <span className="text-tg-hint">для</span> <span className="font-medium">{log.target_user_name}</span></>
-              )}
-            </p>
-            <p className="text-tg-hint text-xs mt-0.5">
-              {new Date(log.created_at).toLocaleString('ru-RU', {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
+    <div className="space-y-4 pb-6">
+      <div className="surface-card rounded-2xl p-4">
+        <p className="text-sm font-medium text-tg-text">История действий</p>
+        <p className="mt-1 text-sm text-tg-hint">Изменения сгруппированы по датам, чтобы было проще просматривать события команды.</p>
+      </div>
+
+      <div className="surface-card rounded-2xl p-4 space-y-4">
+        {Object.entries(groupedLogs).map(([dateLabel, items]) => (
+          <div key={dateLabel} className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-tg-text">{dateLabel}</p>
+              <p className="text-xs text-tg-hint">{items.length}</p>
+            </div>
+
+            <div className="space-y-2">
+              {items.map((log) => {
+                const isEmphasis = log.action.includes('approved') || log.action.includes('created') || log.action.includes('updated');
+                const tone = log.action.includes('penalty') || log.action.includes('rejected')
+                  ? 'rose'
+                  : log.action.includes('bonus')
+                    ? 'emerald'
+                    : 'blue';
+                const label = ACTION_LABELS[log.action] || 'Действие';
+                return (
+                  <div
+                    key={log.id}
+                    className="surface-muted rounded-2xl p-3 flex items-start gap-3"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      tone === 'rose'
+                        ? 'bg-rose-50 dark:bg-rose-900/20'
+                        : tone === 'emerald'
+                          ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                          : 'bg-blue-50 dark:bg-blue-900/20'
+                    }`}>
+                      {tone === 'rose' ? (
+                        <AlertTriangle className="w-4 h-4 text-rose-500" />
+                      ) : tone === 'emerald' ? (
+                        <Gift className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <History className="w-4 h-4 text-blue-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-tg-text">
+                        <span className={`font-medium ${isEmphasis ? 'text-tg-text' : ''}`}>{log.user_name || 'Пользователь'}</span>{' '}
+                        <span className="text-tg-hint">{label}</span>
+                        {log.target_user_name && (
+                          <> <span className="text-tg-hint">для</span> <span className="font-medium">{log.target_user_name}</span></>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-xs text-tg-hint">
+                        {new Date(log.created_at).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                );
               })}
-            </p>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
