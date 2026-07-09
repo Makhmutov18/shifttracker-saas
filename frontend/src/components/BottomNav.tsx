@@ -11,36 +11,40 @@ interface Props {
 }
 
 const navItems: { page: Page; label: string; icon: React.ReactNode; ownerOnly?: boolean }[] = [
-  { page: 'dashboard', label: 'Главная', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { page: 'shift', label: 'Смена', icon: <PlusCircle className="w-5 h-5" /> },
-  { page: 'history', label: 'История', icon: <Clock className="w-5 h-5" /> },
-  { page: 'owner', label: 'Управление', icon: <ShieldCheck className="w-5 h-5" />, ownerOnly: true },
-  { page: 'profile', label: 'Профиль', icon: <User className="w-5 h-5" /> },
+  { page: 'dashboard', label: 'Главная', icon: <LayoutDashboard className="h-5 w-5" /> },
+  { page: 'history', label: 'История', icon: <Clock className="h-5 w-5" /> },
+  { page: 'shift', label: 'Смена', icon: <PlusCircle className="h-5 w-5" /> },
+  { page: 'owner', label: 'Управление', icon: <ShieldCheck className="h-5 w-5" />, ownerOnly: true },
+  { page: 'profile', label: 'Профиль', icon: <User className="h-5 w-5" /> },
 ];
 
 export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
-  const visibleItems = navItems.filter(item => !item.ownerOnly || isAdmin);
+  const visibleItems = navItems.filter((item) => !item.ownerOnly || isAdmin);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 glass-nav safe-area-bottom z-50">
-      <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-        {visibleItems.map((item) => {
-          const isActive = currentPage === item.page;
-          return (
-            <button
-              key={item.page}
-              onClick={() => { hapticFeedback(); onNavigate(item.page); }}
-              className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors ${
-                isActive
-                  ? 'text-tg-primary'
-                  : 'text-tg-hint'
-              }`}
-            >
-              {item.icon}
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </button>
-          );
-        })}
+    <nav className="fixed inset-x-0 bottom-0 z-50 pointer-events-none">
+      <div className="mx-auto max-w-lg px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.7rem)] pt-2">
+        <div className="dock-shell glass-nav pointer-events-auto">
+          {visibleItems.map((item) => {
+            const isActive = currentPage === item.page;
+            const isPrimary = item.page === 'shift';
+
+            return (
+              <button
+                key={item.page}
+                type="button"
+                onClick={() => {
+                  hapticFeedback();
+                  onNavigate(item.page);
+                }}
+                className={`dock-item ${isPrimary ? 'dock-item-primary' : ''} ${isActive ? 'dock-item-active' : ''}`}
+              >
+                <span className={`dock-item-icon ${isPrimary ? 'dock-item-icon-primary' : ''}`}>{item.icon}</span>
+                <span className="dock-item-label">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
