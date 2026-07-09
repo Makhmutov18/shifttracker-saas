@@ -19,7 +19,14 @@ from app.schemas import (
     PayrollSummaryOut, PayrollSummaryRow,
 )
 from app.auth import validate_init_data, extract_user_from_init_data
-from app.utils import calculate_hours, calculate_salary
+from app.utils import (
+    calculate_hours,
+    calculate_salary,
+    normalize_pay_model,
+    safe_decimal,
+    safe_text,
+    shift_status_label,
+)
 from app.notifications import notify_shift_approved, notify_shift_rejected, notify_bonus_added, notify_penalty_added
 
 import uuid
@@ -369,14 +376,19 @@ async def payroll_summary(
 
     shifts_query = (
         select(Shift, User)
-        .join(User, Shift.user_id == User.id)
+        .outerjoin(User, Shift.user_id == User.id)
         .where(
             func.extract("month", Shift.date) == m,
             func.extract("year", Shift.date) == y,
         )
     )
     if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
+        shifts_query = shifts_query.where(
+            or_(
+                Shift.venue_id == venue_id,
+                User.venue_id == venue_id,
+            )
+        )
     elif not _can_manage_all_venue_shifts(user):
         shifts_query = shifts_query.where(
             or_(
@@ -808,10 +820,9 @@ async def export_csv(
     m = month or now.month
     y = year or now.year
 
-    # Get all approved shifts in scope for this month
     shifts_query = (
         select(Shift, User)
-        .join(User, Shift.user_id == User.id)
+        .outerjoin(User, Shift.user_id == User.id)
         .where(
             Shift.status == "approved",
             func.extract("month", Shift.date) == m,
@@ -819,7 +830,12 @@ async def export_csv(
         )
     )
     if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
+        shifts_query = shifts_query.where(
+            or_(
+                Shift.venue_id == venue_id,
+                User.venue_id == venue_id,
+            )
+        )
     elif not _can_manage_all_venue_shifts(user):
         shifts_query = shifts_query.where(
             or_(
@@ -831,7 +847,6 @@ async def export_csv(
     result = await session.execute(shifts_query)
     shifts_with_users = result.all()
 
-    # Get adjustments for this month in the same scope
     adj_query = (
         select(Adjustment, User)
         .join(User, Adjustment.user_id == User.id)
@@ -852,7 +867,6 @@ async def export_csv(
     adj_result = await session.execute(adj_query)
     adjustments_with_users = adj_result.all()
 
-    # Build adjustments summary per user
     adj_by_user: dict[uuid.UUID, dict] = {}
     for adj, adj_user in adjustments_with_users:
         uid = adj.user_id
@@ -863,20 +877,26 @@ async def export_csv(
         else:
             adj_by_user[uid]["penalties"] += adj.amount
 
-    # Build Excel
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Расчёт"
+    ws.title = "??????"
 
-    # Styles
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="2481CC", end_color="2481CC", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center")
 
-    # Headers
     headers = [
-        "Сотрудник", "Дата", "Часы", "Ставка/ч", "Выручка", "% от выручки",
-        "Модель оплаты", "Итого ЗП"
+        "?????????",
+        "?????",
+        "?????????",
+        "????",
+        "????",
+        "??????/?",
+        "???????",
+        "% ?? ???????",
+        "?????? ??????",
+        "??????",
+        "????? ??",
     ]
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
@@ -888,39 +908,68 @@ async def export_csv(
     row = 2
 
     for shift, shift_user in shifts_with_users:
-        rev_pct = shift_user.revenue_percentage or Decimal("0")
-        revenue = shift.revenue or Decimal("0")
+        user_name = safe_text(getattr(shift_user, "name", None), "?????????")
+        position = safe_text(getattr(shift_user, "position", None), "")
+        venue_name = "???????? ?????"
+        pay_model = "hourly"
+
+        if shift_user is not None:
+            venue_name = safe_text(getattr(getattr(shift_user, "venue", None), "name", None), venue_name)
+            pay_model = normalize_pay_model(getattr(shift_user, "pay_model", None))
+
+        shift_venue = getattr(shift, "venue", None)
+        if shift_venue is not None:
+            venue_name = safe_text(getattr(shift_venue, "name", None), venue_name)
+        elif safe_text(getattr(shift, "venue_id", None), "") == "":
+            venue_name = "???????? ?????"
+
+        total_hours = safe_decimal(getattr(shift, "total_hours", None))
+        hourly_rate = safe_decimal(getattr(shift_user, "hourly_rate", None) if shift_user is not None else None)
+        revenue = safe_decimal(getattr(shift, "revenue", None))
+        rev_pct = safe_decimal(getattr(shift_user, "revenue_percentage", None) if shift_user is not None else None)
+        payout = calculate_salary(
+            total_hours,
+            hourly_rate,
+            revenue=revenue if revenue != Decimal("0.00") else None,
+            revenue_percentage=rev_pct if rev_pct != Decimal("0.00") else None,
+            pay_model=pay_model,
+        )
+        status_label = shift_status_label(getattr(shift, "status", None))
+        shift_date = getattr(shift, "date", None)
+        date_value = str(shift_date) if shift_date else ""
 
         user_adj = adj_by_user.get(shift.user_id, {"bonuses": Decimal("0"), "penalties": Decimal("0")})
 
         if shift.user_id not in user_totals:
             user_totals[shift.user_id] = {
-                "name": shift_user.name,
+                "name": user_name,
                 "hours": Decimal("0"),
                 "salary": Decimal("0"),
                 "bonuses": user_adj["bonuses"],
                 "penalties": user_adj["penalties"],
             }
-        user_totals[shift.user_id]["hours"] += shift.total_hours
-        user_totals[shift.user_id]["salary"] += shift.salary_earned
+        user_totals[shift.user_id]["hours"] += total_hours
+        user_totals[shift.user_id]["salary"] += payout
 
-        ws.cell(row=row, column=1, value=shift_user.name)
-        ws.cell(row=row, column=2, value=str(shift.date))
-        ws.cell(row=row, column=3, value=float(shift.total_hours))
-        ws.cell(row=row, column=4, value=float(shift_user.hourly_rate))
-        ws.cell(row=row, column=5, value=float(revenue) if revenue else None)
-        ws.cell(row=row, column=6, value=float(rev_pct) if rev_pct else None)
-        ws.cell(row=row, column=7, value=shift_user.pay_model.value)
-        ws.cell(row=row, column=8, value=float(shift.salary_earned))
+        ws.cell(row=row, column=1, value=user_name)
+        ws.cell(row=row, column=2, value=venue_name)
+        ws.cell(row=row, column=3, value=position)
+        ws.cell(row=row, column=4, value=date_value)
+        ws.cell(row=row, column=5, value=float(total_hours))
+        ws.cell(row=row, column=6, value=float(hourly_rate))
+        ws.cell(row=row, column=7, value=float(revenue) if revenue != Decimal("0.00") else None)
+        ws.cell(row=row, column=8, value=float(rev_pct) if rev_pct != Decimal("0.00") else None)
+        ws.cell(row=row, column=9, value=pay_model)
+        ws.cell(row=row, column=10, value=status_label)
+        ws.cell(row=row, column=11, value=float(payout))
         row += 1
 
-    # Summary section
     row += 1
-    summary_header = ws.cell(row=row, column=1, value="ИТОГО ПО СОТРУДНИКАМ")
+    summary_header = ws.cell(row=row, column=1, value="????? ?? ???????????")
     summary_header.font = Font(bold=True, size=12)
     row += 1
 
-    summary_headers = ["Сотрудник", "Всего часов", "ЗП за смены", "Бонусы", "Штрафы", "Итого к выплате"]
+    summary_headers = ["?????????", "????? ?????", "?? ?? ?????", "??????", "??????", "????? ? ???????"]
     for col, header in enumerate(summary_headers, 1):
         cell = ws.cell(row=row, column=col, value=header)
         cell.font = Font(bold=True)
@@ -937,7 +986,6 @@ async def export_csv(
         ws.cell(row=row, column=6, value=float(net.quantize(Decimal("0.01"))))
         row += 1
 
-    # Auto-width columns
     for col in ws.columns:
         max_length = 0
         col_letter = col[0].column_letter
@@ -946,14 +994,13 @@ async def export_csv(
                 max_length = max(max_length, len(str(cell.value)))
         ws.column_dimensions[col_letter].width = min(max_length + 2, 30)
 
-    # Save to buffer
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
 
     month_names = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+        "??????", "???????", "????", "??????", "???", "????",
+        "????", "??????", "????????", "???????", "??????", "???????",
     ]
     filename = f"raschet_{month_names[m-1]}_{y}.xlsx"
 
@@ -963,8 +1010,6 @@ async def export_csv(
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
-
-# ─── Reminders (called by external cron) ─────────────────────────────────────
 
 @router.post("/reminders/shifts")
 async def send_shift_reminders(

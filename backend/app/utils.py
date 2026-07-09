@@ -1,5 +1,49 @@
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
+import enum
+
+from app.models import PayModel
+
+
+def safe_decimal(value, default: Decimal = Decimal("0.00")) -> Decimal:
+    if value is None:
+        return default
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return default
+
+
+def safe_text(value, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
+def normalize_pay_model(value) -> str:
+    if isinstance(value, PayModel):
+        return value.value
+    if isinstance(value, enum.Enum):
+        return str(value.value)
+    raw = safe_text(value, "hourly")
+    if raw in {"fixed", "shift"}:
+        return "fixed_shift"
+    if raw in {"hourly", "fixed_shift", "revenue", "hybrid"}:
+        return raw
+    return "hourly"
+
+
+def shift_status_label(status) -> str:
+    raw = safe_text(status, "pending")
+    labels = {
+        "pending": "На подтверждении",
+        "approved": "Утверждена",
+        "rejected": "Отклонена",
+    }
+    return labels.get(raw, "Действие")
 
 
 def calculate_hours(start_time, end_time) -> Decimal:
