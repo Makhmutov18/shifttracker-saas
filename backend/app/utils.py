@@ -39,11 +39,11 @@ def normalize_pay_model(value) -> str:
 def shift_status_label(status) -> str:
     raw = safe_text(status, "pending")
     labels = {
-        "pending": "На подтверждении",
-        "approved": "Утверждена",
-        "rejected": "Отклонена",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
     }
-    return labels.get(raw, "Действие")
+    return labels.get(raw, "Action")
 
 
 def calculate_hours(start_time, end_time) -> Decimal:

@@ -879,24 +879,24 @@ async def export_csv(
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "??????"
+    ws.title = "Payroll"
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="2481CC", end_color="2481CC", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center")
 
     headers = [
-        "?????????",
-        "?????",
-        "?????????",
-        "????",
-        "????",
-        "??????/?",
-        "???????",
-        "% ?? ???????",
-        "?????? ??????",
-        "??????",
-        "????? ??",
+        "Employee",
+        "Venue",
+        "Position",
+        "Date",
+        "Hours",
+        "Rate/hour",
+        "Revenue",
+        "Revenue %",
+        "Pay model",
+        "Status",
+        "Total pay",
     ]
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
@@ -908,9 +908,9 @@ async def export_csv(
     row = 2
 
     for shift, shift_user in shifts_with_users:
-        user_name = safe_text(getattr(shift_user, "name", None), "?????????")
+        user_name = safe_text(getattr(shift_user, "name", None), "Employee")
         position = safe_text(getattr(shift_user, "position", None), "")
-        venue_name = "???????? ?????"
+        venue_name = "Main venue"
         pay_model = "hourly"
 
         if shift_user is not None:
@@ -921,7 +921,7 @@ async def export_csv(
         if shift_venue is not None:
             venue_name = safe_text(getattr(shift_venue, "name", None), venue_name)
         elif safe_text(getattr(shift, "venue_id", None), "") == "":
-            venue_name = "???????? ?????"
+            venue_name = "Main venue"
 
         total_hours = safe_decimal(getattr(shift, "total_hours", None))
         hourly_rate = safe_decimal(getattr(shift_user, "hourly_rate", None) if shift_user is not None else None)
@@ -965,11 +965,11 @@ async def export_csv(
         row += 1
 
     row += 1
-    summary_header = ws.cell(row=row, column=1, value="????? ?? ???????????")
+    summary_header = ws.cell(row=row, column=1, value="SUMMARY BY EMPLOYEE")
     summary_header.font = Font(bold=True, size=12)
     row += 1
 
-    summary_headers = ["?????????", "????? ?????", "?? ?? ?????", "??????", "??????", "????? ? ???????"]
+    summary_headers = ["Employee", "Total hours", "Shift pay", "Bonuses", "Penalties", "Net payout"]
     for col, header in enumerate(summary_headers, 1):
         cell = ws.cell(row=row, column=col, value=header)
         cell.font = Font(bold=True)
@@ -999,10 +999,10 @@ async def export_csv(
     output.seek(0)
 
     month_names = [
-        "??????", "???????", "????", "??????", "???", "????",
-        "????", "??????", "????????", "???????", "??????", "???????",
+        "Status", "Revenue", "Hours", "Status", "???", "Hours",
+        "Hours", "Status", "????????", "Revenue", "Status", "Revenue",
     ]
-    filename = f"raschet_{month_names[m-1]}_{y}.xlsx"
+    filename = f"payroll_{month_names[m-1]}_{y}.xlsx"
 
     return StreamingResponse(
         iter([output.getvalue()]),
