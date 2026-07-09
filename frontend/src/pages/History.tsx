@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Clock, CreditCard, TrendingDown, Download, Wallet } from 'lucide-react';
+import { CalendarDays, Clock, CreditCard, Download, TrendingDown, Wallet } from 'lucide-react';
 import { User, PayrollSummary, downloadPayrollExport, getPayrollSummary } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
@@ -51,6 +51,7 @@ export default function History({ user }: Props) {
   }, []);
 
   const currentMonthValue = `${year}-${String(month).padStart(2, '0')}`;
+  const selectedMonthLabel = monthOptions.find((option) => option.value === currentMonthValue)?.label ?? formatMonthLabel(new Date(year, month - 1, 1));
 
   useEffect(() => {
     if (!canManagePayroll) {
@@ -112,136 +113,170 @@ export default function History({ user }: Props) {
   };
 
   return (
-    <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      <h1 className="text-lg font-semibold mb-4 text-tg-text">История</h1>
-
-      <div className="mb-4 space-y-2">
-        <div className="surface-card rounded-[1.35rem] p-3">
-          <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint mb-2">Месяц</label>
-          <select
-            value={currentMonthValue}
-            onChange={(event) => setSelectedMonth(event.target.value)}
-            className="w-full rounded-xl border border-tg-border bg-tg-bg px-4 py-3 text-sm font-medium text-tg-text outline-none focus:ring-2 focus:ring-tg-primary/40"
-          >
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="button"
-          onClick={resetToCurrent}
-          disabled={isCurrentPeriod}
-          className="surface-muted w-full rounded-xl px-4 py-2.5 text-sm font-medium text-tg-text disabled:opacity-60"
-        >
-          Текущий месяц
-        </button>
+    <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold text-tg-text">История</h1>
+        <p className="mt-1 text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
       </div>
 
+      <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-tg-text">Период</p>
+            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть смены, расходы и payroll summary.</p>
+          </div>
+          <button
+            type="button"
+            onClick={resetToCurrent}
+            disabled={isCurrentPeriod}
+            className="surface-muted shrink-0 rounded-xl px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
+          >
+            Текущий месяц
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Месяц</label>
+          <div className="relative">
+            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tg-hint" />
+            <select
+              value={currentMonthValue}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              className="w-full rounded-xl border border-tg-border bg-tg-bg py-3 pl-10 pr-4 text-sm font-medium text-tg-text outline-none focus:ring-2 focus:ring-tg-primary/40"
+            >
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-tg-hint">Сейчас выбран: {selectedMonthLabel}</p>
+        </div>
+      </section>
+
       {canManagePayroll && (
-        <div className="space-y-3 mb-4">
-          {summaryLoading ? (
-            <div className="surface-card rounded-[1.35rem] p-4 animate-pulse">
-              <div className="h-4 w-40 bg-tg-bg/70 rounded mb-3" />
-              <div className="grid grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-16 rounded-xl bg-tg-bg/70" />
-                ))}
+        <section className="space-y-3">
+          <div className="surface-card rounded-[1.4rem] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-tg-text">Сводка выплат</p>
+                <p className="mt-1 text-xs text-tg-hint">Все суммы ниже считаются только по утверждённым сменам.</p>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
+                <Wallet className="h-5 w-5" />
               </div>
             </div>
-          ) : summaryError ? (
-            <div className="surface-card rounded-[1.35rem] p-4">
-              <p className="text-sm font-medium text-tg-text">Payroll summary недоступен</p>
-              <p className="text-xs text-red-400 mt-1">{summaryError}</p>
-            </div>
-          ) : summary ? (
-            <div className="surface-card rounded-[1.35rem] p-4">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <p className="text-sm text-tg-hint">Payroll summary за {getMonthName(month)} {year}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Wallet className="w-4 h-4 text-tg-primary" />
-                    <p className="text-xl font-semibold text-tg-text">{formatCurrency(summary.total_payout)}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-tg-hint">Сотрудники</p>
-                  <p className="text-sm font-medium text-tg-text">{summary.employees_count}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="surface-muted rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Утверждённые смены</p>
-                  <p className="text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
-                </div>
-                <div className="surface-muted rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">В ожидании</p>
-                  <p className="text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
-                </div>
-                <div className="surface-muted rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Часы</p>
-                  <p className="text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
-                </div>
-                <div className="surface-muted rounded-xl p-3">
-                  <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
-                  <p className="text-sm font-semibold text-tg-text">
-                    {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
-                  </p>
-                </div>
-              </div>
-
-              {summary.rows.length > 0 && (
-                <div className="space-y-2">
-                  {summary.rows.slice(0, 5).map((row) => (
-                    <div
-                      key={row.user_id}
-                      className="surface-elevated rounded-xl px-3 py-3 flex items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
-                        <p className="text-xs text-tg-hint">
-                          {row.approved_shifts_count} смены · {formatHours(row.total_hours)}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-tg-text shrink-0">
-                        {formatCurrency(row.total_payout)}
-                      </p>
-                    </div>
+            {summaryLoading ? (
+              <div className="mt-4 animate-pulse space-y-3">
+                <div className="h-20 rounded-[1.35rem] bg-tg-bg/70" />
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-16 rounded-xl bg-tg-bg/70" />
                   ))}
                 </div>
-              )}
-            </div>
-          ) : null}
+              </div>
+            ) : summaryError ? (
+              <div className="mt-4 rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
+                <p className="font-medium">Payroll summary недоступен</p>
+                <p className="mt-1 text-xs">{summaryError}</p>
+              </div>
+            ) : summary ? (
+              <div className="mt-4 space-y-3">
+                <div className="accent-card rounded-[1.5rem] p-5 text-white shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm opacity-80">Итого к выплате</p>
+                      <p className="mt-1 text-3xl font-bold">{formatCurrency(summary.total_payout)}</p>
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/14">
+                      <Wallet className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-sm opacity-90">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatHours(summary.total_hours)}</span>
+                    <span className="opacity-60">·</span>
+                    <span>{summary.employees_count} сотрудников</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
+                    <p className="text-xs text-tg-hint">Утверждённые смены</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
+                  </div>
+                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
+                    <p className="text-xs text-tg-hint">В ожидании</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
+                  </div>
+                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
+                    <p className="text-xs text-tg-hint">Часы</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
+                  </div>
+                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
+                    <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">
+                      {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
+                    </p>
+                  </div>
+                </div>
+
+                {summary.rows.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-tg-text">Сотрудники</p>
+                      <p className="text-xs text-tg-hint">{summary.rows.length} в сводке</p>
+                    </div>
+                    {summary.rows.slice(0, 5).map((row) => (
+                      <div
+                        key={row.user_id}
+                        className="surface-elevated rounded-[1.15rem] px-3 py-3 flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
+                          <p className="text-xs text-tg-hint">
+                            {row.approved_shifts_count} смены · {formatHours(row.total_hours)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-tg-text shrink-0">
+                          {formatCurrency(row.total_payout)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
 
           <button
             type="button"
             onClick={handleExport}
             disabled={exportLoading}
-            className="surface-card w-full text-tg-text py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+            className="surface-card w-full rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 text-tg-text active:scale-[0.98] transition-transform disabled:opacity-60"
           >
             {exportLoading ? (
-              <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" />
             )}
             Выгрузить payroll за {getMonthName(month)} {year} (.xlsx)
           </button>
+
           {exportError && <p className="text-xs text-red-400">{exportError}</p>}
-        </div>
+        </section>
       )}
 
-      <div className="surface-muted flex rounded-xl p-1 mb-4">
+      <div className="surface-muted flex rounded-xl p-1">
         <button
           onClick={() => setTab('shifts')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             tab === 'shifts' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
-          <Clock className="w-4 h-4" />
+          <Clock className="h-4 w-4" />
           Смены
         </button>
         <button
@@ -250,7 +285,7 @@ export default function History({ user }: Props) {
             tab === 'expenses' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
-          <CreditCard className="w-4 h-4" />
+          <CreditCard className="h-4 w-4" />
           Расходы
         </button>
       </div>
@@ -263,14 +298,15 @@ export default function History({ user }: Props) {
             ))}
           </div>
         ) : shiftsError ? (
-          <div className="text-center py-12">
-            <p className="text-red-400 text-sm mb-2">Не удалось загрузить смены</p>
-            <p className="text-tg-hint text-xs">{shiftsError}</p>
+          <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
+            <p className="text-sm font-medium text-rose-500">Не удалось загрузить смены</p>
+            <p className="mt-2 text-xs text-tg-hint">{shiftsError}</p>
           </div>
         ) : shifts.length === 0 ? (
-          <div className="text-center py-12">
-            <Clock className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-            <p className="text-tg-hint text-sm">Пока нет смен за этот месяц</p>
+          <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
+            <Clock className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
+            <p className="text-sm font-medium text-tg-text">За этот месяц смен нет</p>
+            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и в payroll summary.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -286,25 +322,26 @@ export default function History({ user }: Props) {
           ))}
         </div>
       ) : expensesError ? (
-        <div className="text-center py-12">
-          <p className="text-red-400 text-sm mb-2">Не удалось загрузить расходы</p>
-          <p className="text-tg-hint text-xs">{expensesError}</p>
+        <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
+          <p className="text-sm font-medium text-rose-500">Не удалось загрузить расходы</p>
+          <p className="mt-2 text-xs text-tg-hint">{expensesError}</p>
         </div>
       ) : expenses.length === 0 ? (
-        <div className="text-center py-12">
-          <TrendingDown className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-          <p className="text-tg-hint text-sm">Пока нет расходов за этот месяц</p>
+        <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
+          <TrendingDown className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
+          <p className="text-sm font-medium text-tg-text">За этот месяц расходов нет</p>
+          <p className="mt-1 text-xs text-tg-hint">Если расходы появятся, они отобразятся здесь.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {expenses.map((expense) => (
-            <div key={expense.id} className="surface-card rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-tg-text font-medium text-sm">{expense.category}</p>
-                <p className="text-tg-hint text-xs">{expense.date}</p>
-                {expense.comment && <p className="text-tg-hint text-xs mt-0.5">{expense.comment}</p>}
+            <div key={expense.id} className="surface-card rounded-[1.15rem] p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-tg-text">{expense.category}</p>
+                <p className="mt-0.5 text-xs text-tg-hint">{expense.date}</p>
+                {expense.comment && <p className="mt-1 text-xs text-tg-hint">{expense.comment}</p>}
               </div>
-              <p className="text-rose-400 font-semibold text-sm">-{formatCurrency(expense.amount)}</p>
+              <p className="shrink-0 text-sm font-semibold text-rose-500">-{formatCurrency(expense.amount)}</p>
             </div>
           ))}
         </div>
