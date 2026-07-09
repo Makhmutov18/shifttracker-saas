@@ -881,6 +881,7 @@ function VenuesTab() {
   const [editingVenueId, setEditingVenueId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [statusVenueId, setStatusVenueId] = useState<string | null>(null);
+  const [showVenueArchive, setShowVenueArchive] = useState(false);
 
   const fetchVenuesList = async () => {
     try {
@@ -993,6 +994,7 @@ function VenuesTab() {
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Точки</p>
         <p className="mt-1 text-sm text-tg-hint">Создавайте и переименовывайте точки, сохраняя историю сотрудников и смен.</p>
+        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
       </div>
 
       <form onSubmit={handleCreateVenue} className="surface-card rounded-2xl p-4 space-y-3">
@@ -1020,26 +1022,26 @@ function VenuesTab() {
       {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{error}</p>}
       {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
 
-      {venues.length === 0 ? (
+      {venues.filter((venue) => venue.is_active).length === 0 ? (
         <div className="surface-card rounded-2xl px-4 py-5">
-          <p className="text-sm font-medium text-tg-text">Точки ещё не добавлены</p>
+          <p className="text-sm font-medium text-tg-text">Активных точек пока нет</p>
           <p className="mt-1 text-sm text-tg-hint">Создайте первую точку, чтобы распределять по ней сотрудников.</p>
         </div>
       ) : (
         <div className="surface-card rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-tg-text">Список точек</p>
-              <p className="text-xs text-tg-hint">Активные и неактивные точки показаны в одном списке.</p>
+              <p className="text-sm font-medium text-tg-text">Активные точки</p>
+              <p className="text-xs text-tg-hint">Неактивные точки убраны из основного списка и собраны в архив.</p>
             </div>
-            <p className="text-xs text-tg-hint">Всего: {venues.length}</p>
+            <p className="text-xs text-tg-hint">Активных: {venues.filter((venue) => venue.is_active).length}</p>
           </div>
 
-          {venues.map((venue) => {
+          {venues.filter((venue) => venue.is_active).map((venue) => {
             const isEditing = editingVenueId === venue.id;
             const isBusy = statusVenueId === venue.id;
             return (
-              <div key={venue.id} className={`rounded-2xl p-4 ${venue.is_active ? 'surface-muted' : 'surface-muted opacity-85'}`}>
+              <div key={venue.id} className="rounded-2xl p-4 surface-muted">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     {isEditing ? (
@@ -1100,24 +1102,124 @@ function VenuesTab() {
                     <button
                       onClick={() => handleToggleVenue(venue)}
                       disabled={isBusy}
-                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${
-                        venue.is_active ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'
-                      }`}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-600 transition-colors disabled:opacity-60"
                     >
-                      {isBusy ? (
-                        <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
-                      ) : venue.is_active ? (
-                        <XCircle className="w-3.5 h-3.5" />
-                      ) : (
-                        <CheckCircle className="w-3.5 h-3.5" />
-                      )}
-                      {venue.is_active ? 'Деактивировать' : 'Активировать'}
+                      {isBusy ? <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" /> : <XCircle className="w-3.5 h-3.5" />}
+                      В архив
                     </button>
                   )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setShowVenueArchive((value) => !value)}
+        className="surface-muted w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-tg-text"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span>Архив точек</span>
+          <span className="text-xs text-tg-hint">{venues.filter((venue) => !venue.is_active).length}</span>
+        </div>
+      </button>
+
+      {showVenueArchive && (
+        <div className="surface-card rounded-2xl p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-tg-text">Архив точек</p>
+            <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+          </div>
+
+          {venues.filter((venue) => !venue.is_active).length === 0 ? (
+            <div className="rounded-2xl bg-tg-bg px-4 py-5">
+              <p className="text-sm font-medium text-tg-text">Архив точек пуст</p>
+              <p className="mt-1 text-sm text-tg-hint">Неактивные точки появятся здесь после перевода в архив.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {venues.filter((venue) => !venue.is_active).map((venue) => {
+                const isEditing = editingVenueId === venue.id;
+                const isBusy = statusVenueId === venue.id;
+                return (
+                  <div key={venue.id} className="rounded-2xl bg-tg-bg/80 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
+                            placeholder="Название точки"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-tg-text">{venue.name}</p>
+                            <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
+                              В архиве
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {!isEditing && (
+                        <button
+                          onClick={() => {
+                            setEditingVenueId(venue.id);
+                            setEditingName(venue.name);
+                          }}
+                          className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+                          aria-label={`Редактировать ${venue.name}`}
+                        >
+                          <Pencil className="w-4 h-4 text-tg-hint" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleRenameVenue(venue.id)}
+                            disabled={isBusy}
+                            className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                          >
+                            <Check className="w-4 h-4" />
+                            Сохранить
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingVenueId(null);
+                              setEditingName('');
+                            }}
+                            disabled={isBusy}
+                            className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                          >
+                            Отмена
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleVenue(venue)}
+                          disabled={isBusy}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors disabled:opacity-60"
+                        >
+                          {isBusy ? (
+                            <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
+                          ) : (
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          )}
+                          Восстановить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1128,6 +1230,7 @@ function TeamTab({ user }: { user: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchive, setShowArchive] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editPosition, setEditPosition] = useState('');
@@ -1259,17 +1362,21 @@ function TeamTab({ user }: { user: User }) {
   if (users.length === 0) {
     return (
       <div className="surface-card rounded-2xl px-4 py-5">
-        <p className="text-sm font-medium text-tg-text">Сотрудников пока нет</p>
+        <p className="text-sm font-medium text-tg-text">Активных сотрудников пока нет</p>
         <p className="mt-1 text-sm text-tg-hint">Добавьте сотрудника через вкладку приглашения, и он появится здесь.</p>
       </div>
     );
   }
+
+  const activeUsers = users.filter((item) => item.is_active);
+  const archivedUsers = users.filter((item) => !item.is_active);
 
   return (
     <div className="space-y-4">
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Команда</p>
         <p className="mt-1 text-sm text-tg-hint">Создавайте сотрудников, задавайте точку, оплату и права без перегруженной формы.</p>
+        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
       </div>
 
       {teamError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{teamError}</p>}
@@ -1426,70 +1533,148 @@ function TeamTab({ user }: { user: User }) {
       <div className="surface-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">Список сотрудников</p>
-            <p className="text-xs text-tg-hint">Активные и неактивные сотрудники показаны с основными параметрами.</p>
+            <p className="text-sm font-medium text-tg-text">Активные сотрудники</p>
+            <p className="text-xs text-tg-hint">Неактивные сотрудники убраны в архив, но история и выплаты сохраняются.</p>
           </div>
-          <p className="text-xs text-tg-hint">Всего: {users.length}</p>
+          <p className="text-xs text-tg-hint">Активных: {activeUsers.length}</p>
         </div>
 
-        {users.map((u) => (
-          <div key={u.id} className={`rounded-2xl p-4 ${u.is_active ? 'surface-muted' : 'surface-muted opacity-85'}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
-                  <span className={`text-[11px] px-2 py-1 rounded-full ${u.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-300'}`}>
-                    {u.is_active ? 'Активен' : 'Неактивен'}
-                  </span>
+        {activeUsers.length === 0 ? (
+          <div className="rounded-2xl bg-tg-bg px-4 py-5">
+            <p className="text-sm font-medium text-tg-text">Активных сотрудников пока нет</p>
+            <p className="mt-1 text-sm text-tg-hint">Перенесите сотрудника из архива или добавьте нового через приглашение.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activeUsers.map((u) => (
+              <div key={u.id} className="rounded-2xl p-4 surface-muted">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                        Активен
+                      </span>
+                    </div>
+                    <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
+                      <p>Точка: {getVenueName(u.venue)}</p>
+                      <p>Должность: {getPositionLabel(u)}</p>
+                      <p>{getManagementBadge(u)}</p>
+                      <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
+                      <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
+                      {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
+                        <p>Процент от выручки: {u.revenue_percentage}%</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => startEdit(u)}
+                    className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+                    aria-label={`Редактировать ${u.name}`}
+                  >
+                    <Pencil className="w-4 h-4 text-tg-hint" />
+                  </button>
                 </div>
-                <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
-                  <p>Точка: {getVenueName(u.venue)}</p>
-                  <p>Должность: {getPositionLabel(u)}</p>
-                  <p>{getManagementBadge(u)}</p>
-                  <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
-                  <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
-                  {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
-                    <p>Процент от выручки: {u.revenue_percentage}%</p>
+
+                <div className="mt-3 flex gap-2">
+                  {u.id !== user.id ? (
+                    <button
+                      onClick={() => handleStatusChange(u)}
+                      disabled={statusUserId === u.id}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-600 transition-colors disabled:opacity-60"
+                    >
+                      {statusUserId === u.id ? (
+                        <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
+                      ) : (
+                        <UserX className="w-3.5 h-3.5" />
+                      )}
+                      В архив
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
+                      Это вы
+                    </span>
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => startEdit(u)}
-                className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
-                aria-label={`Редактировать ${u.name}`}
-              >
-                <Pencil className="w-4 h-4 text-tg-hint" />
-              </button>
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              {u.id !== user.id ? (
-                <button
-                  onClick={() => handleStatusChange(u)}
-                  disabled={statusUserId === u.id}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${
-                    u.is_active
-                      ? 'bg-rose-500/10 text-rose-600'
-                      : 'bg-emerald-500/10 text-emerald-600'
-                  }`}
-                >
-                  {statusUserId === u.id ? (
-                    <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
-                  ) : u.is_active ? (
-                    <UserX className="w-3.5 h-3.5" />
-                  ) : (
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  )}
-                  {u.is_active ? 'Деактивировать' : 'Активировать'}
-                </button>
-              ) : (
-                <span className="inline-flex items-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
-                  Это вы
-                </span>
-              )}
-            </div>
+            ))}
           </div>
-        ))}
+        )}
+
+        <button
+          type="button"
+          onClick={() => setShowArchive((value) => !value)}
+          className="surface-muted w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-tg-text"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span>Архив сотрудников</span>
+            <span className="text-xs text-tg-hint">{archivedUsers.length}</span>
+          </div>
+        </button>
+
+        {showArchive && (
+          <div className="space-y-3 pt-1">
+            {archivedUsers.length === 0 ? (
+              <div className="rounded-2xl bg-tg-bg px-4 py-5">
+                <p className="text-sm font-medium text-tg-text">Архив сотрудников пуст</p>
+                <p className="mt-1 text-sm text-tg-hint">Деактивированные сотрудники появятся здесь и останутся с историей смен.</p>
+              </div>
+            ) : (
+              archivedUsers.map((u) => (
+                <div key={u.id} className="rounded-2xl p-4 surface-muted opacity-90">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
+                          В архиве
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
+                        <p>Точка: {getVenueName(u.venue)}</p>
+                        <p>Должность: {getPositionLabel(u)}</p>
+                        <p>{getManagementBadge(u)}</p>
+                        <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
+                        <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
+                        {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
+                          <p>Процент от выручки: {u.revenue_percentage}%</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => startEdit(u)}
+                      className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+                      aria-label={`Редактировать ${u.name}`}
+                    >
+                      <Pencil className="w-4 h-4 text-tg-hint" />
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    {u.id !== user.id ? (
+                      <button
+                        onClick={() => handleStatusChange(u)}
+                        disabled={statusUserId === u.id}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors disabled:opacity-60"
+                      >
+                        {statusUserId === u.id ? (
+                          <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        )}
+                        Восстановить
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
+                        Это вы
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
