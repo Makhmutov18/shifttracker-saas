@@ -823,6 +823,10 @@ async def export_csv(
     shifts_query = (
         select(Shift, User)
         .outerjoin(User, Shift.user_id == User.id)
+        .options(
+            selectinload(Shift.venue),
+            selectinload(User.venue),
+        )
         .where(
             Shift.status == "approved",
             func.extract("month", Shift.date) == m,
