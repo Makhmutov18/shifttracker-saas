@@ -982,7 +982,7 @@ function VenuesTab() {
     return (
       <div className="animate-pulse space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
+          <div key={i} className="h-20 surface-card rounded-2xl" />
         ))}
       </div>
     );
@@ -990,7 +990,12 @@ function VenuesTab() {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleCreateVenue} className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3">
+      <div className="surface-card rounded-2xl p-4">
+        <p className="text-sm font-medium text-tg-text">Точки</p>
+        <p className="mt-1 text-sm text-tg-hint">Создавайте и переименовывайте точки, сохраняя историю сотрудников и смен.</p>
+      </div>
+
+      <form onSubmit={handleCreateVenue} className="surface-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-tg-primary" />
           <p className="text-sm font-medium text-tg-text">Новая точка</p>
@@ -1016,17 +1021,25 @@ function VenuesTab() {
       {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
 
       {venues.length === 0 ? (
-        <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5">
+        <div className="surface-card rounded-2xl px-4 py-5">
           <p className="text-sm font-medium text-tg-text">Точки ещё не добавлены</p>
           <p className="mt-1 text-sm text-tg-hint">Создайте первую точку, чтобы распределять по ней сотрудников.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="surface-card rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-tg-text">Список точек</p>
+              <p className="text-xs text-tg-hint">Активные и неактивные точки показаны в одном списке.</p>
+            </div>
+            <p className="text-xs text-tg-hint">Всего: {venues.length}</p>
+          </div>
+
           {venues.map((venue) => {
             const isEditing = editingVenueId === venue.id;
             const isBusy = statusVenueId === venue.id;
             return (
-              <div key={venue.id} className={`rounded-2xl p-4 ${venue.is_active ? 'bg-tg-secondary-bg' : 'bg-tg-secondary-bg/60 opacity-85'}`}>
+              <div key={venue.id} className={`rounded-2xl p-4 ${venue.is_active ? 'surface-muted' : 'surface-muted opacity-85'}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     {isEditing ? (
@@ -1237,7 +1250,7 @@ function TeamTab({ user }: { user: User }) {
     return (
       <div className="animate-pulse space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 bg-tg-secondary-bg rounded-xl" />
+          <div key={i} className="h-20 surface-card rounded-2xl" />
         ))}
       </div>
     );
@@ -1245,7 +1258,7 @@ function TeamTab({ user }: { user: User }) {
 
   if (users.length === 0) {
     return (
-      <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5">
+      <div className="surface-card rounded-2xl px-4 py-5">
         <p className="text-sm font-medium text-tg-text">Сотрудников пока нет</p>
         <p className="mt-1 text-sm text-tg-hint">Добавьте сотрудника через вкладку приглашения, и он появится здесь.</p>
       </div>
@@ -1253,13 +1266,16 @@ function TeamTab({ user }: { user: User }) {
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-tg-hint text-sm mb-2">Сотрудников: {users.length}</p>
+    <div className="space-y-4">
+      <div className="surface-card rounded-2xl p-4">
+        <p className="text-sm font-medium text-tg-text">Команда</p>
+        <p className="mt-1 text-sm text-tg-hint">Создавайте сотрудников, задавайте точку, оплату и права без перегруженной формы.</p>
+      </div>
 
       {teamError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{teamError}</p>}
       {teamSuccess && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{teamSuccess}</p>}
 
-      <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-4">
+      <div className="surface-card rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
@@ -1400,13 +1416,24 @@ function TeamTab({ user }: { user: User }) {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-tg-hint">Нажмите на иконку редактирования у нужного сотрудника.</p>
+          <div className="rounded-2xl bg-tg-bg px-4 py-5">
+            <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
+            <p className="mt-1 text-sm text-tg-hint">Нажмите на иконку редактирования у нужного сотрудника.</p>
+          </div>
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="surface-card rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-tg-text">Список сотрудников</p>
+            <p className="text-xs text-tg-hint">Активные и неактивные сотрудники показаны с основными параметрами.</p>
+          </div>
+          <p className="text-xs text-tg-hint">Всего: {users.length}</p>
+        </div>
+
         {users.map((u) => (
-          <div key={u.id} className={`rounded-2xl p-4 ${u.is_active ? 'bg-tg-secondary-bg' : 'bg-tg-secondary-bg/60 opacity-85'}`}>
+          <div key={u.id} className={`rounded-2xl p-4 ${u.is_active ? 'surface-muted' : 'surface-muted opacity-85'}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
