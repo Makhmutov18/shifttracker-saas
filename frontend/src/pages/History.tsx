@@ -116,15 +116,15 @@ export default function History({ user }: Props) {
     try {
       setExportLoading(true);
       setExportError(null);
-      const blob = await downloadPayrollExport(month, year, venueScopeId);
+      const { blob, filename } = await downloadPayrollExport(month, year, venueScopeId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `shifttracker-${year}-${String(month).padStart(2, '0')}.xlsx`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Не удалось скачать payroll export.');
     } finally {

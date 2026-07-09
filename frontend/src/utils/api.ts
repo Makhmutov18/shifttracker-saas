@@ -535,7 +535,28 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // Export
 
-export async function downloadPayrollExport(month?: number, year?: number, venueId?: string): Promise<Blob> {
+function getDownloadFilename(response: Response, month?: number, year?: number) {
+  const fallback = month && year ? `shifttracker-${year}-${String(month).padStart(2, '0')}.xlsx` : 'shifttracker-payroll.xlsx';
+  const disposition = response.headers.get('content-disposition') || '';
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallback;
+    }
+  }
+
+  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+  if (asciiMatch?.[1]) {
+    return asciiMatch[1];
+  }
+
+  return fallback;
+}
+
+export async function downloadPayrollExport(month?: number, year?: number, venueId?: string): Promise<{ blob: Blob; filename: string }> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
@@ -553,5 +574,8 @@ export async function downloadPayrollExport(month?: number, year?: number, venue
     throw new Error(extractErrorMessage(body, 'Не удалось скачать отчет', response.status));
   }
 
-  return response.blob();
+  return {
+    blob: await response.blob(),
+    filename: getDownloadFilename(response, month, year),
+  };
 }
