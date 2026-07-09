@@ -4,6 +4,8 @@ import { User as UserType } from '../utils/api';
 import { useStats } from '../hooks/useStats';
 import StatsWidget from '../components/StatsWidget';
 import { formatCurrency } from '../utils/helpers';
+import { getTelegramUser } from '../utils/telegram';
+import UserAvatar from '../components/UserAvatar';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
@@ -27,6 +29,7 @@ function getPayModelSummary(user: UserType) {
 
 export default function Dashboard({ user, onNavigate }: Props) {
   const { stats, loading } = useStats();
+  const telegramUser = getTelegramUser();
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
@@ -35,9 +38,12 @@ export default function Dashboard({ user, onNavigate }: Props) {
         className="glass-header flex items-center justify-between mb-6 cursor-pointer rounded-[1.4rem] p-4 active:scale-[0.98] transition-transform"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-tg-primary flex items-center justify-center text-white font-bold">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar
+            name={user.name}
+            photoUrl={telegramUser?.photo_url}
+            sizeClassName="w-12 h-12"
+            textClassName="text-sm"
+          />
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
             <p className="text-sm text-tg-hint">

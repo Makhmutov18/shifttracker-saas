@@ -6,6 +6,10 @@ export function getWebApp() {
   return getTelegram()?.WebApp;
 }
 
+export function getTelegramUser() {
+  return getWebApp()?.initDataUnsafe?.user;
+}
+
 export function isDark(): boolean {
   return getWebApp()?.colorScheme === 'dark';
 }

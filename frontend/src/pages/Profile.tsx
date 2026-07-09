@@ -3,7 +3,9 @@ import { ArrowLeft, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, S
 import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours, getMonthName, getCurrentMonth } from '../utils/helpers';
 import { canAccessOwnerPanel } from '../utils/permissions';
+import { getTelegramUser } from '../utils/telegram';
 import type { ThemeMode } from '../hooks/useTelegramTheme';
+import UserAvatar from '../components/UserAvatar';
 
 interface Props {
   user: UserType;
@@ -52,6 +54,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
   const isAdminContext = canAccessOwnerPanel(user);
+  const telegramUser = getTelegramUser();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,9 +91,12 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
 
       <div className="glass-header rounded-[1.4rem] p-5 mb-4">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-tg-primary flex items-center justify-center text-white text-xl font-bold">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar
+            name={user.name}
+            photoUrl={telegramUser?.photo_url}
+            sizeClassName="w-16 h-16"
+            textClassName="text-xl"
+          />
           <div>
             <h2 className="text-xl font-semibold text-tg-text">{user.name}</h2>
             <p className="text-sm text-tg-hint">{ROLE_LABELS[user.role] || user.role}</p>
