@@ -47,7 +47,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
           <div>
             <h1 className="text-lg font-semibold text-tg-text">{user.name}</h1>
             <p className="text-sm text-tg-hint">
-              {user.venue?.name || 'Заведение'} · {getPayModelSummary(user)}
+              {user.venue?.name || 'Точка'} · {getPayModelSummary(user)}
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock, CreditCard, Download, MapPin, TrendingDown, Wallet } from 'lucide-react';
 import { User, Venue, PayrollSummary, downloadPayrollExport, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
@@ -24,7 +24,7 @@ function formatMonthLabel(date: Date) {
 }
 
 function getVenueLabel(venue: Venue) {
-  return venue.is_active ? venue.name : `${venue.name} (неактивна)`;
+  return venue.is_active ? venue.name : `${venue.name} (РЅРµР°РєС‚РёРІРЅР°)`;
 }
 
 export default function History({ user }: Props) {
@@ -63,9 +63,9 @@ export default function History({ user }: Props) {
     monthOptions.find((option) => option.value === currentMonthValue)?.label ?? formatMonthLabel(new Date(year, month - 1, 1));
   const selectedVenueLabel = useMemo(() => {
     if (!canScopeByVenue || venueScopeId == null) {
-      return 'Все точки';
+      return 'Р’СЃРµ С‚РѕС‡РєРё';
     }
-    return getVenueLabel(venues.find((venue) => venue.id === venueScopeId) ?? { id: venueScopeId, name: 'Точка', is_active: true });
+    return getVenueLabel(venues.find((venue) => venue.id === venueScopeId) ?? { id: venueScopeId, name: 'РўРѕС‡РєР°', is_active: true });
   }, [canScopeByVenue, venueScopeId, venues]);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function History({ user }: Props) {
         setSummary(data);
       } catch (error) {
         setSummary(null);
-        setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить payroll summary.');
+        setSummaryError(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ сводку выплат.');
       } finally {
         setSummaryLoading(false);
       }
@@ -126,7 +126,7 @@ export default function History({ user }: Props) {
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Не удалось скачать payroll export.');
+      setExportError(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ сводку выплат.');
     } finally {
       setExportLoading(false);
     }
@@ -149,15 +149,15 @@ export default function History({ user }: Props) {
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 pb-8 pt-6">
       <div>
-        <h1 className="text-lg font-semibold text-tg-text">История</h1>
-        <p className="mt-1 text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
+        <h1 className="text-lg font-semibold text-tg-text">РСЃС‚РѕСЂРёСЏ</h1>
+        <p className="mt-1 text-sm text-tg-hint">РЎРјРµРЅС‹, СЂР°СЃС…РѕРґС‹ Рё РІС‹РїР»Р°С‚С‹ Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РјРµСЃСЏС†.</p>
       </div>
 
       <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">Период</p>
-            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть смены, расходы и payroll summary.</p>
+            <p className="text-sm font-medium text-tg-text">РџРµСЂРёРѕРґ</p>
+            <p className="mt-1 text-xs text-tg-hint">Р’С‹Р±РµСЂРёС‚Рµ РјРµСЃСЏС†, С‡С‚РѕР±С‹ РїРѕСЃРјРѕС‚СЂРµС‚СЊ СЃРјРµРЅС‹, СЂР°СЃС…РѕРґС‹ Рё сводку выплат.</p>
           </div>
           <button
             type="button"
@@ -165,12 +165,12 @@ export default function History({ user }: Props) {
             disabled={isCurrentPeriod}
             className="surface-muted shrink-0 rounded-xl px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
           >
-            Текущий месяц
+            РўРµРєСѓС‰РёР№ РјРµСЃСЏС†
           </button>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Месяц</label>
+          <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">РњРµСЃСЏС†</label>
           <div className="relative">
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tg-hint" />
             <select
@@ -185,7 +185,7 @@ export default function History({ user }: Props) {
               ))}
             </select>
           </div>
-          <p className="text-xs text-tg-hint">Сейчас выбран: {selectedMonthLabel}</p>
+          <p className="text-xs text-tg-hint">РЎРµР№С‡Р°СЃ РІС‹Р±СЂР°РЅ: {selectedMonthLabel}</p>
         </div>
       </section>
 
@@ -193,20 +193,20 @@ export default function History({ user }: Props) {
         <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-tg-text">Точка</p>
-              <p className="mt-1 text-xs text-tg-hint">Все точки или конкретная точка для просмотра смен, payroll summary и экспорта.</p>
+              <p className="text-sm font-medium text-tg-text">РўРѕС‡РєР°</p>
+              <p className="mt-1 text-xs text-tg-hint">Р’СЃРµ С‚РѕС‡РєРё РёР»Рё РєРѕРЅРєСЂРµС‚РЅР°СЏ С‚РѕС‡РєР° РґР»СЏ РїСЂРѕСЃРјРѕС‚СЂР° СЃРјРµРЅ, сводку выплат Рё СЌРєСЃРїРѕСЂС‚Р°.</p>
             </div>
             <MapPin className="h-4 w-4 text-tg-primary" />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Фильтр</label>
+            <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Р¤РёР»СЊС‚СЂ</label>
             <select
               value={venueFilter}
               onChange={(event) => setVenueFilter(event.target.value)}
               className="w-full rounded-xl border border-tg-border bg-tg-bg py-3 px-4 text-sm font-medium text-tg-text outline-none focus:ring-2 focus:ring-tg-primary/40"
             >
-              <option value="all">Все точки</option>
+              <option value="all">Р’СЃРµ С‚РѕС‡РєРё</option>
               {venues.map((venue) => (
                 <option key={venue.id} value={venue.id}>
                   {getVenueLabel(venue)}
@@ -215,7 +215,7 @@ export default function History({ user }: Props) {
             </select>
           </div>
 
-          <p className="text-xs text-tg-hint">Выбрано: {selectedVenueLabel}</p>
+          <p className="text-xs text-tg-hint">Р’С‹Р±СЂР°РЅРѕ: {selectedVenueLabel}</p>
         </section>
       )}
 
@@ -224,8 +224,8 @@ export default function History({ user }: Props) {
           <div className="surface-card rounded-[1.4rem] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-tg-text">Сводка выплат</p>
-                <p className="mt-1 text-xs text-tg-hint">Все суммы ниже считаются только по утверждённым сменам.</p>
+                <p className="text-sm font-medium text-tg-text">РЎРІРѕРґРєР° РІС‹РїР»Р°С‚</p>
+                <p className="mt-1 text-xs text-tg-hint">Р’СЃРµ СЃСѓРјРјС‹ РЅРёР¶Рµ СЃС‡РёС‚Р°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ РїРѕ СѓС‚РІРµСЂР¶РґС‘РЅРЅС‹Рј СЃРјРµРЅР°Рј.</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
                 <Wallet className="h-5 w-5" />
@@ -243,7 +243,7 @@ export default function History({ user }: Props) {
               </div>
             ) : summaryError ? (
               <div className="mt-4 rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
-                <p className="font-medium">Payroll summary недоступен</p>
+                <p className="font-medium">Сводка выплат РЅРµРґРѕСЃС‚СѓРїРµРЅ</p>
                 <p className="mt-1 text-xs">{summaryError}</p>
               </div>
             ) : summary ? (
@@ -251,7 +251,7 @@ export default function History({ user }: Props) {
                 <div className="accent-card rounded-[1.5rem] p-5 text-white shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm opacity-80">Итого к выплате</p>
+                      <p className="text-sm opacity-80">РС‚РѕРіРѕ Рє РІС‹РїР»Р°С‚Рµ</p>
                       <p className="mt-1 text-3xl font-bold">{formatCurrency(summary.total_payout)}</p>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/14">
@@ -261,27 +261,27 @@ export default function History({ user }: Props) {
                   <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-sm opacity-90">
                     <Clock className="h-4 w-4" />
                     <span>{formatHours(summary.total_hours)}</span>
-                    <span className="opacity-60">·</span>
-                    <span>{summary.employees_count} сотрудников</span>
+                    <span className="opacity-60">В·</span>
+                    <span>{summary.employees_count} СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ</span>
                   </div>
                   <p className="mt-2 text-xs opacity-80">{selectedVenueLabel}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Утверждённые смены</p>
+                    <p className="text-xs text-tg-hint">РЈС‚РІРµСЂР¶РґС‘РЅРЅС‹Рµ СЃРјРµРЅС‹</p>
                     <p className="mt-1 text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
                   </div>
                   <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">В ожидании</p>
+                    <p className="text-xs text-tg-hint">Р’ РѕР¶РёРґР°РЅРёРё</p>
                     <p className="mt-1 text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
                   </div>
                   <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Часы</p>
+                    <p className="text-xs text-tg-hint">Р§Р°СЃС‹</p>
                     <p className="mt-1 text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
                   </div>
                   <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
+                    <p className="text-xs text-tg-hint">Р‘РѕРЅСѓСЃС‹ / С€С‚СЂР°С„С‹</p>
                     <p className="mt-1 text-sm font-semibold text-tg-text">
                       {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
                     </p>
@@ -291,8 +291,8 @@ export default function History({ user }: Props) {
                 {summary.rows.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-tg-text">Сотрудники</p>
-                      <p className="text-xs text-tg-hint">{summary.rows.length} в сводке</p>
+                      <p className="text-sm font-medium text-tg-text">РЎРѕС‚СЂСѓРґРЅРёРєРё</p>
+                      <p className="text-xs text-tg-hint">{summary.rows.length} РІ СЃРІРѕРґРєРµ</p>
                     </div>
                     {summary.rows.slice(0, 5).map((row) => (
                       <div
@@ -302,7 +302,7 @@ export default function History({ user }: Props) {
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
                           <p className="text-xs text-tg-hint">
-                            {row.approved_shifts_count} смены · {formatHours(row.total_hours)}
+                            {row.approved_shifts_count} СЃРјРµРЅС‹ В· {formatHours(row.total_hours)}
                           </p>
                         </div>
                         <p className="text-sm font-semibold text-tg-text shrink-0">
@@ -327,7 +327,7 @@ export default function History({ user }: Props) {
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Выгрузить payroll за {getMonthName(month)} {year} (.xlsx)
+            Р’С‹РіСЂСѓР·РёС‚СЊ сводку выплат Р·Р° {getMonthName(month)} {year} (.xlsx)
           </button>
 
           {exportError && <p className="text-xs text-red-400">{exportError}</p>}
@@ -342,7 +342,7 @@ export default function History({ user }: Props) {
           }`}
         >
           <Clock className="h-4 w-4" />
-          Смены
+          РЎРјРµРЅС‹
         </button>
         <button
           onClick={() => setTab('expenses')}
@@ -351,7 +351,7 @@ export default function History({ user }: Props) {
           }`}
         >
           <CreditCard className="h-4 w-4" />
-          Расходы
+          Р Р°СЃС…РѕРґС‹
         </button>
       </div>
 
@@ -364,14 +364,14 @@ export default function History({ user }: Props) {
           </div>
         ) : shiftsError ? (
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
-            <p className="text-sm font-medium text-rose-500">Не удалось загрузить смены</p>
+            <p className="text-sm font-medium text-rose-500">РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРјРµРЅС‹</p>
             <p className="mt-2 text-xs text-tg-hint">{shiftsError}</p>
           </div>
         ) : shifts.length === 0 ? (
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
             <Clock className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
-            <p className="text-sm font-medium text-tg-text">За этот месяц смен нет</p>
-            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и в payroll summary.</p>
+            <p className="text-sm font-medium text-tg-text">Р—Р° СЌС‚РѕС‚ РјРµСЃСЏС† СЃРјРµРЅ РЅРµС‚</p>
+            <p className="mt-1 text-xs text-tg-hint">РљРѕРіРґР° РїРѕСЏРІСЏС‚СЃСЏ СЃРјРµРЅС‹, РѕРЅРё РѕС‚РѕР±СЂР°Р·СЏС‚СЃСЏ Р·РґРµСЃСЊ Рё РІ сводку выплат.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -388,14 +388,14 @@ export default function History({ user }: Props) {
         </div>
       ) : expensesError ? (
         <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
-          <p className="text-sm font-medium text-rose-500">Не удалось загрузить расходы</p>
+          <p className="text-sm font-medium text-rose-500">РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЂР°СЃС…РѕРґС‹</p>
           <p className="mt-2 text-xs text-tg-hint">{expensesError}</p>
         </div>
       ) : expenses.length === 0 ? (
         <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
           <TrendingDown className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
-          <p className="text-sm font-medium text-tg-text">За этот месяц расходов нет</p>
-          <p className="mt-1 text-xs text-tg-hint">Если расходы появятся, они отобразятся здесь.</p>
+          <p className="text-sm font-medium text-tg-text">Р—Р° СЌС‚РѕС‚ РјРµСЃСЏС† СЂР°СЃС…РѕРґРѕРІ РЅРµС‚</p>
+          <p className="mt-1 text-xs text-tg-hint">Р•СЃР»Рё СЂР°СЃС…РѕРґС‹ РїРѕСЏРІСЏС‚СЃСЏ, РѕРЅРё РѕС‚РѕР±СЂР°Р·СЏС‚СЃСЏ Р·РґРµСЃСЊ.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -414,3 +414,5 @@ export default function History({ user }: Props) {
     </div>
   );
 }
+
+

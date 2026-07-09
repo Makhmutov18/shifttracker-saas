@@ -218,7 +218,7 @@ const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
   { key: 'can_view_team_shifts', label: 'Видеть смены команды' },
   { key: 'can_edit_team_shifts', label: 'Редактировать смены команды' },
   { key: 'can_view_team_payroll', label: 'Видеть выплаты' },
-  { key: 'can_export_payroll', label: 'Экспортировать payroll' },
+  { key: 'can_export_payroll', label: 'Экспортировать выплаты' },
   { key: 'can_manage_team', label: 'Управлять командой и точками' },
   { key: 'can_manage_adjustments', label: 'Управлять корректировками' },
   { key: 'can_manage_expenses', label: 'Управлять расходами' },
