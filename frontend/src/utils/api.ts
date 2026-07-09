@@ -262,10 +262,11 @@ export async function createShift(data: ShiftCreate): Promise<Shift> {
   return normalizeShift(shift);
 }
 
-export async function getShifts(month?: number, year?: number): Promise<Shift[]> {
+export async function getShifts(month?: number, year?: number, venueId?: string): Promise<Shift[]> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
+  if (venueId) params.set('venue_id', venueId);
   const qs = params.toString();
   const shifts = await request<Shift[]>(`/shifts${qs ? `?${qs}` : ''}`);
   return Array.isArray(shifts) ? shifts.map(normalizeShift) : [];
@@ -364,10 +365,11 @@ export async function getMonthlyStats(month?: number, year?: number): Promise<Mo
   return request<MonthlyStats>(`/stats/monthly${qs ? `?${qs}` : ''}`);
 }
 
-export async function getPayrollSummary(month?: number, year?: number): Promise<PayrollSummary> {
+export async function getPayrollSummary(month?: number, year?: number, venueId?: string): Promise<PayrollSummary> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
+  if (venueId) params.set('venue_id', String(venueId));
   const qs = params.toString();
   return request<PayrollSummary>(`/payroll/summary${qs ? `?${qs}` : ''}`);
 }
@@ -533,10 +535,11 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // Export
 
-export async function downloadPayrollExport(month?: number, year?: number): Promise<Blob> {
+export async function downloadPayrollExport(month?: number, year?: number, venueId?: string): Promise<Blob> {
   const params = new URLSearchParams();
   if (month) params.set('month', String(month));
   if (year) params.set('year', String(year));
+  if (venueId) params.set('venue_id', String(venueId));
   const qs = params.toString();
 
   const response = await fetch(`${API_BASE}/export/xlsx${qs ? `?${qs}` : ''}`, {

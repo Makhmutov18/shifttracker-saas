@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Clock, CreditCard, Download, TrendingDown, Wallet } from 'lucide-react';
-import { User, PayrollSummary, downloadPayrollExport, getPayrollSummary } from '../utils/api';
+import { CalendarDays, Clock, CreditCard, Download, MapPin, TrendingDown, Wallet } from 'lucide-react';
+import { User, Venue, PayrollSummary, downloadPayrollExport, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import ShiftCard from '../components/ShiftCard';
@@ -23,12 +23,18 @@ function formatMonthLabel(date: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+function getVenueLabel(venue: Venue) {
+  return venue.is_active ? venue.name : `${venue.name} (неактивна)`;
+}
+
 export default function History({ user }: Props) {
   const [tab, setTab] = useState<Tab>('shifts');
   const [viewDate, setViewDate] = useState(() => ({
     month: getCurrentMonth(),
     year: getCurrentYear(),
   }));
+  const [venueFilter, setVenueFilter] = useState('all');
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -36,9 +42,11 @@ export default function History({ user }: Props) {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const { month, year } = viewDate;
-  const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
-  const { expenses, loading: expensesLoading, error: expensesError } = useExpenses(month, year);
   const canManagePayroll = useMemo(() => hasPermission(user, 'can_view_team_payroll'), [user]);
+  const canScopeByVenue = user.role === 'owner' || user.role === 'admin';
+  const venueScopeId = canScopeByVenue && venueFilter !== 'all' ? venueFilter : undefined;
+  const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year, venueScopeId);
+  const { expenses, loading: expensesLoading, error: expensesError } = useExpenses(month, year);
   const isCurrentPeriod = month === getCurrentMonth() && year === getCurrentYear();
 
   const monthOptions = useMemo<MonthOption[]>(() => {
@@ -51,7 +59,33 @@ export default function History({ user }: Props) {
   }, []);
 
   const currentMonthValue = `${year}-${String(month).padStart(2, '0')}`;
-  const selectedMonthLabel = monthOptions.find((option) => option.value === currentMonthValue)?.label ?? formatMonthLabel(new Date(year, month - 1, 1));
+  const selectedMonthLabel =
+    monthOptions.find((option) => option.value === currentMonthValue)?.label ?? formatMonthLabel(new Date(year, month - 1, 1));
+  const selectedVenueLabel = useMemo(() => {
+    if (!canScopeByVenue || venueScopeId == null) {
+      return 'Все точки';
+    }
+    return getVenueLabel(venues.find((venue) => venue.id === venueScopeId) ?? { id: venueScopeId, name: 'Точка', is_active: true });
+  }, [canScopeByVenue, venueScopeId, venues]);
+
+  useEffect(() => {
+    if (!canScopeByVenue) {
+      setVenues([]);
+      setVenueFilter('all');
+      return;
+    }
+
+    const loadVenues = async () => {
+      try {
+        const data = await getVenues(true);
+        setVenues(Array.isArray(data) ? data : []);
+      } catch {
+        setVenues([]);
+      }
+    };
+
+    loadVenues();
+  }, [canScopeByVenue]);
 
   useEffect(() => {
     if (!canManagePayroll) {
@@ -65,7 +99,7 @@ export default function History({ user }: Props) {
       try {
         setSummaryLoading(true);
         setSummaryError(null);
-        const data = await getPayrollSummary(month, year);
+        const data = await getPayrollSummary(month, year, venueScopeId);
         setSummary(data);
       } catch (error) {
         setSummary(null);
@@ -76,13 +110,13 @@ export default function History({ user }: Props) {
     };
 
     loadSummary();
-  }, [canManagePayroll, month, year]);
+  }, [canManagePayroll, month, year, venueScopeId]);
 
   const handleExport = async () => {
     try {
       setExportLoading(true);
       setExportError(null);
-      const blob = await downloadPayrollExport(month, year);
+      const blob = await downloadPayrollExport(month, year, venueScopeId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -113,7 +147,7 @@ export default function History({ user }: Props) {
   };
 
   return (
-    <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4">
+    <div className="mx-auto max-w-lg space-y-4 px-4 pb-8 pt-6">
       <div>
         <h1 className="text-lg font-semibold text-tg-text">История</h1>
         <p className="mt-1 text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
@@ -154,6 +188,36 @@ export default function History({ user }: Props) {
           <p className="text-xs text-tg-hint">Сейчас выбран: {selectedMonthLabel}</p>
         </div>
       </section>
+
+      {canScopeByVenue && (
+        <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-tg-text">Точка</p>
+              <p className="mt-1 text-xs text-tg-hint">Все точки или конкретная точка для просмотра смен, payroll summary и экспорта.</p>
+            </div>
+            <MapPin className="h-4 w-4 text-tg-primary" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Фильтр</label>
+            <select
+              value={venueFilter}
+              onChange={(event) => setVenueFilter(event.target.value)}
+              className="w-full rounded-xl border border-tg-border bg-tg-bg py-3 px-4 text-sm font-medium text-tg-text outline-none focus:ring-2 focus:ring-tg-primary/40"
+            >
+              <option value="all">Все точки</option>
+              {venues.map((venue) => (
+                <option key={venue.id} value={venue.id}>
+                  {getVenueLabel(venue)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="text-xs text-tg-hint">Выбрано: {selectedVenueLabel}</p>
+        </section>
+      )}
 
       {canManagePayroll && (
         <section className="space-y-3">
@@ -200,6 +264,7 @@ export default function History({ user }: Props) {
                     <span className="opacity-60">·</span>
                     <span>{summary.employees_count} сотрудников</span>
                   </div>
+                  <p className="mt-2 text-xs opacity-80">{selectedVenueLabel}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

@@ -162,6 +162,7 @@ async def create_shift(
 async def list_shifts(
     month: int | None = None,
     year: int | None = None,
+    venue_id: uuid.UUID | None = Query(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -179,7 +180,9 @@ async def list_shifts(
         )
     )
 
-    if _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        query = query.where(Shift.venue_id == venue_id)
+    elif _can_manage_all_venue_shifts(user):
         pass
     elif _can_view_team_history_scope(user):
         query = query.where(
@@ -343,6 +346,7 @@ async def update_shift(
 async def payroll_summary(
     month: int | None = None,
     year: int | None = None,
+    venue_id: uuid.UUID | None = Query(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -354,7 +358,9 @@ async def payroll_summary(
     y = year or now.year
 
     users_query = select(User).where(User.is_active == True)
-    if not _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        users_query = users_query.where(User.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
         users_query = users_query.where(User.venue_id == user.venue_id)
     users_query = users_query.order_by(User.name)
 
@@ -369,7 +375,9 @@ async def payroll_summary(
             func.extract("year", Shift.date) == y,
         )
     )
-    if not _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
         shifts_query = shifts_query.where(
             or_(
                 Shift.venue_id == user.venue_id,
@@ -389,7 +397,9 @@ async def payroll_summary(
             Adjustment.year == y,
         )
     )
-    if not _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        adjustments_query = adjustments_query.where(Adjustment.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
         adjustments_query = adjustments_query.where(
             or_(
                 Adjustment.venue_id == user.venue_id,
@@ -786,6 +796,7 @@ async def list_adjustments(
 async def export_csv(
     month: int | None = None,
     year: int | None = None,
+    venue_id: uuid.UUID | None = Query(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -807,7 +818,9 @@ async def export_csv(
             func.extract("year", Shift.date) == y,
         )
     )
-    if not _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
         shifts_query = shifts_query.where(
             or_(
                 Shift.venue_id == user.venue_id,
@@ -827,7 +840,9 @@ async def export_csv(
             Adjustment.year == y,
         )
     )
-    if not _can_manage_all_venue_shifts(user):
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        adj_query = adj_query.where(Adjustment.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
         adj_query = adj_query.where(
             or_(
                 Adjustment.venue_id == user.venue_id,
