@@ -7,6 +7,7 @@ from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
 import io
 import openpyxl
+from urllib.parse import quote
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -1242,11 +1243,17 @@ async def export_csv(
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    month_slug = russian_months[m - 1].lower()
+    ascii_filename = f"payroll-{y}-{m:02d}.xlsx"
+    russian_filename = f"Порядок.Смены — отчёт по выплатам {russian_months[m - 1].lower()} {y}.xlsx"
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="poryadok_smeny_{month_slug}_{y}.xlsx"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_filename}"; '
+                f"filename*=UTF-8''{quote(russian_filename)}"
+            )
+        },
     )
 
 @router.post("/reminders/shifts")
