@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle, Clock, Coffee, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Send } from 'lucide-react';
 import { Shift, User, createShift, getErrorMessage } from '../utils/api';
 import { formatCurrency, formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
@@ -14,8 +14,6 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const [date, setDate] = useState(getTodayDate());
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
-  const [cashierEnabled, setCashierEnabled] = useState(false);
-  const [cashierHours, setCashierHours] = useState('0');
   const [revenue, setRevenue] = useState('');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,7 +63,6 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         date,
         start_time: `${startTime}:00`,
         end_time: `${endTime}:00`,
-        cashier_hours: cashierEnabled ? parseFloat(cashierHours) || 0 : undefined,
         revenue: needsRevenue ? (parseFloat(revenue) || 0) : undefined,
         comment: comment || undefined,
       });
@@ -169,41 +166,6 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
                 className="w-full text-lg font-semibold px-4 py-3 rounded-xl border border-black/5 outline-none appearance-none placeholder:text-gray-400 [&::-webkit-calendar-picker-indicator]:opacity-50"
               />
             </div>
-          </div>
-
-          <div className="surface-card rounded-[1.35rem] p-4 mb-5">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-2">
-                <Coffee className="w-4 h-4 text-tg-hint" />
-                <span className="text-sm text-tg-text">Часы за кассой</span>
-              </div>
-              <div
-                onClick={() => setCashierEnabled(!cashierEnabled)}
-                className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer ${
-                  cashierEnabled ? 'bg-tg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow-sm ${
-                    cashierEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </div>
-            </label>
-            {cashierEnabled && (
-              <div className="mt-3">
-                <input
-                  type="number"
-                  value={cashierHours}
-                  onChange={(e) => setCashierHours(e.target.value)}
-                  step="0.25"
-                  min="0"
-                  max="24"
-                  placeholder="Количество часов"
-                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-black/5 placeholder:text-gray-400"
-                />
-              </div>
-            )}
           </div>
 
           {needsRevenue && (

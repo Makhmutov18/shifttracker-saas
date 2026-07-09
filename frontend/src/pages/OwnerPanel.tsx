@@ -782,19 +782,7 @@ function ApproveTab() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-tg-hint mb-1">Часы кассы</label>
-                    <input
-                      type="number"
-                      value={draft?.cashier_hours ?? ''}
-                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, cashier_hours: e.target.value } : prev))}
-                      min="0"
-                      step="0.01"
-                      placeholder="0"
-                      className="w-full bg-white text-[#111827] rounded-xl px-3 py-2.5 text-sm outline-none border border-black/5 placeholder:text-gray-400"
-                    />
-                  </div>
+                <div className="grid grid-cols-1 gap-2">
                   <div>
                     <label className="block text-xs text-tg-hint mb-1">Выручка</label>
                     <input

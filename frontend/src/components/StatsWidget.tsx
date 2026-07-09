@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, Clock, Coffee, CreditCard, Gift, AlertTriangle } from 'lucide-react';
+import { Wallet, Clock, CreditCard, Gift, AlertTriangle } from 'lucide-react';
 import { MonthlyStats } from '../utils/api';
 import { formatCurrency, formatHours } from '../utils/helpers';
 
@@ -27,12 +27,6 @@ export default function StatsWidget({ stats, loading }: Props) {
       value: formatHours(stats.total_hours),
       icon: <Clock className="w-5 h-5" />,
       color: 'text-blue-600 dark:text-blue-400',
-    },
-    {
-      label: 'Часы за кассой',
-      value: formatHours(stats.total_cashier_hours),
-      icon: <Coffee className="w-5 h-5" />,
-      color: 'text-amber-600 dark:text-amber-400',
     },
     {
       label: 'Бонусы',
