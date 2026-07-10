@@ -691,6 +691,13 @@ function ApproveTab() {
   const safeShifts = Array.isArray(shifts) ? shifts : [];
   const safeUserNames = userNames ?? {};
   const safeUserVenues = userVenues ?? {};
+  const pendingEmployeesCount = new Set(
+    safeShifts.map((shift) => shift?.user_id).filter((userId): userId is string => Boolean(userId))
+  ).size;
+  const preliminaryAmount = safeShifts.reduce((sum, shift) => {
+    const nextAmount = Number(shift?.salary_earned);
+    return sum + (Number.isFinite(nextAmount) ? nextAmount : 0);
+  }, 0);
 
   const getShiftDateLabel = (date: string) => {
     if (!date || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
@@ -700,7 +707,7 @@ function ApproveTab() {
   };
 
   const getShiftTimeLabel = (time: string) => {
-    return typeof time === 'string' && time.length >= 5 ? formatTime(time) : '00:00';
+    return typeof time === 'string' && time.length >= 5 ? formatTime(time) : '—';
   };
 
   const getShiftAmount = (amount: string | number | null | undefined) => {
@@ -711,6 +718,24 @@ function ApproveTab() {
   const getShiftHours = (hours: string | number | null | undefined) => {
     if (hours == null || hours === '') return formatHours(0);
     return formatHours(hours);
+  };
+
+  const getShiftRevenue = (revenue: string | number | null | undefined) => {
+    if (revenue == null || revenue === '') return null;
+    const nextRevenue = Number(revenue);
+    if (!Number.isFinite(nextRevenue)) return null;
+    return formatCurrency(nextRevenue);
+  };
+
+  const getShiftFallbackTimeText = (shift: Shift) => {
+    const hasStartTime = typeof shift?.start_time === 'string' && shift.start_time.length >= 5;
+    const hasEndTime = typeof shift?.end_time === 'string' && shift.end_time.length >= 5;
+
+    if (!hasStartTime && !hasEndTime) {
+      return 'Время не указано';
+    }
+
+    return `${hasStartTime ? formatTime(shift.start_time) : '—'} · ${hasEndTime ? formatTime(shift.end_time) : '—'}`;
   };
 
   const buildDraft = (shift: Shift): ShiftDraft => ({
@@ -875,7 +900,7 @@ function ApproveTab() {
   if (safeShifts.length === 0) {
     return (
       <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5 text-center">
-        <p className="text-sm font-medium text-tg-text">Нет смен на утверждение</p>
+        <p className="text-sm font-medium text-tg-text">Смен на подтверждении нет</p>
         <p className="mt-1 text-sm text-tg-hint">Новые заявки сотрудников появятся здесь.</p>
       </div>
     );
@@ -883,15 +908,37 @@ function ApproveTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-tg-hint text-sm">Ожидают утверждения: {safeShifts.length}</p>
-        <button
-          onClick={fetchShifts}
-          className="text-tg-primary text-xs font-medium flex items-center gap-1"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Обновить
-        </button>
+      <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-tg-hint">Утвердить</p>
+          <p className="mt-1 text-sm text-tg-hint">Проверьте смены и быстро подтвердите или отклоните их.</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-tg-bg px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-tg-hint">Смен</p>
+            <p className="mt-1 text-base font-semibold text-tg-text">{safeShifts.length}</p>
+          </div>
+          <div className="rounded-2xl bg-tg-bg px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-tg-hint">Сотрудников</p>
+            <p className="mt-1 text-base font-semibold text-tg-text">{pendingEmployeesCount}</p>
+          </div>
+          <div className="rounded-2xl bg-tg-bg px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-tg-hint">Предварительно</p>
+            <p className="mt-1 text-base font-semibold text-tg-text">{formatCurrency(preliminaryAmount)}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-tg-bg px-3 py-2.5">
+          <p className="text-sm text-tg-hint">Смены ждут подтверждения: {safeShifts.length}</p>
+          <button
+            onClick={fetchShifts}
+            className="text-tg-primary text-xs font-medium flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Обновить
+          </button>
+        </div>
       </div>
 
       {safeShifts.map((shift, index) => {
@@ -900,32 +947,57 @@ function ApproveTab() {
         const isSaving = savingShiftId === shiftId;
         const employeeName =
           (shift?.user_id && safeUserNames[shift.user_id]) ||
-          'Сотрудник';
+          'Сотрудник не указан';
         const venueName =
           (shift?.user_id && safeUserVenues[shift.user_id]) ||
-          'Основная точка';
+          'Точка не указана';
+        const revenueLabel = getShiftRevenue(shift?.revenue);
+        const commentText = typeof shift?.comment === 'string' && shift.comment.trim() ? shift.comment.trim() : 'Комментария нет';
 
         return (
-          <div key={shiftId} className="bg-tg-secondary-bg rounded-xl p-4 space-y-3">
+          <div key={shiftId} className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-tg-text font-medium text-sm">{employeeName}</p>
-                <p className="text-tg-hint text-xs">{venueName}</p>
-                <p className="text-tg-hint text-xs">
-                  {getShiftDateLabel(shift?.date || '')} · {getShiftTimeLabel(shift?.start_time || '')} — {getShiftTimeLabel(shift?.end_time || '')}
+              <div className="min-w-0 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-tg-text">{employeeName}</p>
+                  <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-500 dark:bg-amber-400/10 dark:text-amber-300">
+                    На подтверждении
+                  </span>
+                </div>
+                <p className="text-xs text-tg-hint">
+                  {getShiftDateLabel(shift?.date || '')} · {venueName}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-tg-text font-semibold text-sm">{getShiftAmount(shift?.salary_earned)}</p>
-                <p className="text-tg-hint text-xs">{getShiftHours(shift?.total_hours)}</p>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold text-tg-text">{getShiftAmount(shift?.salary_earned)}</p>
+                <p className="text-[11px] text-tg-hint">Предварительно к выплате</p>
+              </div>
+            </div>
+
+            <div className="grid gap-2 text-xs text-tg-hint sm:grid-cols-2">
+              <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                <span className="block text-[11px] uppercase tracking-[0.14em] text-tg-hint">Время</span>
+                <span className="mt-1 block text-sm text-tg-text">{getShiftFallbackTimeText(shift)}</span>
+              </div>
+              <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                <span className="block text-[11px] uppercase tracking-[0.14em] text-tg-hint">Часы</span>
+                <span className="mt-1 block text-sm text-tg-text">{getShiftHours(shift?.total_hours)}</span>
+              </div>
+              <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                <span className="block text-[11px] uppercase tracking-[0.14em] text-tg-hint">Выручка</span>
+                <span className="mt-1 block text-sm text-tg-text">{revenueLabel || 'Выручка не указана'}</span>
+              </div>
+              <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                <span className="block text-[11px] uppercase tracking-[0.14em] text-tg-hint">Статус</span>
+                <span className="mt-1 block text-sm text-tg-text">На подтверждении</span>
               </div>
             </div>
 
             {isEditing ? (
-              <div className="space-y-3 bg-tg-bg rounded-xl p-3">
+              <div className="space-y-3 rounded-2xl bg-tg-bg p-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs text-tg-hint mb-1">Начало</label>
+                    <label className="mb-1 block text-xs text-tg-hint">Начало</label>
                     <input
                       type="time"
                       value={draft?.start_time ?? ''}
@@ -934,7 +1006,7 @@ function ApproveTab() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-tg-hint mb-1">Конец</label>
+                    <label className="mb-1 block text-xs text-tg-hint">Конец</label>
                     <input
                       type="time"
                       value={draft?.end_time ?? ''}
@@ -946,7 +1018,7 @@ function ApproveTab() {
 
                 <div className="grid grid-cols-1 gap-2">
                   <div>
-                    <label className="block text-xs text-tg-hint mb-1">Выручка</label>
+                    <label className="mb-1 block text-xs text-tg-hint">Выручка</label>
                     <input
                       type="number"
                       value={draft?.revenue ?? ''}
@@ -960,7 +1032,7 @@ function ApproveTab() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-tg-hint mb-1">Комментарий</label>
+                  <label className="mb-1 block text-xs text-tg-hint">Комментарий</label>
                   <textarea
                     value={draft?.comment ?? ''}
                     onChange={(e) => setDraft((prev) => (prev ? { ...prev, comment: e.target.value } : prev))}
@@ -988,31 +1060,31 @@ function ApproveTab() {
                   <button
                     onClick={cancelEdit}
                     disabled={isSaving}
-                    className="flex-1 bg-tg-secondary-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                    className="flex-1 rounded-xl border border-black/5 bg-tg-secondary-bg py-2.5 text-sm font-medium text-tg-text disabled:opacity-60 dark:border-white/10"
                   >
                     Отмена
                   </button>
                 </div>
               </div>
-            ) : shift?.comment ? (
-              <p className="text-tg-hint text-xs bg-tg-bg rounded-lg px-3 py-2">{shift.comment}</p>
-            ) : null}
+            ) : (
+              <p className="rounded-xl bg-tg-bg px-3 py-2 text-xs text-tg-hint">{commentText}</p>
+            )}
 
             {!isEditing && Boolean(shift?.id) && (
               <button
                 onClick={() => startEdit(shift)}
-                className="w-full bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/5 bg-tg-bg py-2.5 text-sm font-medium text-tg-text transition-transform active:scale-[0.98] dark:border-white/10"
               >
                 <Pencil className="w-4 h-4" />
                 Исправить перед утверждением
               </button>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={() => handleApprove(shiftId)}
                 disabled={!shift?.id || isSaving || Boolean(editingShiftId === shiftId && draft)}
-                className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
+                className="flex-1 rounded-xl bg-tg-primary py-2.5 text-sm font-medium text-white transition-transform active:scale-[0.98] disabled:opacity-60"
               >
                 <CheckCircle className="w-4 h-4" />
                 Утвердить
@@ -1020,7 +1092,7 @@ function ApproveTab() {
               <button
                 onClick={() => handleReject(shiftId)}
                 disabled={!shift?.id || isSaving}
-                className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform disabled:opacity-60"
+                className="flex-1 rounded-xl border border-black/5 bg-tg-bg py-2.5 text-sm font-medium text-tg-text transition-transform active:scale-[0.98] disabled:opacity-60 dark:border-white/10"
               >
                 <XCircle className="w-4 h-4" />
                 Отклонить
