@@ -251,20 +251,20 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
             )}
             {parseFloat(String(stats.total_penalties)) > 0 ? (
               <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Штрафы</p>
+                <p className="text-xs opacity-70">Удержания</p>
                 <p className="font-semibold text-rose-200">-{formatCurrency(stats.total_penalties)}</p>
               </div>
             ) : (
               <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Штрафы</p>
-                <p className="font-semibold">Штрафов нет</p>
+                <p className="text-xs opacity-70">Удержания</p>
+                <p className="font-semibold">Удержаний нет</p>
               </div>
             )}
           </div>
         </div>
       ) : null}
 
-      {adjustments.length > 0 && (
+      {adjustments.length > 0 ? (
         <div className="mb-4">
           <h3 className="text-sm font-medium text-tg-hint mb-2">Бонусы и удержания за месяц</h3>
           <div className="space-y-2">
@@ -288,6 +288,15 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
                     {new Date(adj.created_at).toLocaleDateString('ru-RU')}
                   </p>
                 </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    adj.type === 'bonus'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                  }`}
+                >
+                  {adj.type === 'bonus' ? 'Бонус' : 'Удержание'}
+                </span>
                 <p className={`font-semibold text-sm ${adj.type === 'bonus' ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {adj.type === 'bonus' ? '+' : '-'}
                   {formatCurrency(adj.amount)}
@@ -295,6 +304,11 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
               </div>
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="mb-4 surface-card rounded-xl p-4 text-center">
+          <p className="text-sm font-medium text-tg-text">Бонусов и удержаний пока нет</p>
+          <p className="mt-1 text-xs text-tg-hint">Когда появятся корректировки, они отобразятся здесь.</p>
         </div>
       )}
 

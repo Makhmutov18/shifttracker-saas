@@ -1908,10 +1908,19 @@ function AdjustTab({ venueId }: { venueId: string }) {
 
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Причина</label>
+          <p className="mb-1.5 text-xs text-tg-hint">
+            {type === 'bonus'
+              ? 'Например: премия за смену, выход в выходной, помощь команде'
+              : 'Например: аванс, покупка зерна, дриппы в счёт зарплаты'}
+          </p>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Например: Отличная работа на смене"
+            placeholder={
+              type === 'bonus'
+                ? 'Например: премия за смену, выход в выходной, помощь команде'
+                : 'Например: зерно домой, аванс, дриппы'
+            }
             rows={2}
             className="w-full bg-white text-[#111827] rounded-xl px-4 py-3 text-sm outline-none resize-none border border-black/5 placeholder:text-gray-400"
           />
@@ -1925,15 +1934,15 @@ function AdjustTab({ venueId }: { venueId: string }) {
           disabled={loading}
           className="w-full bg-tg-primary text-white py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {loading ? (
-            <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-          ) : (
-            <>
-              {type === 'bonus' ? <Gift className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-              {type === 'bonus' ? 'Начислить бонус' : 'Наложить штраф'}
-            </>
-          )}
-        </button>
+              {loading ? (
+                <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <>
+                  {type === 'bonus' ? <Gift className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                  {type === 'bonus' ? 'Добавить бонус' : 'Добавить удержание'}
+                </>
+              )}
+            </button>
       </form>
     </div>
   );
