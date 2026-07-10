@@ -1,8 +1,10 @@
-import React from 'react';
-import { ArrowRight, Clock, History, PlusCircle, ShieldCheck, Wallet } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Clock, ShieldCheck, Wallet } from 'lucide-react';
 import { User as UserType } from '../utils/api';
+import { getPayrollSummary, type PayrollSummary } from '../utils/api';
 import { useStats } from '../hooks/useStats';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, formatDate } from '../utils/helpers';
+import { useShifts } from '../hooks/useShifts';
 import { getTelegramUser } from '../utils/telegram';
 import UserAvatar from '../components/UserAvatar';
 import { canAccessOwnerPanel } from '../utils/permissions';
@@ -13,6 +15,12 @@ interface Props {
   user: UserType;
   onNavigate: (page: Page) => void;
 }
+
+const SHIFT_STATUS_LABELS: Record<string, string> = {
+  pending: 'На подтверждении',
+  approved: 'Утверждена',
+  rejected: 'Отклонена',
+};
 
 function getPayModelSummary(user: UserType) {
   if (user.pay_model === 'hourly') {
@@ -40,10 +48,17 @@ function formatPeriodLabel() {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+function getShiftStatusLabel(status?: string) {
+  return SHIFT_STATUS_LABELS[status || ''] || 'Статус обновляется';
+}
+
 export default function Dashboard({ user, onNavigate }: Props) {
   const { stats, loading, error } = useStats();
+  const { shifts, loading: shiftsLoading } = useShifts();
   const telegramUser = getTelegramUser();
   const showManagement = canAccessOwnerPanel(user);
+  const [summary, setSummary] = useState<Pick<PayrollSummary, 'pending_shifts_count' | 'approved_shifts_count'> | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const totalEarned = stats ? toNumber(stats.total_earned) : 0;
   const totalBonuses = stats ? toNumber(stats.total_bonuses) : 0;
@@ -51,6 +66,49 @@ export default function Dashboard({ user, onNavigate }: Props) {
   const totalExpenses = stats ? toNumber(stats.total_expenses) : 0;
   const payout = (totalEarned + totalBonuses - totalPenalties - totalExpenses).toFixed(2);
   const statusLabel = loading ? 'Сводка обновляется' : error ? 'Сводка недоступна' : 'За текущий месяц';
+  const latestShift = useMemo(() => {
+    return [...(shifts || [])]
+      .filter((shift) => Boolean(shift && shift.date))
+      .sort((left, right) => {
+        const rightCreated = new Date(right.created_at || right.date || 0).getTime();
+        const leftCreated = new Date(left.created_at || left.date || 0).getTime();
+        return rightCreated - leftCreated;
+      })[0] || null;
+  }, [shifts]);
+
+  useEffect(() => {
+    if (!showManagement) {
+      return;
+    }
+
+    let cancelled = false;
+    const now = new Date();
+
+    setSummaryLoading(true);
+    getPayrollSummary(now.getMonth() + 1, now.getFullYear())
+      .then((data) => {
+        if (!cancelled) {
+          setSummary({
+            pending_shifts_count: data.pending_shifts_count ?? 0,
+            approved_shifts_count: data.approved_shifts_count ?? 0,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSummaryLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showManagement]);
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
@@ -117,64 +175,63 @@ export default function Dashboard({ user, onNavigate }: Props) {
         )}
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => onNavigate('shift')}
-          className="surface-card col-span-2 flex items-center justify-between gap-4 rounded-[1.45rem] px-4 py-4 text-left active:scale-[0.98] transition-transform"
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-tg-text">Создать смену</p>
-            <p className="mt-1 text-xs text-tg-hint">Быстрый вход в рабочий поток без лишних экранов.</p>
+      <section className="surface-card rounded-[1.4rem] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
+            {showManagement ? <ShieldCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
           </div>
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-tg-primary text-white">
-            <PlusCircle className="h-5 w-5" />
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('history')}
-          className="surface-card flex items-center gap-3 rounded-[1.35rem] px-4 py-4 text-left active:scale-[0.98] transition-transform"
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
-            <History className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-tg-text">История</p>
-            <p className="mt-0.5 text-xs text-tg-hint">Смены, расходы и выплаты</p>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('history')}
-          className="surface-card flex items-center gap-3 rounded-[1.35rem] px-4 py-4 text-left active:scale-[0.98] transition-transform"
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
-            <Clock className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-tg-text">Выплаты</p>
-            <p className="mt-0.5 text-xs text-tg-hint">Сводка за текущий месяц</p>
-          </div>
-        </button>
-
-        {showManagement ? (
-          <button
-            type="button"
-            onClick={() => onNavigate('owner')}
-            className="surface-card col-span-2 flex items-center justify-between gap-4 rounded-[1.45rem] px-4 py-4 text-left active:scale-[0.98] transition-transform"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-tg-text">Управление</p>
-              <p className="mt-1 text-xs text-tg-hint">Команда, точки и approve flow</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="truncate text-sm font-semibold text-tg-text">
+                {showManagement ? 'Требует внимания' : 'Что дальше'}
+              </h2>
+              <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2.5 py-1 text-[11px] font-medium text-tg-hint">
+                {showManagement ? 'Для вас' : 'Личный статус'}
+              </span>
             </div>
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-          </button>
-        ) : null}
+
+            {showManagement ? (
+              <>
+                {summaryLoading ? (
+                  <p className="mt-2 text-sm text-tg-hint">Проверяем сводку на текущий месяц…</p>
+                ) : summary ? (
+                  <div className="mt-2 space-y-1.5 text-sm">
+                    {summary.pending_shifts_count > 0 ? (
+                      <p className="text-tg-text">
+                        {summary.pending_shifts_count} смен{summary.pending_shifts_count === 1 ? 'а' : ''} ждут подтверждения.
+                      </p>
+                    ) : (
+                      <p className="text-tg-hint">Всё спокойно — критичных действий нет.</p>
+                    )}
+                    {summary.approved_shifts_count === 0 ? (
+                      <p className="text-tg-hint">Нет утверждённых смен за месяц.</p>
+                    ) : null}
+                    <p className="text-tg-hint">Выплаты можно проверить в разделе выплат.</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-tg-hint">Всё спокойно — критичных действий нет.</p>
+                )}
+              </>
+            ) : shiftsLoading ? (
+              <p className="mt-2 text-sm text-tg-hint">Последние данные обновляются после сохранения смены.</p>
+            ) : latestShift ? (
+              <div className="mt-2 space-y-1.5 text-sm">
+                <p className="text-tg-text">
+                  Последняя смена: {formatDate(latestShift.date)} · {getShiftStatusLabel(latestShift.status)}
+                </p>
+                <p className="text-tg-hint">
+                  {latestShift.status === 'approved'
+                    ? 'Смена уже учтена в выплатах.'
+                    : latestShift.status === 'rejected'
+                      ? 'Смена не входит в выплаты.'
+                      : 'После подтверждения она попадёт в выплаты.'}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-tg-hint">Создайте смену после рабочего дня — так сводка будет точнее.</p>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );
