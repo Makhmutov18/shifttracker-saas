@@ -243,6 +243,109 @@ function getShortVenueLabel(venue?: Venue) {
   return venue?.name?.trim() || 'Основная точка';
 }
 
+function EmployeeStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+      <p className="text-[11px] uppercase tracking-wide text-tg-hint">{label}</p>
+      <p className="mt-1 text-sm text-tg-text">{value}</p>
+    </div>
+  );
+}
+
+function TeamEmployeeCard({
+  employee,
+  currentUser,
+  archived = false,
+  onEdit,
+  onToggleStatus,
+  busy,
+}: {
+  employee: User;
+  currentUser: User;
+  archived?: boolean;
+  onEdit: (user: User) => void;
+  onToggleStatus: (user: User) => void;
+  busy?: boolean;
+}) {
+  const isSelf = employee.id === currentUser.id;
+
+  return (
+    <div className={`rounded-[1.4rem] p-4 ${archived ? 'surface-card opacity-90' : 'surface-muted'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-medium text-tg-text">{employee.name}</p>
+            <span
+              className={`rounded-full px-2 py-1 text-[11px] font-medium ${
+                archived
+                  ? 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-300'
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+              }`}
+            >
+              {archived ? 'В архиве' : 'Активен'}
+            </span>
+            <span className="rounded-full bg-tg-bg px-2 py-1 text-[11px] font-medium text-tg-hint">
+              {getManagementBadge(employee)}
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs text-tg-hint">
+            {getManagementRoleLabel(employee)} · {getShortVenueLabel(employee.venue)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onEdit(employee)}
+          className="rounded-xl p-2 transition-colors hover:bg-tg-bg"
+          aria-label={`Редактировать ${employee.name}`}
+        >
+          <Pencil className="w-4 h-4 text-tg-hint" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <EmployeeStat label="Должность" value={getPositionLabel(employee)} />
+        <EmployeeStat label="Точка" value={getShortVenueLabel(employee.venue)} />
+        <EmployeeStat label="Оплата" value={getPayModelLabel(employee.pay_model)} />
+        <EmployeeStat label="Ставка" value={getPayRateLabel(employee)} />
+        {(employee.pay_model === 'revenue' || employee.pay_model === 'hybrid') && Number(employee.revenue_percentage) > 0 && (
+          <div className="col-span-2 rounded-xl bg-tg-bg px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-tg-hint">Процент от выручки</p>
+            <p className="mt-1 text-sm text-tg-text">{employee.revenue_percentage}%</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        {!isSelf ? (
+          <button
+            type="button"
+            onClick={() => onToggleStatus(employee)}
+            disabled={busy}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${
+              archived
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                : 'bg-rose-500/10 text-rose-600'
+            }`}
+          >
+            {busy ? (
+              <span className="animate-spin h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent" />
+            ) : archived ? (
+              <CheckCircle className="h-3.5 w-3.5" />
+            ) : (
+              <UserX className="h-3.5 w-3.5" />
+            )}
+            {archived ? 'Восстановить' : 'В архив'}
+          </button>
+        ) : (
+          <span className="inline-flex flex-1 items-center justify-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
+            Это вы
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
   { key: 'can_approve_shifts', label: 'Утверждать смены' },
   { key: 'can_view_team_shifts', label: 'Видеть смены команды' },
@@ -1587,71 +1690,14 @@ function TeamTab({ user }: { user: User }) {
         ) : (
           <div className="space-y-3">
             {activeUsers.map((u) => (
-              <div key={u.id} className="rounded-2xl p-4 surface-muted">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">Активен</span>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-tg-bg text-tg-hint">
-                        {getManagementBadge(u)}
-                      </span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-tg-hint">
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Должность</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPositionLabel(u)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Точка</p>
-                        <p className="mt-1 text-sm text-tg-text">{getShortVenueLabel(u.venue)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Оплата</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPayModelLabel(u.pay_model)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Ставка</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPayRateLabel(u)}</p>
-                      </div>
-                      {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
-                        <div className="rounded-xl bg-tg-bg px-3 py-2.5 col-span-2">
-                          <p className="text-[11px] uppercase tracking-wide text-tg-hint">Процент от выручки</p>
-                          <p className="mt-1 text-sm text-tg-text">{u.revenue_percentage}%</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => startEdit(u)}
-                    className="rounded-xl p-2 transition-colors hover:bg-tg-bg"
-                    aria-label={`Редактировать ${u.name}`}
-                  >
-                    <Pencil className="w-4 h-4 text-tg-hint" />
-                  </button>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  {u.id !== user.id ? (
-                    <button
-                      onClick={() => handleStatusChange(u)}
-                      disabled={statusUserId === u.id}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-600 transition-colors disabled:opacity-60"
-                    >
-                      {statusUserId === u.id ? (
-                        <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
-                      ) : (
-                        <UserX className="w-3.5 h-3.5" />
-                      )}
-                      В архив
-                    </button>
-                  ) : (
-                    <span className="inline-flex items-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
-                      Это вы
-                    </span>
-                  )}
-                </div>
-              </div>
+              <TeamEmployeeCard
+                key={u.id}
+                employee={u}
+                currentUser={user}
+                onEdit={startEdit}
+                onToggleStatus={handleStatusChange}
+                busy={statusUserId === u.id}
+              />
             ))}
           </div>
         )}
@@ -1676,73 +1722,15 @@ function TeamTab({ user }: { user: User }) {
               </div>
             ) : (
               archivedUsers.map((u) => (
-              <div key={u.id} className="rounded-2xl p-4 surface-muted opacity-90">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
-                        В архиве
-                      </span>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-tg-bg text-tg-hint">
-                        {getManagementBadge(u)}
-                      </span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-tg-hint">
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Должность</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPositionLabel(u)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Точка</p>
-                        <p className="mt-1 text-sm text-tg-text">{getShortVenueLabel(u.venue)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Оплата</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPayModelLabel(u.pay_model)}</p>
-                      </div>
-                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Ставка</p>
-                        <p className="mt-1 text-sm text-tg-text">{getPayRateLabel(u)}</p>
-                      </div>
-                      {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
-                        <div className="rounded-xl bg-tg-bg px-3 py-2.5 col-span-2">
-                          <p className="text-[11px] uppercase tracking-wide text-tg-hint">Процент от выручки</p>
-                          <p className="mt-1 text-sm text-tg-text">{u.revenue_percentage}%</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => startEdit(u)}
-                    className="rounded-xl p-2 transition-colors hover:bg-tg-bg"
-                    aria-label={`Редактировать ${u.name}`}
-                  >
-                    <Pencil className="w-4 h-4 text-tg-hint" />
-                  </button>
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    {u.id !== user.id ? (
-                      <button
-                        onClick={() => handleStatusChange(u)}
-                        disabled={statusUserId === u.id}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors disabled:opacity-60"
-                      >
-                        {statusUserId === u.id ? (
-                          <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
-                        ) : (
-                          <CheckCircle className="w-3.5 h-3.5" />
-                        )}
-                        Восстановить
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center rounded-xl bg-tg-bg px-3 py-2 text-xs font-medium text-tg-hint">
-                        Это вы
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <TeamEmployeeCard
+                  key={u.id}
+                  employee={u}
+                  currentUser={user}
+                  archived
+                  onEdit={startEdit}
+                  onToggleStatus={handleStatusChange}
+                  busy={statusUserId === u.id}
+                />
               ))
             )}
           </div>
