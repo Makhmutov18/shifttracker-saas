@@ -243,6 +243,22 @@ function getShortVenueLabel(venue?: Venue) {
   return venue?.name?.trim() || 'Основная точка';
 }
 
+type VenueDetails = Venue & {
+  address?: string | null;
+  description?: string | null;
+  notes?: string | null;
+};
+
+function getVenueAddressLabel(venue?: Venue) {
+  const raw = venue as VenueDetails | undefined;
+  return raw?.address?.trim() || 'Адрес не указан';
+}
+
+function getVenueDescriptionLabel(venue?: Venue) {
+  const raw = venue as VenueDetails | undefined;
+  return raw?.description?.trim() || raw?.notes?.trim() || 'Описание не добавлено';
+}
+
 function EmployeeStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-xl bg-tg-bg px-3 py-2.5">
@@ -1019,6 +1035,7 @@ function ApproveTab() {
 
 function VenuesTab() {
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -1033,10 +1050,12 @@ function VenuesTab() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getVenues(true);
-      setVenues(Array.isArray(data) ? data : []);
+      const [venuesData, usersData] = await Promise.allSettled([getVenues(true), getUsers(true)]);
+      setVenues(venuesData.status === 'fulfilled' && Array.isArray(venuesData.value) ? venuesData.value : []);
+      setUsers(usersData.status === 'fulfilled' && Array.isArray(usersData.value) ? usersData.value : []);
     } catch (err: any) {
       setVenues([]);
+      setUsers([]);
       setError(err.message || 'Не удалось загрузить точки');
     } finally {
       setLoading(false);
@@ -1139,8 +1158,16 @@ function VenuesTab() {
     <div className="space-y-4">
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Точки</p>
-        <p className="mt-1 text-sm text-tg-hint">Создавайте и переименовывайте точки, сохраняя историю сотрудников и смен.</p>
+        <p className="mt-1 text-sm text-tg-hint">Создавайте, переименовывайте и архивируйте точки без потери истории сотрудников и смен.</p>
         <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <EmployeeStat label="Активных" value={venues.filter((venue) => venue.is_active).length} />
+          <EmployeeStat label="В архиве" value={venues.filter((venue) => !venue.is_active).length} />
+          <EmployeeStat
+            label="С точкой"
+            value={users.filter((userItem) => Boolean(userItem.venue_id || userItem.venue?.id)).length}
+          />
+        </div>
       </div>
 
       <form onSubmit={handleCreateVenue} className="surface-card rounded-2xl p-4 space-y-3">
@@ -1168,26 +1195,35 @@ function VenuesTab() {
       {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{error}</p>}
       {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
 
-      {venues.filter((venue) => venue.is_active).length === 0 ? (
-        <div className="surface-card rounded-2xl px-4 py-5">
-          <p className="text-sm font-medium text-tg-text">Активных точек пока нет</p>
-          <p className="mt-1 text-sm text-tg-hint">Создайте первую точку, чтобы распределять по ней сотрудников.</p>
+      {venues.length === 0 ? (
+        <div className="surface-card rounded-2xl px-4 py-5 text-center">
+          <Building2 className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
+          <p className="text-sm font-medium text-tg-text">Точек пока нет</p>
+          <p className="mt-1 text-sm text-tg-hint">Добавьте первую точку, чтобы привязывать к ней сотрудников и смены.</p>
         </div>
       ) : (
         <div className="surface-card rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-tg-text">Активные точки</p>
-              <p className="text-xs text-tg-hint">Неактивные точки убраны из основного списка и собраны в архив.</p>
+              <p className="text-xs text-tg-hint">Основной список для работы со сменами и сотрудниками.</p>
             </div>
             <p className="text-xs text-tg-hint">Активных: {venues.filter((venue) => venue.is_active).length}</p>
           </div>
 
-          {venues.filter((venue) => venue.is_active).map((venue) => {
+          {venues.filter((venue) => venue.is_active).length === 0 ? (
+            <div className="rounded-2xl bg-tg-bg px-4 py-5">
+              <p className="text-sm font-medium text-tg-text">Активных точек пока нет</p>
+              <p className="mt-1 text-sm text-tg-hint">Переведите точку из архива или добавьте новую.</p>
+            </div>
+          ) : venues.filter((venue) => venue.is_active).map((venue) => {
             const isEditing = editingVenueId === venue.id;
             const isBusy = statusVenueId === venue.id;
+            const employeeCount = users.filter(
+              (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
+            ).length;
             return (
-              <div key={venue.id} className="rounded-2xl p-4 surface-muted">
+              <div key={venue.id} className="rounded-[1.35rem] p-3.5 surface-muted">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     {isEditing ? (
@@ -1199,14 +1235,22 @@ function VenuesTab() {
                         placeholder="Название точки"
                       />
                     ) : (
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-tg-text">{venue.name}</p>
-                        <span className={`text-[11px] px-2 py-1 rounded-full ${venue.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-300'}`}>
-                          {venue.is_active ? 'Активна' : 'Неактивна'}
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-300">
+                          Активна
+                        </span>
+                        <span className="rounded-full bg-tg-bg px-2 py-1 text-[11px] font-medium text-tg-hint">
+                          {employeeCount} сотрудников
                         </span>
                       </div>
                     )}
-                    {!isEditing && <p className="mt-2 text-xs text-tg-hint">Статус точки можно менять без удаления истории сотрудников и смен.</p>}
+                    {!isEditing && (
+                      <div className="mt-2 space-y-0.5 text-xs text-tg-hint">
+                        <p>{getVenueAddressLabel(venue)}</p>
+                        <p>{getVenueDescriptionLabel(venue)}</p>
+                      </div>
+                    )}
                   </div>
                   {!isEditing && (
                     <button
@@ -1231,7 +1275,7 @@ function VenuesTab() {
                         className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
                       >
                         <Check className="w-4 h-4" />
-                        Сохранить
+                        Сохранить изменения
                       </button>
                       <button
                         onClick={() => {
@@ -1239,7 +1283,7 @@ function VenuesTab() {
                           setEditingName('');
                         }}
                         disabled={isBusy}
-                        className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                        className="flex-1 surface-muted text-tg-text py-2.5 rounded-xl text-sm font-medium disabled:opacity-60"
                       >
                         Отмена
                       </button>
@@ -1285,12 +1329,15 @@ function VenuesTab() {
               <p className="mt-1 text-sm text-tg-hint">Неактивные точки появятся здесь после перевода в архив.</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {venues.filter((venue) => !venue.is_active).map((venue) => {
                 const isEditing = editingVenueId === venue.id;
                 const isBusy = statusVenueId === venue.id;
+                const employeeCount = users.filter(
+                  (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
+                ).length;
                 return (
-                  <div key={venue.id} className="rounded-2xl bg-tg-bg/80 p-4">
+                  <div key={venue.id} className="rounded-[1.35rem] bg-tg-bg/80 p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (
@@ -1302,11 +1349,20 @@ function VenuesTab() {
                             placeholder="Название точки"
                           />
                         ) : (
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium text-tg-text">{venue.name}</p>
-                            <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
+                            <span className="rounded-full bg-zinc-500/10 px-2 py-1 text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                               В архиве
                             </span>
+                            <span className="rounded-full bg-tg-bg px-2 py-1 text-[11px] font-medium text-tg-hint">
+                              {employeeCount} сотрудников
+                            </span>
+                          </div>
+                        )}
+                        {!isEditing && (
+                          <div className="mt-2 space-y-0.5 text-xs text-tg-hint">
+                            <p>{getVenueAddressLabel(venue)}</p>
+                            <p>{getVenueDescriptionLabel(venue)}</p>
                           </div>
                         )}
                       </div>
@@ -1333,7 +1389,7 @@ function VenuesTab() {
                             className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
                           >
                             <Check className="w-4 h-4" />
-                            Сохранить
+                            Сохранить изменения
                           </button>
                           <button
                             onClick={() => {
@@ -1341,7 +1397,7 @@ function VenuesTab() {
                               setEditingName('');
                             }}
                             disabled={isBusy}
-                            className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                            className="flex-1 surface-muted text-tg-text py-2.5 rounded-xl text-sm font-medium disabled:opacity-60"
                           >
                             Отмена
                           </button>
