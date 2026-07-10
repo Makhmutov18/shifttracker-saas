@@ -1888,7 +1888,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
               }`}
             >
               <AlertTriangle className="w-4 h-4" />
-              Штраф
+              Удержание
             </button>
           </div>
         </div>
@@ -1949,7 +1949,7 @@ const ACTION_LABELS: Record<string, string> = {
   shift_edited: 'Отредактировал смену',
   user_created: 'Создал сотрудника',
   bonus_added: 'Начислил бонус',
-  penalty_added: 'Наложил штраф',
+  penalty_added: 'Добавил удержание',
 };
 
 function AuditTab() {

@@ -21,7 +21,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_view_team_payroll: 'Смотреть выплаты команды',
   can_export_payroll: 'Экспортировать выплаты',
   can_manage_team: 'Управлять сотрудниками',
-  can_manage_adjustments: 'Выдавать бонусы/штрафы',
+  can_manage_adjustments: 'Выдавать бонусы/удержания',
   can_manage_expenses: 'Управлять расходами',
 };
 

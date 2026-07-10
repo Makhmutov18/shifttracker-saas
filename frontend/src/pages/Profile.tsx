@@ -266,7 +266,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
 
       {adjustments.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-medium text-tg-hint mb-2">Бонусы и штрафы за месяц</h3>
+          <h3 className="text-sm font-medium text-tg-hint mb-2">Бонусы и удержания за месяц</h3>
           <div className="space-y-2">
             {adjustments.map((adj) => (
               <div key={adj.id} className="surface-card rounded-xl p-3 flex items-center gap-3">
