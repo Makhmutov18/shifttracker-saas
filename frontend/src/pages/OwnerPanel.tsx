@@ -270,7 +270,7 @@ function TeamEmployeeCard({
   const isSelf = employee.id === currentUser.id;
 
   return (
-    <div className={`rounded-[1.4rem] p-4 ${archived ? 'surface-card opacity-90' : 'surface-muted'}`}>
+    <div className={`rounded-[1.35rem] p-3.5 ${archived ? 'surface-card opacity-90' : 'surface-muted'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -287,9 +287,12 @@ function TeamEmployeeCard({
             <span className="rounded-full bg-tg-bg px-2 py-1 text-[11px] font-medium text-tg-hint">
               {getManagementBadge(employee)}
             </span>
+            <span className="rounded-full bg-tg-bg px-2 py-1 text-[11px] font-medium text-tg-hint">
+              {getManagementRoleLabel(employee)}
+            </span>
           </div>
           <p className="mt-1.5 text-xs text-tg-hint">
-            {getManagementRoleLabel(employee)} · {getShortVenueLabel(employee.venue)}
+            {getPositionLabel(employee)} · {getShortVenueLabel(employee.venue)}
           </p>
         </div>
         <button
@@ -1513,13 +1516,19 @@ function TeamTab({ user }: { user: User }) {
 
   const activeUsers = users.filter((item) => item.is_active);
   const archivedUsers = users.filter((item) => !item.is_active);
+  const activeVenueCount = venues.filter((venue) => venue?.is_active).length;
 
   return (
     <div className="space-y-4">
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Команда</p>
-        <p className="mt-1 text-sm text-tg-hint">Создавайте сотрудников, задавайте точку, оплату и права без перегруженной формы.</p>
+        <p className="mt-1 text-sm text-tg-hint">Управляйте сотрудниками, точками, оплатой и доступом без лишней формы.</p>
         <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <EmployeeStat label="Активных" value={activeUsers.length} />
+          <EmployeeStat label="В архиве" value={archivedUsers.length} />
+          <EmployeeStat label="Точек" value={activeVenueCount} />
+        </div>
       </div>
 
       {teamError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{teamError}</p>}
@@ -1535,7 +1544,7 @@ function TeamTab({ user }: { user: User }) {
         </div>
 
         {editingUser ? (
-          <div className="space-y-4">
+          <div className="space-y-4 rounded-[1.35rem] bg-tg-bg/60 p-3.5">
             <EmployeeFormSection title="Основное" description="Имя, должность и точка сотрудника.">
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">Имя сотрудника</label>
@@ -1659,7 +1668,7 @@ function TeamTab({ user }: { user: User }) {
               </button>
               <button
                 onClick={() => setEditingUser(null)}
-                className="flex-1 bg-tg-bg text-tg-text py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700"
+                className="flex-1 surface-muted text-tg-text py-2.5 rounded-xl text-sm font-medium"
               >
                 Отмена
               </button>
@@ -1688,7 +1697,7 @@ function TeamTab({ user }: { user: User }) {
             <p className="mt-1 text-sm text-tg-hint">Перенесите сотрудника из архива или добавьте нового через приглашение.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {activeUsers.map((u) => (
               <TeamEmployeeCard
                 key={u.id}
@@ -1714,7 +1723,7 @@ function TeamTab({ user }: { user: User }) {
         </button>
 
         {showArchive && (
-          <div className="space-y-3 pt-1">
+          <div className="space-y-2.5 pt-1">
             {archivedUsers.length === 0 ? (
               <div className="rounded-2xl bg-tg-bg px-4 py-5">
                 <p className="text-sm font-medium text-tg-text">Архив сотрудников пуст</p>
