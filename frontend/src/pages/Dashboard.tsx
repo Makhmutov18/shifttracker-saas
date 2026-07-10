@@ -8,6 +8,7 @@ import { useShifts } from '../hooks/useShifts';
 import { getTelegramUser } from '../utils/telegram';
 import UserAvatar from '../components/UserAvatar';
 import { canAccessOwnerPanel } from '../utils/permissions';
+import { hasPermission } from '../utils/permissions';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 
@@ -57,6 +58,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
   const { shifts, loading: shiftsLoading } = useShifts();
   const telegramUser = getTelegramUser();
   const showManagement = canAccessOwnerPanel(user);
+  const canApproveShifts = showManagement || hasPermission(user, 'can_approve_shifts');
   const [summary, setSummary] = useState<Pick<PayrollSummary, 'pending_shifts_count' | 'approved_shifts_count'> | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
@@ -77,7 +79,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
   }, [shifts]);
 
   useEffect(() => {
-    if (!showManagement) {
+    if (!canApproveShifts) {
       return;
     }
 
@@ -108,7 +110,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [showManagement]);
+  }, [canApproveShifts]);
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
@@ -178,38 +180,38 @@ export default function Dashboard({ user, onNavigate }: Props) {
       <section className="surface-card rounded-[1.4rem] p-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
-            {showManagement ? <ShieldCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+            {canApproveShifts ? <ShieldCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <h2 className="truncate text-sm font-semibold text-tg-text">
-                {showManagement ? 'Требует внимания' : 'Что дальше'}
+                {canApproveShifts ? 'Смены ждут подтверждения' : 'Что дальше'}
               </h2>
               <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2.5 py-1 text-[11px] font-medium text-tg-hint">
-                {showManagement ? 'Для вас' : 'Личный статус'}
+                {canApproveShifts ? 'Для вас' : 'Личный статус'}
               </span>
             </div>
 
-            {showManagement ? (
+            {canApproveShifts ? (
               <>
                 {summaryLoading ? (
                   <p className="mt-2 text-sm text-tg-hint">Проверяем сводку на текущий месяц…</p>
-                ) : summary ? (
-                  <div className="mt-2 space-y-1.5 text-sm">
-                    {summary.pending_shifts_count > 0 ? (
-                      <p className="text-tg-text">
-                        {summary.pending_shifts_count} смен{summary.pending_shifts_count === 1 ? 'а' : ''} ждут подтверждения.
-                      </p>
-                    ) : (
-                      <p className="text-tg-hint">Всё спокойно — критичных действий нет.</p>
-                    )}
-                    {summary.approved_shifts_count === 0 ? (
-                      <p className="text-tg-hint">Нет утверждённых смен за месяц.</p>
-                    ) : null}
-                    <p className="text-tg-hint">Выплаты можно проверить в разделе выплат.</p>
+                ) : (summary?.pending_shifts_count ?? 0) > 0 ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-tg-text">
+                      {summary?.pending_shifts_count} смен{summary?.pending_shifts_count === 1 ? 'а' : ''} ждут подтверждения.
+                    </p>
+                    <p className="text-xs text-tg-hint">Можно открыть утверждение и быстро проверить новые заявки.</p>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('owner')}
+                      className="inline-flex items-center justify-center rounded-full bg-tg-primary px-3.5 py-2 text-xs font-medium text-tg-button-text transition-transform active:scale-[0.98]"
+                    >
+                      Открыть утверждение
+                    </button>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-tg-hint">Всё спокойно — критичных действий нет.</p>
+                  <p className="mt-2 text-sm text-tg-hint">Смен на подтверждении нет.</p>
                 )}
               </>
             ) : shiftsLoading ? (
