@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, PlusCircle, Clock, ShieldCheck, User } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Clock, ShieldCheck, User, Wallet } from 'lucide-react';
 import { hapticFeedback } from '../utils/telegram';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
@@ -9,14 +9,6 @@ interface Props {
   onNavigate: (page: Page) => void;
   isAdmin: boolean;
 }
-
-const navItems: { page: Page; label: string; icon: React.ReactNode; ownerOnly?: boolean }[] = [
-  { page: 'dashboard', label: 'Главная', icon: <LayoutDashboard className="h-5 w-5" /> },
-  { page: 'history', label: 'История', icon: <Clock className="h-5 w-5" /> },
-  { page: 'shift', label: 'Смена', icon: <PlusCircle className="h-5 w-5" /> },
-  { page: 'owner', label: 'Управление', icon: <ShieldCheck className="h-5 w-5" />, ownerOnly: true },
-  { page: 'profile', label: 'Профиль', icon: <User className="h-5 w-5" /> },
-];
 
 function NavButton({
   page,
@@ -51,12 +43,20 @@ function NavButton({
 }
 
 export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
-  const visibleItems = navItems.filter((item) => !item.ownerOnly || isAdmin);
-  const sideItems = visibleItems.filter((item) => item.page !== 'shift');
-  const midpoint = Math.ceil(sideItems.length / 2);
-  const leftItems = sideItems.slice(0, midpoint);
-  const rightItems = sideItems.slice(midpoint);
-  const shiftItem = navItems.find((item) => item.page === 'shift');
+  const leftItems = [
+    { page: 'dashboard' as Page, label: 'Главная', icon: <LayoutDashboard className="h-5 w-5" /> },
+    { page: 'history' as Page, label: 'История', icon: <Clock className="h-5 w-5" /> },
+  ];
+
+  const rightItems = isAdmin
+    ? [
+        { page: 'owner' as Page, label: 'Управление', icon: <ShieldCheck className="h-5 w-5" /> },
+        { page: 'profile' as Page, label: 'Профиль', icon: <User className="h-5 w-5" /> },
+      ]
+    : [
+        { page: 'history' as Page, label: 'Выплаты', icon: <Wallet className="h-5 w-5" /> },
+        { page: 'profile' as Page, label: 'Профиль', icon: <User className="h-5 w-5" /> },
+      ];
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 pointer-events-none">
@@ -68,16 +68,14 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
             ))}
           </div>
 
-          {shiftItem ? (
-            <NavButton
-              page={shiftItem.page}
-              label={shiftItem.label}
-              icon={shiftItem.icon}
-              currentPage={currentPage}
-              onNavigate={onNavigate}
-              className="dock-center"
-            />
-          ) : null}
+          <NavButton
+            page="shift"
+            label="Смена"
+            icon={<PlusCircle className="h-5 w-5" />}
+            currentPage={currentPage}
+            onNavigate={onNavigate}
+            className="dock-center"
+          />
 
           <div className="dock-side dock-side-right">
             {rightItems.map((item) => (
