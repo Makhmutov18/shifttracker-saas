@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, SunMedium } from 'lucide-react';
-import { User as UserType, Adjustment, getAdjustments, getMonthlyStats, MonthlyStats } from '../utils/api';
+import {
+  User as UserType,
+  Adjustment,
+  AuditLog,
+  getAdjustments,
+  getErrorMessage,
+  getMonthlyStats,
+  getMyAuditLogs,
+  MonthlyStats,
+} from '../utils/api';
 import { formatCurrency, formatHours, getMonthName, getCurrentMonth } from '../utils/helpers';
 import { canAccessOwnerPanel } from '../utils/permissions';
 import { getTelegramUser } from '../utils/telegram';
@@ -30,6 +39,15 @@ const PAY_MODEL_LABELS: Record<string, string> = {
   hybrid: 'Почасовая + %',
 };
 
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  user_updated: 'Данные сотрудника изменены',
+  user_deactivated: 'Сотрудник архивирован',
+  shift_created: 'Смена создана',
+  shift_edited: 'Смена отредактирована',
+  shift_approved: 'Смена утверждена',
+  shift_rejected: 'Смена отклонена',
+};
+
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
   { value: 'system', label: 'Системная', icon: <Monitor className="w-4 h-4" /> },
   { value: 'light', label: 'Светлая', icon: <SunMedium className="w-4 h-4" /> },
@@ -49,10 +67,36 @@ function getPayModelSummary(user: UserType) {
   return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`;
 }
 
+function getAuditActionLabel(action?: string) {
+  return action ? AUDIT_ACTION_LABELS[action] || 'Изменение' : 'Изменение';
+}
+
+function formatAuditTimestamp(value?: string) {
+  if (!value) {
+    return 'Дата не указана';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function Profile({ user, onBack, themeMode, onThemeModeChange }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const isAdminContext = canAccessOwnerPanel(user);
   const telegramUser = getTelegramUser();
 
@@ -69,6 +113,37 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
       }
     };
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAuditLogs = async () => {
+      setAuditLoading(true);
+      setAuditError(null);
+
+      try {
+        const data = await getMyAuditLogs(20);
+        if (!cancelled) {
+          setAuditLogs(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAuditLogs([]);
+          setAuditError(getErrorMessage(error, 'Не удалось загрузить историю изменений'));
+        }
+      } finally {
+        if (!cancelled) {
+          setAuditLoading(false);
+        }
+      }
+    };
+
+    fetchAuditLogs();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const netIncome = stats
@@ -222,6 +297,48 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
           </div>
         </div>
       )}
+
+      <div className="surface-card rounded-[1.4rem] p-4 mb-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-tg-text">История изменений</h3>
+            <p className="text-xs text-tg-hint">Показываем только события, связанные с вами.</p>
+          </div>
+        </div>
+
+        {auditLoading ? (
+          <div className="space-y-2">
+            <div className="h-14 rounded-2xl bg-tg-secondary-bg/70 animate-pulse" />
+            <div className="h-14 rounded-2xl bg-tg-secondary-bg/70 animate-pulse" />
+          </div>
+        ) : auditError ? (
+          <div className="rounded-2xl bg-tg-secondary-bg px-4 py-4">
+            <p className="text-sm font-medium text-tg-text">Не удалось загрузить историю изменений</p>
+            <p className="mt-1 text-sm text-tg-hint">{auditError}</p>
+          </div>
+        ) : auditLogs.length > 0 ? (
+          <div className="space-y-2">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="rounded-2xl bg-tg-secondary-bg px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-tg-text">{getAuditActionLabel(log.action)}</p>
+                    <p className="mt-0.5 text-xs text-tg-hint">
+                      {log.user_name ? `Кто изменил: ${log.user_name} · ` : ''}
+                      {formatAuditTimestamp(log.created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-tg-secondary-bg px-4 py-4">
+            <p className="text-sm font-medium text-tg-text">Изменений пока нет</p>
+            <p className="mt-1 text-sm text-tg-hint">Когда управляющий изменит ваши данные или смены, они появятся здесь.</p>
+          </div>
+        )}
+      </div>
 
       {!isAdminContext && (
         <div className="surface-muted mt-4 rounded-2xl p-4">

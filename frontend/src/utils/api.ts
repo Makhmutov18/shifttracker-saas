@@ -461,6 +461,13 @@ export async function getAuditLogs(page?: number, limit?: number): Promise<Audit
   return request<AuditLog[]>(`/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
+export async function getMyAuditLogs(limit?: number): Promise<AuditLog[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return request<AuditLog[]>(`/me/audit-log${qs ? `?${qs}` : ''}`);
+}
+
 // Adjustments
 
 export interface Adjustment {

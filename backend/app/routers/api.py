@@ -51,6 +51,25 @@ def _can_view_team_history_scope(user: User) -> bool:
     )
 
 
+def _serialize_audit_logs(logs: list[AuditLog]) -> list[AuditLogOut]:
+    return [
+        AuditLogOut(
+            id=log.id,
+            user_id=log.user_id,
+            target_user_id=log.target_user_id,
+            action=log.action,
+            entity_type=log.entity_type,
+            entity_id=log.entity_id,
+            old_value=log.old_value,
+            new_value=log.new_value,
+            created_at=log.created_at.isoformat() if log.created_at else "",
+            user_name=log.user.name if log.user else None,
+            target_user_name=log.target_user.name if log.target_user else None,
+        )
+        for log in logs
+    ]
+
+
 async def get_current_user(
     init_data: str = Header(..., alias="X-Init-Data"),
     session: AsyncSession = Depends(get_session),
@@ -675,23 +694,28 @@ async def list_audit_logs(
     )
     result = await session.execute(query)
     logs = result.scalars().all()
+    return _serialize_audit_logs(logs)
 
-    return [
-        AuditLogOut(
-            id=log.id,
-            user_id=log.user_id,
-            target_user_id=log.target_user_id,
-            action=log.action,
-            entity_type=log.entity_type,
-            entity_id=log.entity_id,
-            old_value=log.old_value,
-            new_value=log.new_value,
-            created_at=log.created_at.isoformat() if log.created_at else "",
-            user_name=log.user.name if log.user else None,
-            target_user_name=log.target_user.name if log.target_user else None,
+
+@router.get("/me/audit-log", response_model=list[AuditLogOut])
+async def list_my_audit_log(
+    limit: int = Query(20, ge=1, le=50),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    query = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.user), selectinload(AuditLog.target_user))
+        .where(
+            AuditLog.target_user_id == user.id,
+            AuditLog.entity_type.in_(("user", "shift")),
         )
-        for log in logs
-    ]
+        .order_by(AuditLog.created_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    logs = result.scalars().all()
+    return _serialize_audit_logs(logs)
 
 
 # ─── Adjustments (Bonuses / Penalties) ──────────────────────────────────────
