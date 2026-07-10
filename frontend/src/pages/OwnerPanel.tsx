@@ -213,6 +213,34 @@ function getManagementBadge(user: Pick<User, 'role' | 'permissions'>) {
   return canAccessOwnerPanel(user) ? 'Есть доступ к управлению' : 'Обычный сотрудник';
 }
 
+function getManagementRoleLabel(user: Pick<User, 'role' | 'permissions'>) {
+  if (user.role === 'owner') return 'Владелец';
+  if (user.role === 'admin') return 'Администратор';
+  if (user.role === 'senior') return 'Старший';
+  return 'Сотрудник';
+}
+
+function getPayModelLabel(payModel: User['pay_model']) {
+  return PAY_MODEL_LABELS[payModel];
+}
+
+function getPayRateLabel(user: Pick<User, 'hourly_rate' | 'pay_model' | 'revenue_percentage'>) {
+  if (user.pay_model === 'revenue') {
+    return 'Индивидуально';
+  }
+  if (user.pay_model === 'fixed_shift') {
+    return `${formatCurrency(user.hourly_rate)} / смена`;
+  }
+  if (user.pay_model === 'hybrid') {
+    return `${formatCurrency(user.hourly_rate)} / час`;
+  }
+  return `${formatCurrency(user.hourly_rate)} / час`;
+}
+
+function getShortVenueLabel(venue?: Venue) {
+  return venue?.name?.trim() || 'Основная точка';
+}
+
 const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
   { key: 'can_approve_shifts', label: 'Утверждать смены' },
   { key: 'can_view_team_shifts', label: 'Видеть смены команды' },
@@ -1385,15 +1413,15 @@ function TeamTab({ user }: { user: User }) {
       <div className="surface-card rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
-            <p className="text-xs text-tg-hint">Выберите человека из списка ниже, чтобы обновить его данные.</p>
+            <p className="text-sm font-medium text-tg-text">Сотрудники</p>
+            <p className="text-xs text-tg-hint">Список, где можно быстро проверить точку, должность, оплату и доступ к управлению.</p>
           </div>
           <RefreshCw className="w-4 h-4 text-tg-hint" />
         </div>
 
         {editingUser ? (
           <div className="space-y-4">
-            <EmployeeFormSection title="Основное">
+            <EmployeeFormSection title="Основное" description="Имя, должность и точка сотрудника.">
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">Имя сотрудника</label>
                 <input
@@ -1436,7 +1464,7 @@ function TeamTab({ user }: { user: User }) {
               </div>
             </EmployeeFormSection>
 
-            <EmployeeFormSection title="Оплата">
+            <EmployeeFormSection title="Оплата" description="Модель оплаты и ставка для расчёта выплат.">
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">Модель оплаты</label>
                 <select
@@ -1552,24 +1580,39 @@ function TeamTab({ user }: { user: User }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
-                        Активен
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">Активен</span>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-tg-bg text-tg-hint">
+                        {getManagementBadge(u)}
                       </span>
                     </div>
-                    <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
-                      <p>Точка: {getVenueName(u.venue)}</p>
-                      <p>Должность: {getPositionLabel(u)}</p>
-                      <p>{getManagementBadge(u)}</p>
-                      <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
-                      <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-tg-hint">
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Должность</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPositionLabel(u)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Точка</p>
+                        <p className="mt-1 text-sm text-tg-text">{getShortVenueLabel(u.venue)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Оплата</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPayModelLabel(u.pay_model)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Ставка</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPayRateLabel(u)}</p>
+                      </div>
                       {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
-                        <p>Процент от выручки: {u.revenue_percentage}%</p>
+                        <div className="rounded-xl bg-tg-bg px-3 py-2.5 col-span-2">
+                          <p className="text-[11px] uppercase tracking-wide text-tg-hint">Процент от выручки</p>
+                          <p className="mt-1 text-sm text-tg-text">{u.revenue_percentage}%</p>
+                        </div>
                       )}
                     </div>
                   </div>
                   <button
                     onClick={() => startEdit(u)}
-                    className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
+                    className="rounded-xl p-2 transition-colors hover:bg-tg-bg"
                     aria-label={`Редактировать ${u.name}`}
                   >
                     <Pencil className="w-4 h-4 text-tg-hint" />
@@ -1621,33 +1664,50 @@ function TeamTab({ user }: { user: User }) {
               </div>
             ) : (
               archivedUsers.map((u) => (
-                <div key={u.id} className="rounded-2xl p-4 surface-muted opacity-90">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
-                        <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
-                          В архиве
-                        </span>
-                      </div>
-                      <div className="mt-2 grid gap-1.5 text-xs text-tg-hint">
-                        <p>Точка: {getVenueName(u.venue)}</p>
-                        <p>Должность: {getPositionLabel(u)}</p>
-                        <p>{getManagementBadge(u)}</p>
-                        <p>Модель оплаты: {PAY_MODEL_LABELS[u.pay_model]}</p>
-                        <p>Ставка: {u.pay_model === 'revenue' ? 'Индивидуально' : `${formatCurrency(u.hourly_rate)} ${getRateLabel(u.pay_model)}`}</p>
-                        {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
-                          <p>Процент от выручки: {u.revenue_percentage}%</p>
-                        )}
-                      </div>
+              <div key={u.id} className="rounded-2xl p-4 surface-muted opacity-90">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-tg-text font-medium text-sm truncate">{u.name}</p>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-500/10 text-zinc-600 dark:text-zinc-300">
+                        В архиве
+                      </span>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-tg-bg text-tg-hint">
+                        {getManagementBadge(u)}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => startEdit(u)}
-                      className="p-2 rounded-xl hover:bg-tg-bg transition-colors"
-                      aria-label={`Редактировать ${u.name}`}
-                    >
-                      <Pencil className="w-4 h-4 text-tg-hint" />
-                    </button>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-tg-hint">
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Должность</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPositionLabel(u)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Точка</p>
+                        <p className="mt-1 text-sm text-tg-text">{getShortVenueLabel(u.venue)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Оплата</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPayModelLabel(u.pay_model)}</p>
+                      </div>
+                      <div className="rounded-xl bg-tg-bg px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-tg-hint">Ставка</p>
+                        <p className="mt-1 text-sm text-tg-text">{getPayRateLabel(u)}</p>
+                      </div>
+                      {(u.pay_model === 'revenue' || u.pay_model === 'hybrid') && Number(u.revenue_percentage) > 0 && (
+                        <div className="rounded-xl bg-tg-bg px-3 py-2.5 col-span-2">
+                          <p className="text-[11px] uppercase tracking-wide text-tg-hint">Процент от выручки</p>
+                          <p className="mt-1 text-sm text-tg-text">{u.revenue_percentage}%</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => startEdit(u)}
+                    className="rounded-xl p-2 transition-colors hover:bg-tg-bg"
+                    aria-label={`Редактировать ${u.name}`}
+                  >
+                    <Pencil className="w-4 h-4 text-tg-hint" />
+                  </button>
                   </div>
 
                   <div className="mt-3 flex gap-2">
