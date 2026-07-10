@@ -6,12 +6,13 @@ import ShiftForm from './pages/ShiftForm';
 import History from './pages/History';
 import OwnerPanel from './pages/OwnerPanel';
 import Profile from './pages/Profile';
+import Payouts from './pages/Payouts';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import BottomNav from './components/BottomNav';
 import { canAccessOwnerPanel } from './utils/permissions';
 
-type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
+type Page = 'dashboard' | 'shift' | 'history' | 'payouts' | 'owner' | 'profile';
 type OwnerPanelTab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
 type NavigationOptions = {
   ownerTab?: OwnerPanelTab;
@@ -51,6 +52,8 @@ export default function App() {
         );
       case 'history':
         return <History user={user} />;
+      case 'payouts':
+        return <Payouts user={user} />;
       case 'owner':
         return canAccessOwnerPanel(user) ? (
           <OwnerPanel user={user} initialTab={ownerTab} onInitialTabConsumed={() => setOwnerTab(null)} />

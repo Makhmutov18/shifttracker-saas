@@ -2,7 +2,7 @@ import React from 'react';
 import { LayoutDashboard, PlusCircle, Clock, ShieldCheck, User, Wallet } from 'lucide-react';
 import { hapticFeedback } from '../utils/telegram';
 
-type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
+type Page = 'dashboard' | 'shift' | 'history' | 'payouts' | 'owner' | 'profile';
 
 interface Props {
   currentPage: Page;
@@ -54,7 +54,7 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
         { page: 'profile' as Page, label: 'Профиль', icon: <User className="h-5 w-5" /> },
       ]
     : [
-        { page: 'history' as Page, label: 'Выплаты', icon: <Wallet className="h-5 w-5" /> },
+        { page: 'payouts' as Page, label: 'Выплаты', icon: <Wallet className="h-5 w-5" /> },
         { page: 'profile' as Page, label: 'Профиль', icon: <User className="h-5 w-5" /> },
       ];
 
