@@ -50,6 +50,8 @@ import {
 
 interface Props {
   user: User;
+  initialTab?: Tab | null;
+  onInitialTabConsumed?: () => void;
 }
 
 type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
@@ -252,8 +254,8 @@ const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
   { key: 'can_manage_expenses', label: 'Управлять расходами' },
 ];
 
-export default function OwnerPanel({ user }: Props) {
-  const [tab, setTab] = useState<Tab>('invite');
+export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'invite');
   const canApprove = hasPermission(user, 'can_approve_shifts') || hasPermission(user, 'can_edit_team_shifts');
   const canManageTeam = hasPermission(user, 'can_manage_team');
   const canManageAdjustments = hasPermission(user, 'can_manage_adjustments');
@@ -278,6 +280,16 @@ export default function OwnerPanel({ user }: Props) {
       setTab(activeTabs[0].id);
     }
   }, [activeTabs, tab]);
+
+  useEffect(() => {
+    if (!initialTab) {
+      return;
+    }
+    if (activeTabs.some((item) => item.id === initialTab)) {
+      setTab(initialTab);
+      onInitialTabConsumed?.();
+    }
+  }, [activeTabs, initialTab, onInitialTabConsumed]);
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">

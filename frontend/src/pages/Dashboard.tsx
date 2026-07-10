@@ -11,10 +11,14 @@ import { canAccessOwnerPanel } from '../utils/permissions';
 import { hasPermission } from '../utils/permissions';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
+type OwnerPanelTab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
+type NavigationOptions = {
+  ownerTab?: OwnerPanelTab;
+};
 
 interface Props {
   user: UserType;
-  onNavigate: (page: Page) => void;
+  onNavigate: (page: Page, options?: NavigationOptions) => void;
 }
 
 const SHIFT_STATUS_LABELS: Record<string, string> = {
@@ -204,7 +208,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
                     <p className="text-xs text-tg-hint">Можно открыть утверждение и быстро проверить новые заявки.</p>
                     <button
                       type="button"
-                      onClick={() => onNavigate('owner')}
+                      onClick={() => onNavigate('owner', { ownerTab: 'approve' })}
                       className="inline-flex items-center justify-center rounded-full bg-tg-primary px-3.5 py-2 text-xs font-medium text-tg-button-text transition-transform active:scale-[0.98]"
                     >
                       Открыть утверждение
