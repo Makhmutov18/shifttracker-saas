@@ -75,17 +75,37 @@ export default function History({ user }: Props) {
       return;
     }
 
+    let cancelled = false;
+
     const loadVenues = async () => {
       try {
         const data = await getVenues(true);
-        setVenues(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setVenues(Array.isArray(data) ? data : []);
+        }
       } catch {
-        setVenues([]);
+        if (!cancelled) {
+          setVenues([]);
+        }
       }
     };
 
     loadVenues();
+
+    return () => {
+      cancelled = true;
+    };
   }, [canScopeByVenue]);
+
+  useEffect(() => {
+    if (!canScopeByVenue) {
+      return;
+    }
+
+    if (venueFilter !== 'all' && venues.length > 0 && !venues.some((venue) => venue.id === venueFilter)) {
+      setVenueFilter('all');
+    }
+  }, [canScopeByVenue, venueFilter, venues]);
 
   useEffect(() => {
     if (!canManagePayroll) {
@@ -95,21 +115,33 @@ export default function History({ user }: Props) {
       return;
     }
 
+    let cancelled = false;
+
     const loadSummary = async () => {
       try {
         setSummaryLoading(true);
         setSummaryError(null);
         const data = await getPayrollSummary(month, year, venueScopeId);
-        setSummary(data);
+        if (!cancelled) {
+          setSummary(data);
+        }
       } catch (error) {
-        setSummary(null);
-        setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить сводку выплат.');
+        if (!cancelled) {
+          setSummary(null);
+          setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить сводку выплат.');
+        }
       } finally {
-        setSummaryLoading(false);
+        if (!cancelled) {
+          setSummaryLoading(false);
+        }
       }
     };
 
     loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
   }, [canManagePayroll, month, year, venueScopeId]);
 
   const handleExport = async () => {
@@ -147,10 +179,10 @@ export default function History({ user }: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-8 pt-6">
-      <div>
+    <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
+      <div className="space-y-1">
         <h1 className="text-lg font-semibold text-tg-text">История</h1>
-        <p className="mt-1 text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
+        <p className="text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
       </div>
 
       <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
@@ -187,19 +219,17 @@ export default function History({ user }: Props) {
           </div>
           <p className="text-xs text-tg-hint">Сейчас выбран: {selectedMonthLabel}</p>
         </div>
-      </section>
 
-      {canScopeByVenue && (
-        <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-tg-text">Точка</p>
-              <p className="mt-1 text-xs text-tg-hint">Все точки или конкретная точка для просмотра смен, сводки выплат и экспорта.</p>
+        {canScopeByVenue && (
+          <div className="space-y-2 border-t border-tg-border pt-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-tg-text">Точка</p>
+                <p className="mt-1 text-xs text-tg-hint">Можно смотреть все точки или выбрать одну конкретную.</p>
+              </div>
+              <MapPin className="h-4 w-4 text-tg-primary" />
             </div>
-            <MapPin className="h-4 w-4 text-tg-primary" />
-          </div>
 
-          <div className="space-y-2">
             <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Фильтр</label>
             <select
               value={venueFilter}
@@ -213,15 +243,14 @@ export default function History({ user }: Props) {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-tg-hint">Выбрано: {selectedVenueLabel}</p>
           </div>
-
-          <p className="text-xs text-tg-hint">Выбрано: {selectedVenueLabel}</p>
-        </section>
-      )}
+        )}
+      </section>
 
       {canManagePayroll && (
         <section className="space-y-3">
-          <div className="surface-card rounded-[1.4rem] p-4">
+          <div className="surface-card rounded-[1.4rem] p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-tg-text">Сводка выплат</p>
@@ -233,58 +262,63 @@ export default function History({ user }: Props) {
             </div>
 
             {summaryLoading ? (
-              <div className="mt-4 animate-pulse space-y-3">
+              <div className="mt-1 animate-pulse space-y-3">
                 <div className="h-20 rounded-[1.35rem] bg-tg-bg/70" />
                 <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-16 rounded-xl bg-tg-bg/70" />
+                  {[1, 2, 3, 4].map((index) => (
+                    <div key={index} className="h-16 rounded-xl bg-tg-bg/70" />
                   ))}
                 </div>
               </div>
             ) : summaryError ? (
-              <div className="mt-4 rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
+              <div className="rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
                 <p className="font-medium">Сводка выплат недоступна</p>
                 <p className="mt-1 text-xs">{summaryError}</p>
               </div>
             ) : summary ? (
-              <div className="mt-4 space-y-3">
-                <div className="accent-card rounded-[1.5rem] p-5 text-white shadow-sm">
+              <div className="space-y-3">
+                <div className="surface-muted rounded-[1.35rem] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm opacity-80">Итого к выплате</p>
-                      <p className="mt-1 text-3xl font-bold">{formatCurrency(summary.total_payout)}</p>
+                      <p className="text-xs uppercase tracking-wide text-tg-hint">К выплате</p>
+                      <p className="mt-1 text-2xl font-semibold text-tg-text">{formatCurrency(summary.total_payout)}</p>
                     </div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/14">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
                       <Wallet className="h-5 w-5" />
                     </div>
                   </div>
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-sm opacity-90">
-                    <Clock className="h-4 w-4" />
-                    <span>{formatHours(summary.total_hours)}</span>
-                    <span className="opacity-60">В·</span>
-                    <span>{summary.employees_count} сотрудников</span>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-tg-hint">
+                    <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
+                      {formatHours(summary.total_hours)}
+                    </span>
+                    <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
+                      {summary.approved_shifts_count} утверждённых смен
+                    </span>
+                    <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
+                      {summary.employees_count} сотрудников
+                    </span>
+                    <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
+                      {selectedMonthLabel}
+                    </span>
                   </div>
-                  <p className="mt-2 text-xs opacity-80">{selectedVenueLabel}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Утверждённые смены</p>
-                    <p className="mt-1 text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
-                  </div>
-                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
+                  <div className="surface-muted rounded-[1.15rem] p-4">
                     <p className="text-xs text-tg-hint">На подтверждении</p>
                     <p className="mt-1 text-sm font-semibold text-tg-text">{summary.pending_shifts_count}</p>
                   </div>
-                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Часы</p>
-                    <p className="mt-1 text-sm font-semibold text-tg-text">{formatHours(summary.total_hours)}</p>
+                  <div className="surface-muted rounded-[1.15rem] p-4">
+                    <p className="text-xs text-tg-hint">Утверждено</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{summary.approved_shifts_count}</p>
                   </div>
-                  <div className="surface-muted rounded-[1.15rem] p-4 shadow-sm">
-                    <p className="text-xs text-tg-hint">Бонусы / штрафы</p>
-                    <p className="mt-1 text-sm font-semibold text-tg-text">
-                      {formatCurrency(summary.total_bonuses)} / {formatCurrency(summary.total_penalties)}
-                    </p>
+                  <div className="surface-muted rounded-[1.15rem] p-4">
+                    <p className="text-xs text-tg-hint">Бонусы</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{formatCurrency(summary.total_bonuses)}</p>
+                  </div>
+                  <div className="surface-muted rounded-[1.15rem] p-4">
+                    <p className="text-xs text-tg-hint">Штрафы</p>
+                    <p className="mt-1 text-sm font-semibold text-tg-text">{formatCurrency(summary.total_penalties)}</p>
                   </div>
                 </div>
 
@@ -297,15 +331,15 @@ export default function History({ user }: Props) {
                     {summary.rows.slice(0, 5).map((row) => (
                       <div
                         key={row.user_id}
-                        className="surface-elevated rounded-[1.15rem] px-3 py-3 flex items-center justify-between gap-3"
+                        className="surface-elevated flex items-center justify-between gap-3 rounded-[1.15rem] px-3 py-3"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-tg-text truncate">{row.user_name}</p>
+                          <p className="truncate text-sm font-medium text-tg-text">{row.user_name}</p>
                           <p className="text-xs text-tg-hint">
-                            {row.approved_shifts_count} смены В· {formatHours(row.total_hours)}
+                            {row.approved_shifts_count} смены · {formatHours(row.total_hours)}
                           </p>
                         </div>
-                        <p className="text-sm font-semibold text-tg-text shrink-0">
+                        <p className="shrink-0 text-sm font-semibold text-tg-text">
                           {formatCurrency(row.total_payout)}
                         </p>
                       </div>
@@ -313,20 +347,18 @@ export default function History({ user }: Props) {
                   </div>
                 )}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm text-tg-hint">Сводка выплат пока недоступна.</p>
+            )}
           </div>
 
           <button
             type="button"
             onClick={handleExport}
             disabled={exportLoading}
-            className="surface-card w-full rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 text-tg-text active:scale-[0.98] transition-transform disabled:opacity-60"
+            className="surface-card flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-tg-text transition-transform active:scale-[0.98] disabled:opacity-60"
           >
-            {exportLoading ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
+            {exportLoading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Download className="h-4 w-4" />}
             Выгрузить сводку выплат за {getMonthName(month)} {year} (.xlsx)
           </button>
 
@@ -337,7 +369,7 @@ export default function History({ user }: Props) {
       <div className="surface-muted flex rounded-xl p-1">
         <button
           onClick={() => setTab('shifts')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${
             tab === 'shifts' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
@@ -346,7 +378,7 @@ export default function History({ user }: Props) {
         </button>
         <button
           onClick={() => setTab('expenses')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${
             tab === 'expenses' ? 'surface-card text-tg-text' : 'text-tg-hint'
           }`}
         >
@@ -358,8 +390,8 @@ export default function History({ user }: Props) {
       {tab === 'shifts' ? (
         shiftsLoading ? (
           <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 surface-card rounded-xl" />
+            {[1, 2, 3].map((index) => (
+              <div key={index} className="h-20 surface-card rounded-xl" />
             ))}
           </div>
         ) : shiftsError ? (
@@ -371,7 +403,7 @@ export default function History({ user }: Props) {
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
             <Clock className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
             <p className="text-sm font-medium text-tg-text">За этот месяц смен нет</p>
-            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и в сводке выплат.</p>
+            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и попадут в сводку выплат.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -382,8 +414,8 @@ export default function History({ user }: Props) {
         )
       ) : expensesLoading ? (
         <div className="space-y-3 animate-pulse">
-          {[1, 2].map((i) => (
-            <div key={i} className="h-16 surface-card rounded-xl" />
+          {[1, 2].map((index) => (
+            <div key={index} className="h-16 surface-card rounded-xl" />
           ))}
         </div>
       ) : expensesError ? (
@@ -395,12 +427,12 @@ export default function History({ user }: Props) {
         <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
           <TrendingDown className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
           <p className="text-sm font-medium text-tg-text">За этот месяц расходов нет</p>
-          <p className="mt-1 text-xs text-tg-hint">Если расходы появятся, они отобразятся здесь.</p>
+          <p className="mt-1 text-xs text-tg-hint">Когда появятся расходы, они отобразятся здесь.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {expenses.map((expense) => (
-            <div key={expense.id} className="surface-card rounded-[1.15rem] p-4 flex items-center justify-between gap-4">
+            <div key={expense.id} className="surface-card flex items-center justify-between gap-4 rounded-[1.15rem] p-4">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-tg-text">{expense.category}</p>
                 <p className="mt-0.5 text-xs text-tg-hint">{expense.date}</p>
