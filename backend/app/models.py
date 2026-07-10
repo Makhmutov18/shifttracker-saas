@@ -51,6 +51,19 @@ class PayModel(str, enum.Enum):
     hybrid = "hybrid"
 
 
+class PayrollRunStatus(str, enum.Enum):
+    draft = "draft"
+    finalized = "finalized"
+    paid = "paid"
+    cancelled = "cancelled"
+
+
+class PayrollScheduleType(str, enum.Enum):
+    manual = "manual"
+    twice_monthly = "twice_monthly"
+    percent_advance = "percent_advance"
+
+
 class Venue(Base):
     __tablename__ = "venues"
 
@@ -66,6 +79,11 @@ class Venue(Base):
     users: Mapped[list["User"]] = relationship("User", back_populates="venue")
     shifts: Mapped[list["Shift"]] = relationship("Shift", back_populates="venue")
     expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="venue")
+    payroll_runs: Mapped[list["PayrollRun"]] = relationship("PayrollRun", back_populates="venue")
+    payroll_schedule_settings: Mapped[list["PayrollScheduleSettings"]] = relationship(
+        "PayrollScheduleSettings",
+        back_populates="venue",
+    )
 
     def __repr__(self) -> str:
         return f"<Venue {self.name}>"
@@ -109,6 +127,25 @@ class User(Base):
     venue: Mapped["Venue"] = relationship("Venue", back_populates="users")
     shifts: Mapped[list["Shift"]] = relationship("Shift", back_populates="user")
     expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="user")
+    payroll_runs_created: Mapped[list["PayrollRun"]] = relationship(
+        "PayrollRun",
+        back_populates="created_by_user",
+        foreign_keys="PayrollRun.created_by_id",
+    )
+    payroll_run_items: Mapped[list["PayrollRunItem"]] = relationship(
+        "PayrollRunItem",
+        back_populates="user",
+    )
+    payroll_payments_received: Mapped[list["PayrollPayment"]] = relationship(
+        "PayrollPayment",
+        back_populates="user",
+        foreign_keys="PayrollPayment.user_id",
+    )
+    payroll_payments_created: Mapped[list["PayrollPayment"]] = relationship(
+        "PayrollPayment",
+        back_populates="created_by_user",
+        foreign_keys="PayrollPayment.created_by_id",
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.name} ({self.role})>"
@@ -249,3 +286,181 @@ class Adjustment(Base):
 
     def __repr__(self) -> str:
         return f"<Adjustment {self.type} {self.amount} for {self.user_id}>"
+
+
+class PayrollRun(Base):
+    __tablename__ = "payroll_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[PayrollRunStatus] = mapped_column(
+        SAEnum(PayrollRunStatus, name="payroll_run_status"),
+        nullable=False,
+        default=PayrollRunStatus.draft,
+    )
+    total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    total_paid: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    venue_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.id"), nullable=True
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    finalized_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    paid_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_by_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="payroll_runs_created",
+        foreign_keys=[created_by_id],
+    )
+    venue: Mapped[Optional["Venue"]] = relationship("Venue", back_populates="payroll_runs")
+    items: Mapped[list["PayrollRunItem"]] = relationship(
+        "PayrollRunItem",
+        back_populates="payroll_run",
+        cascade="all, delete-orphan",
+    )
+    payments: Mapped[list["PayrollPayment"]] = relationship(
+        "PayrollPayment",
+        back_populates="payroll_run",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self) -> str:
+        return f"<PayrollRun {self.title} {self.period_start}..{self.period_end}>"
+
+
+class PayrollRunItem(Base):
+    __tablename__ = "payroll_run_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    payroll_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payroll_runs.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    approved_shifts_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    approved_hours: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, default=Decimal("0.00")
+    )
+    base_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    bonus_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    deduction_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    final_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    paid_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    remaining_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    payroll_run: Mapped["PayrollRun"] = relationship("PayrollRun", back_populates="items")
+    user: Mapped["User"] = relationship("User", back_populates="payroll_run_items")
+
+    def __repr__(self) -> str:
+        return f"<PayrollRunItem {self.payroll_run_id} {self.user_id}>"
+
+
+class PayrollPayment(Base):
+    __tablename__ = "payroll_payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    payroll_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payroll_runs.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    payroll_run: Mapped["PayrollRun"] = relationship("PayrollRun", back_populates="payments")
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="payroll_payments_received",
+        foreign_keys=[user_id],
+    )
+    created_by_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="payroll_payments_created",
+        foreign_keys=[created_by_id],
+    )
+
+    def __repr__(self) -> str:
+        return f"<PayrollPayment {self.amount} for {self.user_id}>"
+
+
+class PayrollScheduleSettings(Base):
+    __tablename__ = "payroll_schedule_settings"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    venue_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.id"), nullable=True
+    )
+    schedule_type: Mapped[PayrollScheduleType] = mapped_column(
+        SAEnum(PayrollScheduleType, name="payroll_schedule_type"),
+        nullable=False,
+        default=PayrollScheduleType.manual,
+    )
+    first_payment_day: Mapped[Optional[int]] = mapped_column(nullable=True)
+    second_payment_day: Mapped[Optional[int]] = mapped_column(nullable=True)
+    first_period_rule: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    second_period_rule: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    advance_percent: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    venue: Mapped[Optional["Venue"]] = relationship(
+        "Venue",
+        back_populates="payroll_schedule_settings",
+    )
+
+    def __repr__(self) -> str:
+        return f"<PayrollScheduleSettings {self.schedule_type} venue={self.venue_id}>"

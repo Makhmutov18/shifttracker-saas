@@ -200,3 +200,72 @@ class AdjustmentOut(BaseModel):
     creator_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+# ═════ Payroll Runs ═════
+
+class PayrollRunItemRead(BaseModel):
+    id: uuid.UUID
+    payroll_run_id: uuid.UUID
+    user_id: uuid.UUID
+    approved_shifts_count: int = 0
+    approved_hours: Decimal = Decimal("0.00")
+    base_amount: Decimal = Decimal("0.00")
+    bonus_amount: Decimal = Decimal("0.00")
+    deduction_amount: Decimal = Decimal("0.00")
+    final_amount: Decimal = Decimal("0.00")
+    paid_amount: Decimal = Decimal("0.00")
+    remaining_amount: Decimal = Decimal("0.00")
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PayrollPaymentRead(BaseModel):
+    id: uuid.UUID
+    payroll_run_id: uuid.UUID
+    user_id: uuid.UUID
+    amount: Decimal
+    payment_date: date
+    method: Optional[str] = None
+    comment: Optional[str] = None
+    created_by_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PayrollScheduleSettingsRead(BaseModel):
+    id: uuid.UUID
+    venue_id: Optional[uuid.UUID] = None
+    schedule_type: str
+    first_payment_day: Optional[int] = None
+    second_payment_day: Optional[int] = None
+    first_period_rule: Optional[str] = None
+    second_period_rule: Optional[str] = None
+    advance_percent: Optional[Decimal] = None
+    is_active: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PayrollRunRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    period_start: date
+    period_end: date
+    status: str
+    total_amount: Decimal = Decimal("0.00")
+    total_paid: Decimal = Decimal("0.00")
+    created_by_id: uuid.UUID
+    venue_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    finalized_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    items: list[PayrollRunItemRead] = Field(default_factory=list)
+    payments: list[PayrollPaymentRead] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
