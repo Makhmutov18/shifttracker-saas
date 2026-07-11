@@ -12,13 +12,17 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
 from app.database import get_session
-from app.models import User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType
+from app.models import (
+    User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
+    PayrollRun, PayrollRunItem, PayrollRunStatus,
+)
 from app.permissions import has_permission
 from app.schemas import (
     UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
+    PayrollRunCreate, PayrollRunRead,
 )
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
@@ -699,6 +703,89 @@ async def payroll_run_preview(
         ),
         rows=preview_rows,
     )
+
+
+@router.post("/payroll-runs", response_model=PayrollRunRead, status_code=201)
+async def create_payroll_run(
+    payroll_data: PayrollRunCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Only owners and admins can create payroll runs")
+    if payroll_data.period_start > payroll_data.period_end:
+        raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
+
+    venue_filter = (
+        PayrollRun.venue_id.is_(None)
+        if payroll_data.venue_id is None
+        else PayrollRun.venue_id == payroll_data.venue_id
+    )
+    duplicate_result = await session.execute(
+        select(PayrollRun.id).where(
+            PayrollRun.period_start == payroll_data.period_start,
+            PayrollRun.period_end == payroll_data.period_end,
+            venue_filter,
+            PayrollRun.status.in_((PayrollRunStatus.draft, PayrollRunStatus.finalized)),
+        ).limit(1)
+    )
+    if duplicate_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="An active payroll run already exists for this period and venue",
+        )
+
+    preview = await payroll_run_preview(
+        period_start=payroll_data.period_start,
+        period_end=payroll_data.period_end,
+        venue_id=payroll_data.venue_id,
+        user=user,
+        session=session,
+    )
+    title = payroll_data.title or (
+        f"Payroll {payroll_data.period_start.isoformat()} - {payroll_data.period_end.isoformat()}"
+    )
+    payroll_run = PayrollRun(
+        title=title,
+        period_start=payroll_data.period_start,
+        period_end=payroll_data.period_end,
+        status=PayrollRunStatus.draft,
+        total_amount=preview.total_amount,
+        total_paid=Decimal("0.00"),
+        created_by_id=user.id,
+        venue_id=payroll_data.venue_id,
+        notes=payroll_data.notes,
+    )
+    payroll_run.items = [
+        PayrollRunItem(
+            user_id=row.user_id,
+            approved_shifts_count=row.shifts_count,
+            approved_hours=row.total_hours,
+            base_amount=row.base_amount,
+            bonus_amount=row.bonuses,
+            deduction_amount=row.deductions,
+            final_amount=row.total_amount,
+            paid_amount=Decimal("0.00"),
+            remaining_amount=row.total_amount,
+        )
+        for row in preview.rows
+    ]
+
+    try:
+        session.add(payroll_run)
+        await session.flush()
+        saved_result = await session.execute(
+            select(PayrollRun)
+            .options(selectinload(PayrollRun.items), selectinload(PayrollRun.payments))
+            .where(PayrollRun.id == payroll_run.id)
+        )
+        saved_run = saved_result.scalar_one()
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    return saved_run
 
 
 @router.post("/expenses", response_model=ExpenseOut)

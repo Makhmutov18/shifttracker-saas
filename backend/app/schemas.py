@@ -248,6 +248,14 @@ class PayrollRunItemRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PayrollRunCreate(BaseModel):
+    title: Optional[str] = None
+    period_start: date
+    period_end: date
+    venue_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
+
+
 class PayrollPaymentRead(BaseModel):
     id: uuid.UUID
     payroll_run_id: uuid.UUID
