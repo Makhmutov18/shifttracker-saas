@@ -51,6 +51,10 @@ def _can_view_team_history_scope(user: User) -> bool:
     )
 
 
+def _can_view_general_audit(user: User) -> bool:
+    return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
+
+
 def _serialize_audit_logs(logs: list[AuditLog]) -> list[AuditLogOut]:
     return [
         AuditLogOut(
@@ -683,6 +687,12 @@ async def list_audit_logs(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if not _can_view_general_audit(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Общий журнал действий доступен только пользователям с правом управления командой.",
+        )
+
     offset = (page - 1) * limit
 
     query = (
