@@ -148,7 +148,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
               <span>{statusLabel}</span>
             </div>
             <div>
-              <p className="text-sm text-tg-hint">Итого к выплате за {formatPeriodLabel()}</p>
+              <p className="text-sm text-tg-hint">Начислено за {formatPeriodLabel()}</p>
               <p className="mt-1 text-3xl font-semibold tracking-tight text-tg-text">
                 {loading ? '—' : formatCurrency(payout)}
               </p>
@@ -227,10 +227,10 @@ export default function Dashboard({ user, onNavigate }: Props) {
                 </p>
                 <p className="text-tg-hint">
                   {latestShift.status === 'approved'
-                    ? 'Смена уже учтена в выплатах.'
+                    ? 'Смена учтена в начислениях.'
                     : latestShift.status === 'rejected'
-                      ? 'Смена не входит в выплаты.'
-                      : 'После подтверждения она попадёт в выплаты.'}
+                      ? 'Смена не входит в начисления.'
+                      : 'После подтверждения она войдёт в начисления.'}
                 </p>
               </div>
             ) : (

@@ -369,8 +369,8 @@ const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
   { key: 'can_approve_shifts', label: 'Утверждать смены' },
   { key: 'can_view_team_shifts', label: 'Видеть смены команды' },
   { key: 'can_edit_team_shifts', label: 'Редактировать смены команды' },
-  { key: 'can_view_team_payroll', label: 'Видеть выплаты' },
-  { key: 'can_export_payroll', label: 'Экспортировать выплаты' },
+  { key: 'can_view_team_payroll', label: 'Видеть сводку начислений' },
+  { key: 'can_export_payroll', label: 'Экспортировать расчёт выплат' },
   { key: 'can_manage_team', label: 'Управлять командой и точками' },
   { key: 'can_manage_adjustments', label: 'Управлять корректировками' },
   { key: 'can_manage_expenses', label: 'Управлять расходами' },
@@ -970,7 +970,7 @@ function ApproveTab() {
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-tg-text">{getShiftAmount(shift?.salary_earned)}</p>
-                <p className="text-[11px] text-tg-hint">Предварительно к выплате</p>
+                <p className="text-[11px] text-tg-hint">Предварительно</p>
               </div>
             </div>
 
@@ -1231,7 +1231,7 @@ function VenuesTab() {
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Точки</p>
         <p className="mt-1 text-sm text-tg-hint">Создавайте, переименовывайте и архивируйте точки без потери истории сотрудников и смен.</p>
-        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <EmployeeStat label="Активных" value={venues.filter((venue) => venue.is_active).length} />
           <EmployeeStat label="В архиве" value={venues.filter((venue) => !venue.is_active).length} />
@@ -1392,7 +1392,7 @@ function VenuesTab() {
         <div className="surface-card rounded-2xl p-4 space-y-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Архив точек</p>
-            <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+            <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
           </div>
 
           {venues.filter((venue) => !venue.is_active).length === 0 ? (
@@ -1603,7 +1603,7 @@ function TeamTab({ user }: { user: User }) {
       setTeamError(null);
       setTeamSuccess(null);
       if (target.is_active) {
-        const confirmed = window.confirm(`Деактивировать сотрудника ${target.name}? Его смены и выплаты сохранятся.`);
+        const confirmed = window.confirm(`Деактивировать сотрудника ${target.name}? Его смены, начисления и история сохранятся.`);
         if (!confirmed) return;
         await deleteUser(target.id);
         setTeamSuccess(`${target.name} деактивирован`);
@@ -1651,7 +1651,7 @@ function TeamTab({ user }: { user: User }) {
       <div className="surface-card rounded-2xl p-4">
         <p className="text-sm font-medium text-tg-text">Команда</p>
         <p className="mt-1 text-sm text-tg-hint">Управляйте сотрудниками, точками, оплатой и доступом без лишней формы.</p>
-        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, выплаты и историю.</p>
+        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <EmployeeStat label="Активных" value={activeUsers.length} />
           <EmployeeStat label="В архиве" value={archivedUsers.length} />
@@ -1716,7 +1716,7 @@ function TeamTab({ user }: { user: User }) {
               </div>
             </EmployeeFormSection>
 
-            <EmployeeFormSection title="Оплата" description="Модель оплаты и ставка для расчёта выплат.">
+            <EmployeeFormSection title="Оплата" description="Модель оплаты и ставка для расчёта начислений.">
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">Модель оплаты</label>
                 <select
@@ -1814,7 +1814,7 @@ function TeamTab({ user }: { user: User }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Активные сотрудники</p>
-            <p className="text-xs text-tg-hint">Неактивные сотрудники убраны в архив, но история и выплаты сохраняются.</p>
+            <p className="text-xs text-tg-hint">Неактивные сотрудники убраны в архив, но история и начисления сохраняются.</p>
           </div>
           <p className="text-xs text-tg-hint">Активных: {activeUsers.length}</p>
         </div>

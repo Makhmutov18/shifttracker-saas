@@ -227,7 +227,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
         </div>
       ) : stats ? (
         <div className="accent-card rounded-[1.4rem] p-5 text-white mb-4">
-          <p className="text-sm opacity-80 mb-1">К выплате за {getMonthName(getCurrentMonth())}</p>
+          <p className="text-sm opacity-80 mb-1">Начислено за {getMonthName(getCurrentMonth())}</p>
           <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
           <div className="grid grid-cols-2 gap-3 mt-4">
             <div className="bg-white/10 rounded-xl p-3 border border-white/15">

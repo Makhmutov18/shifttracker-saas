@@ -60,7 +60,7 @@ export default function StatsWidget({ stats, loading }: Props) {
       <div className="accent-card rounded-[1.4rem] p-5 text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm opacity-80 mb-1">Итого к выплате</p>
+            <p className="text-sm opacity-80 mb-1">Начислено за месяц</p>
             <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
           </div>
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/14">

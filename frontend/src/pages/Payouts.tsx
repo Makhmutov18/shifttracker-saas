@@ -45,8 +45,8 @@ function getStatusLabel(status: ShiftStatus | string) {
 }
 
 function getPayoutLabel(status: ShiftStatus | string) {
-  if (status === 'approved') return 'К выплате';
-  if (status === 'rejected') return 'Не входит в выплату';
+  if (status === 'approved') return 'Начислено по утверждённым сменам';
+  if (status === 'rejected') return 'Не входит в расчёт';
   return 'Предварительно';
 }
 
@@ -153,7 +153,7 @@ export default function Payouts({ user }: Props) {
       } catch (error) {
         if (!cancelled) {
           setMonthStats(null);
-          setStatsError(getErrorMessage(error, 'Не удалось загрузить выплаты.'));
+          setStatsError(getErrorMessage(error, 'Не удалось загрузить начисления.'));
         }
       } finally {
         if (!cancelled) {
@@ -234,14 +234,14 @@ export default function Payouts({ user }: Props) {
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-tg-text">Выплаты</h1>
         <p className="text-sm text-tg-hint">Сводка по вашим сменам за выбранный месяц.</p>
-        <p className="text-xs text-tg-hint">Показаны личные выплаты для {user.name}.</p>
+        <p className="text-xs text-tg-hint">Показаны личные начисления для {user.name}.</p>
       </div>
 
       <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Период</p>
-            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть выплату и список смен.</p>
+            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть начисления и список смен.</p>
           </div>
           <button
             type="button"
@@ -276,7 +276,7 @@ export default function Payouts({ user }: Props) {
       <section className="surface-card rounded-[1.45rem] p-4 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">К выплате за месяц</p>
+            <p className="text-sm font-medium text-tg-text">Начислено за месяц</p>
             <p className="mt-1 text-xs text-tg-hint">Сводка считается по вашим сменам за {selectedMonthLabel}.</p>
           </div>
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
@@ -295,13 +295,13 @@ export default function Payouts({ user }: Props) {
           </div>
         ) : statsError ? (
           <div className="rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
-            <p className="font-medium">Сводка выплат недоступна</p>
+            <p className="font-medium">Сводка начислений недоступна</p>
             <p className="mt-1 text-xs">{statsError}</p>
           </div>
         ) : (
           <>
             <div className="surface-muted rounded-[1.35rem] p-4">
-              <p className="text-xs uppercase tracking-wide text-tg-hint">Итого к выплате</p>
+              <p className="text-xs uppercase tracking-wide text-tg-hint">Начислено</p>
               <p className="mt-1 text-3xl font-semibold tracking-tight text-tg-text">
                 {formatCurrency(totalPayout)}
               </p>
@@ -322,7 +322,7 @@ export default function Payouts({ user }: Props) {
               <SummaryMetric
                 title="Утверждено"
                 value={`${approvedCount} смен · ${formatCurrency(approvedAmount)}`}
-                hint="Смены уже входят в выплату"
+                hint="Смены учтены в начислениях"
               />
               <SummaryMetric
                 title="На подтверждении"
@@ -330,7 +330,7 @@ export default function Payouts({ user }: Props) {
                 hint="Это предварительная сумма"
               />
               <SummaryMetric
-                title="Не входит в выплату"
+                title="Не входит в расчёт"
                 value={`${rejectedCount} смен · ${formatCurrency(rejectedAmount)}`}
                 hint="Отклонённые смены не учитываются"
               />
@@ -342,7 +342,7 @@ export default function Payouts({ user }: Props) {
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">Смены, влияющие на выплату</p>
+            <p className="text-sm font-medium text-tg-text">Смены, влияющие на начисления</p>
             <p className="mt-1 text-xs text-tg-hint">Список показывает, как каждая смена попадает в расчёт.</p>
           </div>
           <p className="text-xs text-tg-hint">{hasAnyShifts ? `${monthShifts.length} смен` : 'Нет смен'}</p>
@@ -357,7 +357,7 @@ export default function Payouts({ user }: Props) {
         ) : shiftsError ? (
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
             <CircleAlert className="mx-auto mb-3 h-12 w-12 text-rose-400" />
-            <p className="text-sm font-medium text-tg-text">Не удалось загрузить выплаты</p>
+            <p className="text-sm font-medium text-tg-text">Не удалось загрузить смены</p>
             <p className="mt-2 text-xs text-tg-hint">{shiftsError}</p>
           </div>
         ) : hasAnyShifts ? (
@@ -375,7 +375,7 @@ export default function Payouts({ user }: Props) {
         ) : (
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
             <Clock3 className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
-            <p className="text-sm font-medium text-tg-text">За выбранный месяц выплат пока нет</p>
+            <p className="text-sm font-medium text-tg-text">За выбранный месяц начислений пока нет</p>
             <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь с суммой и статусом.</p>
           </div>
         )}

@@ -104,7 +104,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
             <p className="mt-2 text-sm text-tg-hint">{successDescription}</p>
 
             <div className="accent-card mt-5 rounded-[1.4rem] p-5 text-white">
-              <p className="text-sm opacity-80">Начислено</p>
+              <p className="text-sm opacity-80">{saved.status === 'pending' ? 'Предварительно' : 'Начислено'}</p>
               <p className="mt-1 text-3xl font-bold">{formatCurrency(saved.salary)}</p>
               <p className="mt-1 text-sm opacity-80">{formatHours(saved.hours)}</p>
             </div>

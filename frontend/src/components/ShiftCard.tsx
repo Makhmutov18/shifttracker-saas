@@ -32,11 +32,11 @@ export default function ShiftCard({ shift }: Props) {
         ? 'На подтверждении'
         : 'Статус уточняется';
   const payoutLabel = isApproved
-    ? 'К выплате'
+    ? 'Начислено'
     : isPending
       ? 'Предварительно'
       : isRejected
-        ? 'Не входит в выплату'
+        ? 'Не входит в расчёт'
         : 'Сумма';
   const amountClass = isApproved ? 'text-tg-text' : 'text-tg-hint';
 

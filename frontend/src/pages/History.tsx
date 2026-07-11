@@ -128,7 +128,7 @@ export default function History({ user }: Props) {
       } catch (error) {
         if (!cancelled) {
           setSummary(null);
-          setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить сводку выплат.');
+          setSummaryError(error instanceof Error ? error.message : 'Не удалось загрузить сводку начислений.');
         }
       } finally {
         if (!cancelled) {
@@ -158,7 +158,7 @@ export default function History({ user }: Props) {
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Не удалось скачать сводку выплат.');
+      setExportError(error instanceof Error ? error.message : 'Не удалось скачать расчёт начислений.');
     } finally {
       setExportLoading(false);
     }
@@ -182,14 +182,14 @@ export default function History({ user }: Props) {
     <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-tg-text">История</h1>
-        <p className="text-sm text-tg-hint">Смены, расходы и выплаты за выбранный месяц.</p>
+        <p className="text-sm text-tg-hint">Смены, расходы и начисления за выбранный месяц.</p>
       </div>
 
       <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Период</p>
-            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть смены, расходы и сводку выплат.</p>
+            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть смены, расходы и сводку начислений.</p>
           </div>
           <button
             type="button"
@@ -253,7 +253,7 @@ export default function History({ user }: Props) {
           <div className="surface-card rounded-[1.4rem] p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-tg-text">Сводка выплат</p>
+                <p className="text-sm font-medium text-tg-text">Сводка начислений</p>
                 <p className="mt-1 text-xs text-tg-hint">Все суммы ниже считаются только по утверждённым сменам.</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
@@ -272,7 +272,7 @@ export default function History({ user }: Props) {
               </div>
             ) : summaryError ? (
               <div className="rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
-                <p className="font-medium">Сводка выплат недоступна</p>
+                <p className="font-medium">Сводка начислений недоступна</p>
                 <p className="mt-1 text-xs">{summaryError}</p>
               </div>
             ) : summary ? (
@@ -280,7 +280,7 @@ export default function History({ user }: Props) {
                 <div className="surface-muted rounded-[1.35rem] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-tg-hint">К выплате</p>
+                      <p className="text-xs uppercase tracking-wide text-tg-hint">Начислено по утверждённым сменам</p>
                       <p className="mt-1 text-2xl font-semibold text-tg-text">{formatCurrency(summary.total_payout)}</p>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
@@ -348,7 +348,7 @@ export default function History({ user }: Props) {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-tg-hint">Сводка выплат пока недоступна.</p>
+              <p className="text-sm text-tg-hint">Сводка начислений пока недоступна.</p>
             )}
           </div>
 
@@ -359,7 +359,7 @@ export default function History({ user }: Props) {
             className="surface-card flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-tg-text transition-transform active:scale-[0.98] disabled:opacity-60"
           >
             {exportLoading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Download className="h-4 w-4" />}
-            Выгрузить сводку выплат за {getMonthName(month)} {year} (.xlsx)
+            Выгрузить расчёт начислений за {getMonthName(month)} {year} (.xlsx)
           </button>
 
           {exportError && <p className="text-xs text-red-400">{exportError}</p>}
@@ -403,7 +403,7 @@ export default function History({ user }: Props) {
           <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
             <Clock className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
             <p className="text-sm font-medium text-tg-text">За этот месяц смен нет</p>
-            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и попадут в сводку выплат.</p>
+            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь и попадут в расчёт начислений.</p>
           </div>
         ) : (
           <div className="space-y-3">
