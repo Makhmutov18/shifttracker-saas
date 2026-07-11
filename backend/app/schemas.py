@@ -162,6 +162,32 @@ class PayrollSummaryOut(BaseModel):
 
 # ─── Audit Log ──────────────────────────────────────────────────────────────
 
+class PayrollPreviewRow(BaseModel):
+    user_id: uuid.UUID
+    user_name: str
+    venue_name: str = "Основная точка"
+    shifts_count: int = 0
+    total_hours: Decimal = Decimal("0.00")
+    base_amount: Decimal = Decimal("0.00")
+    bonuses: Decimal = Decimal("0.00")
+    deductions: Decimal = Decimal("0.00")
+    total_amount: Decimal = Decimal("0.00")
+
+
+class PayrollPreviewOut(BaseModel):
+    period_start: date
+    period_end: date
+    venue_id: Optional[uuid.UUID] = None
+    employees_count: int = 0
+    shifts_count: int = 0
+    total_hours: Decimal = Decimal("0.00")
+    total_base_amount: Decimal = Decimal("0.00")
+    total_bonuses: Decimal = Decimal("0.00")
+    total_deductions: Decimal = Decimal("0.00")
+    total_amount: Decimal = Decimal("0.00")
+    rows: list[PayrollPreviewRow] = []
+
+
 class AuditLogOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID

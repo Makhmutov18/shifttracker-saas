@@ -18,7 +18,7 @@ from app.schemas import (
     UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
-    PayrollSummaryOut, PayrollSummaryRow,
+    PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
 )
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
@@ -570,6 +570,136 @@ async def payroll_summary(
 
 
 # ─── Expenses ────────────────────────────────────────────────────────────────
+
+@router.get("/payroll-runs/preview", response_model=PayrollPreviewOut)
+async def payroll_run_preview(
+    period_start: date,
+    period_end: date,
+    venue_id: uuid.UUID | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not has_permission(user, "can_view_team_payroll"):
+        raise HTTPException(status_code=403, detail="Only users with payroll access can preview payroll")
+    if period_start > period_end:
+        raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
+
+    shifts_query = (
+        select(Shift, User)
+        .outerjoin(User, Shift.user_id == User.id)
+        .options(selectinload(Shift.venue), selectinload(User.venue))
+        .where(
+            Shift.status == "approved",
+            Shift.date >= period_start,
+            Shift.date <= period_end,
+        )
+    )
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(
+            or_(Shift.venue_id == venue_id, User.venue_id == venue_id)
+        )
+    elif not _can_manage_all_venue_shifts(user):
+        shifts_query = shifts_query.where(
+            or_(Shift.venue_id == user.venue_id, User.venue_id == user.venue_id)
+        )
+    shifts_result = await session.execute(shifts_query.order_by(User.name, Shift.date))
+    approved_shifts = shifts_result.all()
+
+    adjustments_query = (
+        select(Adjustment, User)
+        .join(User, Adjustment.user_id == User.id)
+        .where(
+            Adjustment.year * 100 + Adjustment.month >= period_start.year * 100 + period_start.month,
+            Adjustment.year * 100 + Adjustment.month <= period_end.year * 100 + period_end.month,
+        )
+    )
+    if venue_id is not None and _can_manage_all_venue_shifts(user):
+        adjustments_query = adjustments_query.where(Adjustment.venue_id == venue_id)
+    elif not _can_manage_all_venue_shifts(user):
+        adjustments_query = adjustments_query.where(
+            or_(Adjustment.venue_id == user.venue_id, User.venue_id == user.venue_id)
+        )
+    adjustments_result = await session.execute(adjustments_query)
+    adjustments = adjustments_result.all()
+
+    rows_by_user: dict[uuid.UUID, dict] = {}
+    for shift, shift_user in approved_shifts:
+        if shift_user is None:
+            continue
+        row = rows_by_user.setdefault(
+            shift.user_id,
+            {
+                "user_id": shift.user_id,
+                "user_name": safe_text(shift_user.name, "Сотрудник"),
+                "venue_name": "Основная точка",
+                "shifts_count": 0,
+                "total_hours": Decimal("0.00"),
+                "base_amount": Decimal("0.00"),
+                "bonuses": Decimal("0.00"),
+                "deductions": Decimal("0.00"),
+            },
+        )
+        shift_venue_name = safe_text(getattr(getattr(shift, "venue", None), "name", None), "")
+        user_venue_name = safe_text(getattr(getattr(shift_user, "venue", None), "name", None), "")
+        row["venue_name"] = shift_venue_name or user_venue_name or "Основная точка"
+        row["shifts_count"] += 1
+        row["total_hours"] += safe_decimal(shift.total_hours)
+        row["base_amount"] += safe_decimal(shift.salary_earned)
+
+    for adjustment, adjustment_user in adjustments:
+        if adjustment_user is None:
+            continue
+        row = rows_by_user.setdefault(
+            adjustment.user_id,
+            {
+                "user_id": adjustment.user_id,
+                "user_name": safe_text(adjustment_user.name, "Сотрудник"),
+                "venue_name": safe_text(getattr(getattr(adjustment_user, "venue", None), "name", None), "Основная точка"),
+                "shifts_count": 0,
+                "total_hours": Decimal("0.00"),
+                "base_amount": Decimal("0.00"),
+                "bonuses": Decimal("0.00"),
+                "deductions": Decimal("0.00"),
+            },
+        )
+        if adjustment.type == AdjustmentType.bonus:
+            row["bonuses"] += safe_decimal(adjustment.amount)
+        else:
+            row["deductions"] += safe_decimal(adjustment.amount)
+
+    preview_rows = [
+        PayrollPreviewRow(
+            **row,
+            total_amount=calculate_payout_total(
+                row["base_amount"], row["bonuses"], row["deductions"]
+            ),
+        )
+        for row in rows_by_user.values()
+        if row["shifts_count"] > 0 or row["bonuses"] or row["deductions"]
+    ]
+    preview_rows.sort(key=lambda row: (row.user_name.lower(), row.user_id.hex))
+
+    total_hours = sum((row.total_hours for row in preview_rows), Decimal("0.00"))
+    total_base_amount = sum((row.base_amount for row in preview_rows), Decimal("0.00"))
+    total_bonuses = sum((row.bonuses for row in preview_rows), Decimal("0.00"))
+    total_deductions = sum((row.deductions for row in preview_rows), Decimal("0.00"))
+
+    return PayrollPreviewOut(
+        period_start=period_start,
+        period_end=period_end,
+        venue_id=venue_id,
+        employees_count=len(preview_rows),
+        shifts_count=sum(row.shifts_count for row in preview_rows),
+        total_hours=total_hours,
+        total_base_amount=total_base_amount,
+        total_bonuses=total_bonuses,
+        total_deductions=total_deductions,
+        total_amount=calculate_payout_total(
+            total_base_amount, total_bonuses, total_deductions
+        ),
+        rows=preview_rows,
+    )
+
 
 @router.post("/expenses", response_model=ExpenseOut)
 async def create_expense(
