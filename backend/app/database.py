@@ -51,7 +51,6 @@ async def init_db():
         await conn.execute(text("""
             DO $$
             DECLARE
-                has_admin_role boolean := false;
                 has_barista_role boolean := false;
             BEGIN
                 IF EXISTS (
@@ -67,20 +66,10 @@ async def init_db():
                         SELECT 1
                         FROM pg_enum enum_value
                         JOIN pg_type enum_type ON enum_value.enumtypid = enum_type.oid
-                        WHERE enum_type.typname = 'user_role' AND enum_value.enumlabel = 'admin'
-                    ) INTO has_admin_role;
-
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM pg_enum enum_value
-                        JOIN pg_type enum_type ON enum_value.enumtypid = enum_type.oid
                         WHERE enum_type.typname = 'user_role' AND enum_value.enumlabel = 'barista'
                     ) INTO has_barista_role;
 
-                    IF has_admin_role THEN
-                        UPDATE users SET role = 'admin' WHERE role::text = 'owner';
-                    END IF;
-
+                    -- owner is a current role and must never be rewritten at startup.
                     IF has_barista_role THEN
                         UPDATE users SET role = 'barista' WHERE role::text = 'employee';
                     END IF;
