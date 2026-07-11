@@ -23,6 +23,7 @@ import {
   AuditLog,
   PayrollPreview,
   PayrollRunDetail,
+  PayrollRunItem,
   PayrollRunListItem,
   Shift,
   User,
@@ -31,6 +32,8 @@ import {
   createUser,
   createVenue,
   createPayrollRun,
+  cancelPayrollRun,
+  createPayrollPayment,
   deactivateVenue,
   deleteUser,
   getAuditLogs,
@@ -38,6 +41,7 @@ import {
   getPayrollRun,
   getPayrollRunPreview,
   getPayrollRuns,
+  finalizePayrollRun,
   getUsers,
   getVenues,
   updateShift,
@@ -497,8 +501,14 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [previewLoading, setPreviewLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [paymentItem, setPaymentItem] = useState<PayrollRunItem | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentComment, setPaymentComment] = useState('');
 
   const loadRuns = async () => {
     try {
@@ -583,6 +593,95 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
       setError(getPayrollRunError(err));
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const refreshSelectedRun = async (runId: string) => {
+    const updated = await getPayrollRun(runId);
+    setSelectedRun(updated);
+    await loadRuns();
+    return updated;
+  };
+
+  const handleFinalize = async () => {
+    if (!selectedRun || !canCreate || selectedRun.status !== 'draft') return;
+    if (!window.confirm('Зафиксировать расчёт? После этого изменения смен не повлияют на сохранённые суммы.')) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      setActionLoading(true);
+      await finalizePayrollRun(selectedRun.id);
+      await refreshSelectedRun(selectedRun.id);
+      setSuccess('Расчёт зафиксирован.');
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!selectedRun || !canCreate || selectedRun.status !== 'draft') return;
+    if (!window.confirm('Отменить расчёт? Он останется в истории и не будет доступен для оплаты.')) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      setActionLoading(true);
+      await cancelPayrollRun(selectedRun.id);
+      await refreshSelectedRun(selectedRun.id);
+      setSuccess('Расчёт отменён.');
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openPaymentForm = (item: PayrollRunItem) => {
+    setPaymentItem(item);
+    setPaymentAmount(String(item.remaining_amount || '0'));
+    setPaymentDate(new Date().toISOString().slice(0, 10));
+    setPaymentMethod('');
+    setPaymentComment('');
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handlePayment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedRun || !paymentItem || !canCreate || selectedRun.status !== 'finalized') return;
+    const amount = Number(paymentAmount);
+    const remaining = Number(paymentItem.remaining_amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Введите сумму выплаты больше нуля.');
+      return;
+    }
+    if (amount > remaining) {
+      setError('Сумма выплаты не может быть больше остатка.');
+      return;
+    }
+    if (!paymentDate) {
+      setError('Укажите дату выплаты.');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    try {
+      setActionLoading(true);
+      await createPayrollPayment(selectedRun.id, {
+        user_id: paymentItem.user_id,
+        amount,
+        payment_date: paymentDate,
+        method: paymentMethod.trim() || undefined,
+        comment: paymentComment.trim() || undefined,
+      });
+      await refreshSelectedRun(selectedRun.id);
+      setPaymentItem(null);
+      setSuccess('Выплата записана.');
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -741,6 +840,31 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             </div>
             <button type="button" onClick={() => setSelectedRun(null)} className="text-xs text-tg-hint">Закрыть</button>
           </div>
+          {canCreate && selectedRun.status === 'draft' && (
+            <div className="flex flex-col gap-2 border-t border-tg-hint/10 pt-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleFinalize}
+                disabled={actionLoading}
+                className="flex-1 rounded-xl bg-tg-primary px-3 py-2.5 text-xs font-semibold text-tg-button-text disabled:opacity-60"
+              >
+                {actionLoading ? 'Сохраняем…' : 'Зафиксировать расчёт'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={actionLoading}
+                className="flex-1 rounded-xl surface-muted px-3 py-2.5 text-xs font-semibold text-tg-text disabled:opacity-60"
+              >
+                Отменить расчёт
+              </button>
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2 border-t border-tg-hint/10 pt-3 text-xs">
+            <div><p className="text-tg-hint">Начислено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(selectedRun.total_amount)}</p></div>
+            <div><p className="text-tg-hint">Выплачено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(selectedRun.total_paid)}</p></div>
+            <div><p className="text-tg-hint">Осталось</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency((selectedRun.items || []).reduce((total, item) => total + Number(item.remaining_amount || 0), 0))}</p></div>
+          </div>
           <div className="space-y-2">
             {(selectedRun.items || []).map((item) => (
               <div key={item.id} className="surface-muted rounded-xl p-3">
@@ -748,14 +872,53 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                   <p className="text-sm font-medium text-tg-text">{item.user_name || 'Сотрудник'}</p>
                   <p className="text-sm font-semibold text-tg-text">{formatCurrency(item.final_amount)}</p>
                 </div>
-                <p className="mt-1 text-xs text-tg-hint">{item.approved_shifts_count} смен · {formatHours(item.approved_hours)} · Выплачено {formatCurrency(item.paid_amount)} · Осталось {formatCurrency(item.remaining_amount)}</p>
+                <p className="mt-1 text-xs text-tg-hint">{item.approved_shifts_count} смен · {formatHours(item.approved_hours)}</p>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                  <span className="text-tg-hint">Начислено <b className="block mt-0.5 text-tg-text">{formatCurrency(item.final_amount)}</b></span>
+                  <span className="text-tg-hint">Выплачено <b className="block mt-0.5 text-tg-text">{formatCurrency(item.paid_amount)}</b></span>
+                  <span className="text-tg-hint">Осталось <b className="block mt-0.5 text-tg-text">{formatCurrency(item.remaining_amount)}</b></span>
+                </div>
+                {canCreate && selectedRun.status === 'finalized' && Number(item.remaining_amount || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openPaymentForm(item)}
+                    disabled={actionLoading}
+                    className="mt-3 w-full rounded-xl bg-tg-primary px-3 py-2.5 text-xs font-semibold text-tg-button-text disabled:opacity-60"
+                  >
+                    Записать выплату
+                  </button>
+                )}
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between border-t border-tg-hint/10 pt-3 text-sm">
-            <span className="text-tg-hint">Итого начислено</span>
-            <b className="text-tg-text">{formatCurrency(selectedRun.total_amount)}</b>
-          </div>
+          {paymentItem && selectedRun.status === 'finalized' && canCreate && (
+            <form onSubmit={handlePayment} className="surface-muted space-y-3 rounded-xl p-3">
+              <div>
+                <h4 className="text-sm font-semibold text-tg-text">Записать выплату</h4>
+                <p className="mt-1 text-xs text-tg-hint">{paymentItem.user_name || 'Сотрудник'} · остаток {formatCurrency(paymentItem.remaining_amount)}</p>
+              </div>
+              <label className="block text-xs text-tg-hint">
+                Сумма
+                <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none" disabled={actionLoading} />
+              </label>
+              <label className="block text-xs text-tg-hint">
+                Дата выплаты
+                <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none" disabled={actionLoading} />
+              </label>
+              <label className="block text-xs text-tg-hint">
+                Способ выплаты <span className="text-tg-hint">(необязательно)</span>
+                <input type="text" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} placeholder="Например: наличные или перевод" className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint" disabled={actionLoading} />
+              </label>
+              <label className="block text-xs text-tg-hint">
+                Комментарий <span className="text-tg-hint">(необязательно)</span>
+                <textarea value={paymentComment} onChange={(event) => setPaymentComment(event.target.value)} placeholder="Комментарий к выплате" rows={2} className="mt-1.5 w-full resize-none rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint" disabled={actionLoading} />
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" disabled={actionLoading} className="flex-1 rounded-xl bg-tg-primary px-3 py-2.5 text-xs font-semibold text-tg-button-text disabled:opacity-60">{actionLoading ? 'Сохраняем…' : 'Записать выплату'}</button>
+                <button type="button" onClick={() => setPaymentItem(null)} disabled={actionLoading} className="rounded-xl surface-card px-3 py-2.5 text-xs font-semibold text-tg-text disabled:opacity-60">Отмена</button>
+              </div>
+            </form>
+          )}
         </section>
       )}
     </div>

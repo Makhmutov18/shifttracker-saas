@@ -482,6 +482,55 @@ export async function getPayrollRun(payrollRunId: string): Promise<PayrollRunDet
   return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}`);
 }
 
+export async function finalizePayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
+  return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}/finalize`, {
+    method: 'POST',
+  });
+}
+
+export async function cancelPayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
+  return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}/cancel`, {
+    method: 'POST',
+  });
+}
+
+export interface CreatePayrollPaymentRequest {
+  user_id: string;
+  amount: number;
+  payment_date: string;
+  method?: string;
+  comment?: string;
+}
+
+export interface PayrollPaymentResult {
+  payment: {
+    id: string;
+    payroll_run_id: string;
+    user_id: string;
+    amount: string;
+    payment_date: string;
+    method: string | null;
+    comment: string | null;
+    created_by_id: string;
+    created_at: string;
+  };
+  user_id: string;
+  paid_amount: string;
+  remaining_amount: string;
+  total_paid: string;
+  status: string;
+}
+
+export async function createPayrollPayment(
+  payrollRunId: string,
+  data: CreatePayrollPaymentRequest,
+): Promise<PayrollPaymentResult> {
+  return request<PayrollPaymentResult>(`/payroll-runs/${payrollRunId}/payments`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 // Admin
 
 export interface AdminCreateUserRequest {
