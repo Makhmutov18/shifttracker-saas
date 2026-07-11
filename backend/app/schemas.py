@@ -340,3 +340,24 @@ class PayrollRunListItem(BaseModel):
     created_by_id: uuid.UUID
     created_by_name: Optional[str] = None
     created_at: datetime
+
+
+class PersonalPayrollPaymentRead(BaseModel):
+    amount: Decimal
+    payment_date: date
+    method: Optional[str] = None
+    comment: Optional[str] = None
+    created_at: datetime
+
+
+class PersonalPayrollRunRead(BaseModel):
+    payroll_run_id: uuid.UUID
+    title: str
+    period_start: date
+    period_end: date
+    venue_name: str
+    status: str
+    final_amount: Decimal = Decimal("0.00")
+    paid_amount: Decimal = Decimal("0.00")
+    remaining_amount: Decimal = Decimal("0.00")
+    payments: list[PersonalPayrollPaymentRead] = Field(default_factory=list)

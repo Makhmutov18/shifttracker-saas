@@ -24,7 +24,7 @@ from app.schemas import (
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
-    PayrollPaymentCreate, PayrollPaymentResult,
+    PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
 )
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
@@ -894,6 +894,61 @@ async def list_payroll_runs(
         )
         for run in runs
     ]
+
+
+@router.get("/me/payroll-runs", response_model=list[PersonalPayrollRunRead])
+async def list_my_payroll_runs(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Return only finalized or paid payroll snapshots belonging to the current user."""
+    result = await session.execute(
+        select(PayrollRun)
+        .join(PayrollRunItem, PayrollRunItem.payroll_run_id == PayrollRun.id)
+        .options(
+            selectinload(PayrollRun.items),
+            selectinload(PayrollRun.payments),
+            selectinload(PayrollRun.venue),
+        )
+        .where(
+            PayrollRunItem.user_id == user.id,
+            PayrollRun.status.in_((PayrollRunStatus.finalized, PayrollRunStatus.paid)),
+        )
+        .order_by(PayrollRun.period_end.desc(), PayrollRun.created_at.desc())
+    )
+    runs = result.unique().scalars().all()
+    personal_runs: list[PersonalPayrollRunRead] = []
+    for run in runs:
+        item = next((run_item for run_item in run.items if run_item.user_id == user.id), None)
+        if item is None:
+            continue
+        payments = [
+            PersonalPayrollPaymentRead(
+                amount=payment.amount,
+                payment_date=payment.payment_date,
+                method=payment.method,
+                comment=payment.comment,
+                created_at=payment.created_at,
+            )
+            for payment in run.payments
+            if payment.user_id == user.id
+        ]
+        payments.sort(key=lambda payment: (payment.payment_date, payment.created_at), reverse=True)
+        personal_runs.append(
+            PersonalPayrollRunRead(
+                payroll_run_id=run.id,
+                title=run.title,
+                period_start=run.period_start,
+                period_end=run.period_end,
+                venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Основная точка",
+                status=run.status.value if hasattr(run.status, "value") else str(run.status),
+                final_amount=item.final_amount,
+                paid_amount=item.paid_amount,
+                remaining_amount=item.remaining_amount,
+                payments=payments,
+            )
+        )
+    return personal_runs
 
 
 @router.get("/payroll-runs/{payroll_run_id}", response_model=PayrollRunRead)
