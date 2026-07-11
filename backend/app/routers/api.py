@@ -55,6 +55,10 @@ def _can_view_general_audit(user: User) -> bool:
     return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
 
 
+def _can_send_shift_reminders(user: User) -> bool:
+    return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
+
+
 def _serialize_audit_logs(logs: list[AuditLog]) -> list[AuditLogOut]:
     return [
         AuditLogOut(
@@ -75,11 +79,11 @@ def _serialize_audit_logs(logs: list[AuditLog]) -> list[AuditLogOut]:
 
 
 async def get_current_user(
-    init_data: str = Header(..., alias="X-Init-Data"),
+    init_data: str | None = Header(None, alias="X-Init-Data"),
     session: AsyncSession = Depends(get_session),
 ) -> User:
     """Dependency: validates initData and returns the authenticated user."""
-    if not validate_init_data(init_data):
+    if not init_data or not validate_init_data(init_data):
         raise HTTPException(status_code=401, detail="Invalid init data")
 
     user_data = extract_user_from_init_data(init_data)
@@ -1294,8 +1298,15 @@ async def export_csv(
 @router.post("/reminders/shifts")
 async def send_shift_reminders(
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Send reminders to users who haven't logged today's shift. Call via cron at 21:00."""
+    if not _can_send_shift_reminders(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Отправка напоминаний доступна только пользователям с правом управления командой.",
+        )
+
     from app.notifications import send_shift_reminder
     from app.models import Shift as ShiftModel
 
