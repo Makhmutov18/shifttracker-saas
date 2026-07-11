@@ -920,6 +920,71 @@ async def get_payroll_run(
     )
 
 
+@router.post("/payroll-runs/{payroll_run_id}/finalize", response_model=PayrollRunRead)
+async def finalize_payroll_run(
+    payroll_run_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Only owners and admins can finalize payroll runs")
+
+    result = await session.execute(
+        select(PayrollRun)
+        .options(selectinload(PayrollRun.payments))
+        .where(PayrollRun.id == payroll_run_id)
+    )
+    run = result.scalar_one_or_none()
+    if run is None or not _payroll_run_is_visible(run, user):
+        raise HTTPException(status_code=404, detail="Payroll run not found")
+    if run.status != PayrollRunStatus.draft:
+        raise HTTPException(status_code=409, detail="Only draft payroll runs can be finalized")
+
+    run.status = PayrollRunStatus.finalized
+    run.finalized_at = datetime.now(timezone.utc)
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    return await get_payroll_run(payroll_run_id=payroll_run_id, user=user, session=session)
+
+
+@router.post("/payroll-runs/{payroll_run_id}/cancel", response_model=PayrollRunRead)
+async def cancel_payroll_run(
+    payroll_run_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Only owners and admins can cancel payroll runs")
+
+    result = await session.execute(
+        select(PayrollRun)
+        .options(selectinload(PayrollRun.payments))
+        .where(PayrollRun.id == payroll_run_id)
+    )
+    run = result.scalar_one_or_none()
+    if run is None or not _payroll_run_is_visible(run, user):
+        raise HTTPException(status_code=404, detail="Payroll run not found")
+    if run.status == PayrollRunStatus.paid:
+        raise HTTPException(status_code=409, detail="Paid payroll runs cannot be changed")
+    if run.status == PayrollRunStatus.cancelled:
+        raise HTTPException(status_code=409, detail="Payroll run is already cancelled")
+    if run.status == PayrollRunStatus.finalized and run.payments:
+        raise HTTPException(status_code=409, detail="Finalized payroll runs with payments cannot be cancelled")
+
+    run.status = PayrollRunStatus.cancelled
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    return await get_payroll_run(payroll_run_id=payroll_run_id, user=user, session=session)
+
+
 @router.post("/expenses", response_model=ExpenseOut)
 async def create_expense(
     expense_data: ExpenseCreate,
