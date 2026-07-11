@@ -96,6 +96,20 @@ def calculate_salary(
     return hourly_part
 
 
+def calculate_payout_total(
+    base_amount: Decimal,
+    bonus_amount: Decimal | None = None,
+    deduction_amount: Decimal | None = None,
+) -> Decimal:
+    """Return payroll accrual: approved base plus bonuses minus deductions."""
+    total = (
+        safe_decimal(base_amount)
+        + safe_decimal(bonus_amount)
+        - safe_decimal(deduction_amount)
+    )
+    return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def get_current_month_range() -> tuple[datetime, datetime]:
     """Returns (start_of_month, end_of_month) in UTC."""
     now = datetime.now(timezone.utc)

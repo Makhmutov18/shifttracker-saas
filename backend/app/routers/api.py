@@ -26,6 +26,7 @@ from app.utils import (
     calculate_salary,
     normalize_pay_model,
     safe_decimal,
+    calculate_payout_total,
     safe_text,
     shift_status_label,
 )
@@ -519,7 +520,9 @@ async def payroll_summary(
     total_penalties = Decimal("0.00")
 
     for row in rows_by_user.values():
-        total_payout = row["shift_payout"] + row["bonuses"] - row["penalties"]
+        total_payout = calculate_payout_total(
+            row["shift_payout"], row["bonuses"], row["penalties"]
+        )
         total_hours += row["total_hours"]
         total_shift_payout += row["shift_payout"]
         total_bonuses += row["bonuses"]
@@ -559,7 +562,9 @@ async def payroll_summary(
         total_shift_payout=total_shift_payout,
         total_bonuses=total_bonuses,
         total_penalties=total_penalties,
-        total_payout=total_shift_payout + total_bonuses - total_penalties,
+        total_payout=calculate_payout_total(
+            total_shift_payout, total_bonuses, total_penalties
+        ),
         rows=rows,
     )
 
@@ -636,7 +641,7 @@ async def monthly_stats(
     shift_result = await session.execute(shifts_query)
     total_earned, total_hours, total_cashier_hours, shifts_count = shift_result.one()
 
-    # Expenses
+    # Expenses are operational records and are intentionally not payroll deductions.
     expenses_query = select(
         func.coalesce(func.sum(Expense.amount), 0),
     ).where(
@@ -670,6 +675,7 @@ async def monthly_stats(
     )
     penalties_result = await session.execute(penalties_query)
     total_penalties = penalties_result.scalar() or Decimal("0.00")
+    total_payout = calculate_payout_total(total_earned, total_bonuses, total_penalties)
 
     return MonthlyStats(
         total_earned=Decimal(str(total_earned)),
@@ -678,6 +684,7 @@ async def monthly_stats(
         total_expenses=Decimal(str(total_expenses)),
         total_bonuses=Decimal(str(total_bonuses)),
         total_penalties=Decimal(str(total_penalties)),
+        total_payout=total_payout,
         shifts_count=int(shifts_count),
     )
 
@@ -1213,7 +1220,9 @@ async def export_csv(
         total_bonuses = Decimal("0.00")
         total_penalties = Decimal("0.00")
         for totals in sorted(user_totals.values(), key=lambda item: str(item["name"]).lower()):
-            net = totals["shift_pay"] + totals["bonuses"] - totals["penalties"]
+            net = calculate_payout_total(
+                totals["shift_pay"], totals["bonuses"], totals["penalties"]
+            )
             total_shifts += int(totals["shifts_count"])
             total_hours += totals["hours"]
             total_shift_pay += totals["shift_pay"]
@@ -1249,7 +1258,11 @@ async def export_csv(
         ws_summary.cell(
             row=row,
             column=7,
-            value=float((total_shift_pay + total_bonuses - total_penalties).quantize(Decimal("0.01"))),
+            value=float(
+                calculate_payout_total(
+                    total_shift_pay, total_bonuses, total_penalties
+                )
+            ),
         )
         for col in range(1, 8):
             cell = ws_summary.cell(row=row, column=col)

@@ -48,12 +48,7 @@ export default function StatsWidget({ stats, loading }: Props) {
     },
   ];
 
-  const netIncome = (
-    parseFloat(stats.total_earned) +
-    parseFloat(stats.total_bonuses) -
-    parseFloat(stats.total_penalties) -
-    parseFloat(stats.total_expenses)
-  ).toFixed(2);
+  const netIncome = parseFloat(stats.total_payout).toFixed(2);
 
   return (
     <div className="space-y-3">

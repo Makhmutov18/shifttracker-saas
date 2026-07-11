@@ -131,6 +131,7 @@ class MonthlyStats(BaseModel):
     total_expenses: Decimal = Decimal("0.00")
     total_bonuses: Decimal = Decimal("0.00")
     total_penalties: Decimal = Decimal("0.00")
+    total_payout: Decimal = Decimal("0.00")
     shifts_count: int = 0
 
 

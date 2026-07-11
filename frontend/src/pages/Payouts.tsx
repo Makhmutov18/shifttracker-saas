@@ -199,12 +199,7 @@ export default function Payouts({ user }: Props) {
       return 0;
     }
 
-    return (
-      toNumber(monthStats.total_earned) +
-      toNumber(monthStats.total_bonuses) -
-      toNumber(monthStats.total_penalties) -
-      toNumber(monthStats.total_expenses)
-    );
+    return toNumber(monthStats.total_payout);
   }, [monthStats]);
 
   const totalHours = monthStats ? monthStats.total_hours : '0';

@@ -66,11 +66,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
   const [summary, setSummary] = useState<Pick<PayrollSummary, 'pending_shifts_count' | 'approved_shifts_count'> | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const totalEarned = stats ? toNumber(stats.total_earned) : 0;
-  const totalBonuses = stats ? toNumber(stats.total_bonuses) : 0;
-  const totalPenalties = stats ? toNumber(stats.total_penalties) : 0;
-  const totalExpenses = stats ? toNumber(stats.total_expenses) : 0;
-  const payout = (totalEarned + totalBonuses - totalPenalties - totalExpenses).toFixed(2);
+  const payout = stats ? toNumber(stats.total_payout).toFixed(2) : '0.00';
   const statusLabel = loading ? 'Сводка обновляется' : error ? 'Сводка недоступна' : 'За текущий месяц';
   const latestShift = useMemo(() => {
     return [...(shifts || [])]

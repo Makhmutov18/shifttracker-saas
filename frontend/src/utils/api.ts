@@ -329,6 +329,7 @@ export interface MonthlyStats {
   total_expenses: string;
   total_bonuses: string;
   total_penalties: string;
+  total_payout: string;
   shifts_count: number;
 }
 

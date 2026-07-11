@@ -146,14 +146,7 @@ export default function Profile({ user, onBack, themeMode, onThemeModeChange }: 
     };
   }, []);
 
-  const netIncome = stats
-    ? (
-        parseFloat(stats.total_earned) +
-        parseFloat(stats.total_bonuses) -
-        parseFloat(stats.total_penalties) -
-        parseFloat(stats.total_expenses)
-      ).toFixed(2)
-    : '0.00';
+  const netIncome = stats ? parseFloat(stats.total_payout).toFixed(2) : '0.00';
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
