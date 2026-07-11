@@ -4,7 +4,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import io
 import openpyxl
 from urllib.parse import quote
@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 from app.database import get_session
 from app.models import (
     User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
-    PayrollRun, PayrollRunItem, PayrollRunStatus,
+    PayrollRun, PayrollRunItem, PayrollRunStatus, PayrollPayment,
 )
 from app.permissions import has_permission
 from app.schemas import (
@@ -23,6 +23,7 @@ from app.schemas import (
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
+    PayrollPaymentCreate, PayrollPaymentResult,
 )
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
@@ -983,6 +984,109 @@ async def cancel_payroll_run(
         raise
 
     return await get_payroll_run(payroll_run_id=payroll_run_id, user=user, session=session)
+
+
+@router.post("/payroll-runs/{payroll_run_id}/payments", response_model=PayrollPaymentResult, status_code=201)
+async def create_payroll_payment(
+    payroll_run_id: uuid.UUID,
+    payment_data: PayrollPaymentCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Only owners and admins can record payroll payments")
+
+    try:
+        run_result = await session.execute(
+            select(PayrollRun)
+            .with_for_update()
+            .where(PayrollRun.id == payroll_run_id)
+        )
+        run = run_result.scalar_one_or_none()
+        if run is None or not _payroll_run_is_visible(run, user):
+            raise HTTPException(status_code=404, detail="Payroll run not found")
+        if run.status != PayrollRunStatus.finalized:
+            raise HTTPException(status_code=409, detail="Payments can only be recorded for finalized payroll runs")
+
+        item_result = await session.execute(
+            select(PayrollRunItem)
+            .with_for_update()
+            .where(
+                PayrollRunItem.payroll_run_id == payroll_run_id,
+                PayrollRunItem.user_id == payment_data.user_id,
+            )
+        )
+        item = item_result.scalar_one_or_none()
+        if item is None:
+            raise HTTPException(status_code=404, detail="Employee is not included in this payroll run")
+
+        amount = safe_decimal(payment_data.amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        current_paid = safe_decimal(item.paid_amount)
+        current_remaining = safe_decimal(item.remaining_amount)
+        if current_paid < 0 or current_remaining < 0:
+            raise HTTPException(status_code=409, detail="Payroll item has invalid payment amounts")
+        if amount <= 0:
+            raise HTTPException(status_code=422, detail="Payment amount must be greater than zero")
+        if amount > current_remaining:
+            raise HTTPException(status_code=409, detail="Payment amount exceeds the employee remaining amount")
+
+        new_paid = current_paid + amount
+        new_remaining = current_remaining - amount
+        new_total_paid = safe_decimal(run.total_paid) + amount
+        if new_total_paid > safe_decimal(run.total_amount):
+            raise HTTPException(status_code=409, detail="Payment amount exceeds the payroll run total")
+
+        item.paid_amount = new_paid
+        item.remaining_amount = new_remaining
+        run.total_paid = new_total_paid
+
+        all_items_result = await session.execute(
+            select(PayrollRunItem)
+            .with_for_update()
+            .where(PayrollRunItem.payroll_run_id == payroll_run_id)
+        )
+        all_items = all_items_result.scalars().all()
+        if all_items and all(safe_decimal(row.remaining_amount) == Decimal("0.00") for row in all_items):
+            run.status = PayrollRunStatus.paid
+            run.paid_at = datetime.now(timezone.utc)
+
+        payment = PayrollPayment(
+            payroll_run_id=payroll_run_id,
+            user_id=payment_data.user_id,
+            amount=amount,
+            payment_date=payment_data.payment_date,
+            method=payment_data.method,
+            comment=payment_data.comment,
+            created_by_id=user.id,
+        )
+        session.add(payment)
+        await session.flush()
+        await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
+    except Exception:
+        await session.rollback()
+        raise
+
+    return PayrollPaymentResult(
+        payment=PayrollPaymentRead(
+            id=payment.id,
+            payroll_run_id=payment.payroll_run_id,
+            user_id=payment.user_id,
+            amount=payment.amount,
+            payment_date=payment.payment_date,
+            method=payment.method,
+            comment=payment.comment,
+            created_by_id=payment.created_by_id,
+            created_at=payment.created_at,
+        ),
+        user_id=item.user_id,
+        paid_amount=item.paid_amount,
+        remaining_amount=item.remaining_amount,
+        total_paid=run.total_paid,
+        status=run.status.value if hasattr(run.status, "value") else str(run.status),
+    )
 
 
 @router.post("/expenses", response_model=ExpenseOut)

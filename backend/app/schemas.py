@@ -271,6 +271,23 @@ class PayrollPaymentRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PayrollPaymentCreate(BaseModel):
+    user_id: uuid.UUID
+    amount: Decimal = Field(..., gt=0)
+    payment_date: date
+    method: Optional[str] = None
+    comment: Optional[str] = None
+
+
+class PayrollPaymentResult(BaseModel):
+    payment: PayrollPaymentRead
+    user_id: uuid.UUID
+    paid_amount: Decimal = Decimal("0.00")
+    remaining_amount: Decimal = Decimal("0.00")
+    total_paid: Decimal = Decimal("0.00")
+    status: str
+
+
 class PayrollScheduleSettingsRead(BaseModel):
     id: uuid.UUID
     venue_id: Optional[uuid.UUID] = None
