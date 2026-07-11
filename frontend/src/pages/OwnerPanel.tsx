@@ -2,6 +2,7 @@
 import {
   AlertTriangle,
   Building2,
+  Calculator,
   Check,
   CheckCircle,
   Copy,
@@ -20,16 +21,23 @@ import {
 import {
   AdminCreateUserResponse,
   AuditLog,
+  PayrollPreview,
+  PayrollRunDetail,
+  PayrollRunListItem,
   Shift,
   User,
   Venue,
   createAdjustment,
   createUser,
   createVenue,
+  createPayrollRun,
   deactivateVenue,
   deleteUser,
   getAuditLogs,
   getPendingShifts,
+  getPayrollRun,
+  getPayrollRunPreview,
+  getPayrollRuns,
   getUsers,
   getVenues,
   updateShift,
@@ -54,7 +62,7 @@ interface Props {
   onInitialTabConsumed?: () => void;
 }
 
-type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
+type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues' | 'payroll';
 
 type ShiftDraft = {
   start_time: string;
@@ -381,6 +389,8 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
   const canApprove = hasPermission(user, 'can_approve_shifts') || hasPermission(user, 'can_edit_team_shifts');
   const canManageTeam = hasPermission(user, 'can_manage_team');
   const canManageAdjustments = hasPermission(user, 'can_manage_adjustments');
+  const canViewPayroll = hasPermission(user, 'can_view_team_payroll');
+  const canCreatePayroll = user.role === 'owner' || user.role === 'admin';
   const canViewAudit = canManageTeam;
 
   const visibleTabs: { id: Tab; label: string; icon: React.ReactNode; visible: boolean }[] = [
@@ -390,6 +400,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
     { id: 'audit', label: 'История', icon: <History className="w-4 h-4 inline mr-1" />, visible: canViewAudit },
     { id: 'team', label: 'Команда', icon: <Users className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
     { id: 'venues', label: 'Точки', icon: <Building2 className="w-4 h-4 inline mr-1" />, visible: canManageTeam },
+    { id: 'payroll', label: 'Расчёты', icon: <Calculator className="w-4 h-4 inline mr-1" />, visible: canViewPayroll },
   ];
 
   const activeTabs = visibleTabs.filter((item) => item.visible);
@@ -442,7 +453,311 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
         {tab === 'audit' && canViewAudit && <AuditTab />}
         {tab === 'team' && canManageTeam && <TeamTab user={user} />}
         {tab === 'venues' && canManageTeam && <VenuesTab />}
+        {tab === 'payroll' && canViewPayroll && (
+          <PayrollRunsTab
+            canCreate={canCreatePayroll}
+            userVenueId={user.venue_id}
+            restrictToVenue={!canCreatePayroll}
+          />
+        )}
       </OwnerPanelBoundary>
+    </div>
+  );
+}
+
+function getPayrollRunStatusLabel(status: string) {
+  return {
+    draft: 'Черновик',
+    finalized: 'Зафиксирован',
+    paid: 'Выплачен',
+    cancelled: 'Отменён',
+  }[status] || 'Статус не указан';
+}
+
+function getPayrollRunError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (/already included|already exists|conflict|duplicate/i.test(message)) {
+    return 'Часть источников уже включена в другой активный расчёт.';
+  }
+  return message || 'Не удалось выполнить операцию.';
+}
+
+function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate: boolean; userVenueId: string; restrictToVenue: boolean }) {
+  const now = new Date();
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const defaultEnd = now.toISOString().slice(0, 10);
+  const [periodStart, setPeriodStart] = useState(defaultStart);
+  const [periodEnd, setPeriodEnd] = useState(defaultEnd);
+  const [venueId, setVenueId] = useState('');
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [preview, setPreview] = useState<PayrollPreview | null>(null);
+  const [runs, setRuns] = useState<PayrollRunListItem[]>([]);
+  const [selectedRun, setSelectedRun] = useState<PayrollRunDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const loadRuns = async () => {
+    try {
+      const data = await getPayrollRuns(venueId || (restrictToVenue ? userVenueId : undefined));
+      setRuns(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      const [runsResult, venuesResult] = await Promise.allSettled([
+        getPayrollRuns(restrictToVenue ? userVenueId : undefined),
+        getVenues(false),
+      ]);
+      if (!active) return;
+      if (runsResult.status === 'fulfilled') {
+        setRuns(Array.isArray(runsResult.value) ? runsResult.value : []);
+      } else {
+        setError(getPayrollRunError(runsResult.reason));
+      }
+      if (venuesResult.status === 'fulfilled') {
+        setVenues(Array.isArray(venuesResult.value) ? venuesResult.value.filter((venue) => venue.is_active) : []);
+      }
+      setLoading(false);
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [restrictToVenue, userVenueId]);
+
+  const handlePreview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setPreview(null);
+    if (!periodStart || !periodEnd || periodStart > periodEnd) {
+      setError('Проверьте даты периода.');
+      return;
+    }
+    try {
+      setPreviewLoading(true);
+      const data = await getPayrollRunPreview(periodStart, periodEnd, venueId || undefined);
+      setPreview(data);
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!preview || !canCreate) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      setSaving(true);
+      await createPayrollRun({
+        period_start: periodStart,
+        period_end: periodEnd,
+        venue_id: venueId || undefined,
+      });
+      setSuccess('Черновик расчёта сформирован.');
+      await loadRuns();
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenDetails = async (runId: string) => {
+    setError(null);
+    try {
+      setDetailsLoading(true);
+      setSelectedRun(await getPayrollRun(runId));
+    } catch (err) {
+      setError(getPayrollRunError(err));
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 pb-6">
+      <section className="surface-card rounded-2xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="surface-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-tg-primary">
+            <Calculator className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-tg-text">Расчёты выплат</h2>
+            <p className="mt-1 text-sm text-tg-hint">Сформируйте расчёт начислений за выбранный период</p>
+          </div>
+        </div>
+        <form onSubmit={handlePreview} className="mt-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-tg-hint">
+              Начало периода
+              <input
+                type="date"
+                value={periodStart}
+                onChange={(event) => setPeriodStart(event.target.value)}
+                className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
+              />
+            </label>
+            <label className="text-xs text-tg-hint">
+              Конец периода
+              <input
+                type="date"
+                value={periodEnd}
+                onChange={(event) => setPeriodEnd(event.target.value)}
+                className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
+              />
+            </label>
+          </div>
+          <label className="block text-xs text-tg-hint">
+            Точка
+            <select
+              value={venueId}
+              onChange={(event) => setVenueId(event.target.value)}
+              className="mt-1.5 w-full appearance-none rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
+            >
+              <option value="">Все точки</option>
+              {venues.map((venue) => (
+                <option key={venue.id} value={venue.id}>{venue.name}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={previewLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-tg-primary py-3 text-sm font-semibold text-tg-button-text disabled:opacity-60"
+          >
+            {previewLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
+            Предварительный расчёт
+          </button>
+        </form>
+      </section>
+
+      {error && <div className="surface-card rounded-xl p-3 text-sm text-rose-600 dark:text-rose-200">{error}</div>}
+      {success && <div className="surface-card rounded-xl p-3 text-sm text-emerald-600 dark:text-emerald-200">{success}</div>}
+
+      {preview && (
+        <section className="surface-card space-y-3 rounded-2xl p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-tg-text">Предварительный расчёт</h3>
+              <p className="mt-1 text-xs text-tg-hint">{formatDate(preview.period_start)} — {formatDate(preview.period_end)}</p>
+            </div>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={saving}
+                className="shrink-0 rounded-xl bg-tg-primary px-3 py-2.5 text-xs font-semibold text-tg-button-text disabled:opacity-60"
+              >
+                {saving ? 'Сохраняем…' : 'Сформировать черновик'}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Сотрудники</p><p className="mt-1 font-semibold text-tg-text">{preview.employees_count}</p></div>
+            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Смены</p><p className="mt-1 font-semibold text-tg-text">{preview.shifts_count}</p></div>
+            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Часы</p><p className="mt-1 font-semibold text-tg-text">{formatHours(preview.total_hours)}</p></div>
+            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Начислено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(preview.total_amount)}</p></div>
+          </div>
+          <div className="grid gap-2 text-sm text-tg-hint sm:grid-cols-3">
+            <span>База: <b className="text-tg-text">{formatCurrency(preview.total_base_amount)}</b></span>
+            <span>Бонусы: <b className="text-tg-text">{formatCurrency(preview.total_bonuses)}</b></span>
+            <span>Удержания: <b className="text-tg-text">{formatCurrency(preview.total_deductions)}</b></span>
+          </div>
+          {preview.rows.length === 0 ? (
+            <div className="surface-muted rounded-xl px-4 py-6 text-center text-sm text-tg-hint">За выбранный период начислений нет</div>
+          ) : (
+            <div className="space-y-2">
+              {preview.rows.map((row) => (
+                <div key={row.user_id} className="surface-muted rounded-xl p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-tg-text">{row.user_name || 'Сотрудник'}</p>
+                      <p className="mt-1 text-xs text-tg-hint">{row.venue_name || 'Основная точка'}</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-tg-text">{formatCurrency(row.total_amount)}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-tg-hint">{row.shifts_count} смен · {formatHours(row.total_hours)} · База {formatCurrency(row.base_amount)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-tg-text">Сохранённые расчёты</h3>
+          <button type="button" onClick={loadRuns} className="text-xs font-medium text-tg-primary">Обновить</button>
+        </div>
+        {loading ? (
+          <div className="animate-pulse space-y-2">{[1, 2, 3].map((item) => <div key={item} className="h-24 rounded-2xl surface-card" />)}</div>
+        ) : runs.length === 0 ? (
+          <div className="surface-card rounded-2xl px-4 py-8 text-center text-sm text-tg-hint">Расчётов пока нет</div>
+        ) : (
+          runs.map((run) => (
+            <button
+              key={run.id}
+              type="button"
+              onClick={() => handleOpenDetails(run.id)}
+              className="surface-card block w-full rounded-2xl p-4 text-left transition-transform active:scale-[0.99]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-tg-text">{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</p>
+                  <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Все точки'} · {formatDate(run.period_start)} — {formatDate(run.period_end)}</p>
+                </div>
+                <span className="shrink-0 rounded-full surface-muted px-2.5 py-1 text-[11px] font-medium text-tg-text">{getPayrollRunStatusLabel(run.status)}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <span className="text-tg-hint">Сотрудники <b className="block mt-0.5 text-tg-text">{run.employees_count}</b></span>
+                <span className="text-tg-hint">Начислено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_amount)}</b></span>
+                <span className="text-tg-hint">Выплачено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_paid)}</b></span>
+              </div>
+              <p className="mt-3 text-[11px] text-tg-hint">Создано: {formatDate(run.created_at)} · {run.created_by_name || 'Пользователь'}</p>
+            </button>
+          ))
+        )}
+      </section>
+
+      {detailsLoading && <div className="surface-card rounded-2xl p-4 text-sm text-tg-hint">Загружаем детали…</div>}
+      {selectedRun && !detailsLoading && (
+        <section className="surface-card space-y-3 rounded-2xl p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-tg-text">{selectedRun.title}</h3>
+              <p className="mt-1 text-xs text-tg-hint">{getPayrollRunStatusLabel(selectedRun.status)} · {selectedRun.venue_name || 'Все точки'}</p>
+            </div>
+            <button type="button" onClick={() => setSelectedRun(null)} className="text-xs text-tg-hint">Закрыть</button>
+          </div>
+          <div className="space-y-2">
+            {(selectedRun.items || []).map((item) => (
+              <div key={item.id} className="surface-muted rounded-xl p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-tg-text">{item.user_name || 'Сотрудник'}</p>
+                  <p className="text-sm font-semibold text-tg-text">{formatCurrency(item.final_amount)}</p>
+                </div>
+                <p className="mt-1 text-xs text-tg-hint">{item.approved_shifts_count} смен · {formatHours(item.approved_hours)} · Выплачено {formatCurrency(item.paid_amount)} · Осталось {formatCurrency(item.remaining_amount)}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between border-t border-tg-hint/10 pt-3 text-sm">
+            <span className="text-tg-hint">Итого начислено</span>
+            <b className="text-tg-text">{formatCurrency(selectedRun.total_amount)}</b>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

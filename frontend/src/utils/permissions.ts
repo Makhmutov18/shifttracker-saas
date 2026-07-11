@@ -130,6 +130,7 @@ export function canAccessOwnerPanel(user: Pick<User, 'role' | 'permissions'>): b
     effective.can_approve_shifts ||
     effective.can_edit_team_shifts ||
     effective.can_manage_team ||
-    effective.can_manage_adjustments
+    effective.can_manage_adjustments ||
+    effective.can_view_team_payroll
   );
 }

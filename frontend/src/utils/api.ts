@@ -375,6 +375,113 @@ export async function getPayrollSummary(month?: number, year?: number, venueId?:
   return request<PayrollSummary>(`/payroll/summary${qs ? `?${qs}` : ''}`);
 }
 
+export interface PayrollPreviewRow {
+  user_id: string;
+  user_name: string;
+  venue_name: string;
+  shifts_count: number;
+  total_hours: string;
+  base_amount: string;
+  bonuses: string;
+  deductions: string;
+  total_amount: string;
+}
+
+export interface PayrollPreview {
+  period_start: string;
+  period_end: string;
+  venue_id: string | null;
+  employees_count: number;
+  shifts_count: number;
+  total_hours: string;
+  total_base_amount: string;
+  total_bonuses: string;
+  total_deductions: string;
+  total_amount: string;
+  rows: PayrollPreviewRow[];
+}
+
+export interface PayrollRunListItem {
+  id: string;
+  title: string;
+  period_start: string;
+  period_end: string;
+  venue_id: string | null;
+  venue_name: string | null;
+  status: 'draft' | 'finalized' | 'paid' | 'cancelled' | string;
+  employees_count: number;
+  total_amount: string;
+  total_paid: string;
+  created_by_id: string;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface PayrollRunItem {
+  id: string;
+  payroll_run_id: string;
+  user_id: string;
+  user_name: string | null;
+  approved_shifts_count: number;
+  approved_hours: string;
+  base_amount: string;
+  bonus_amount: string;
+  deduction_amount: string;
+  final_amount: string;
+  paid_amount: string;
+  remaining_amount: string;
+  created_at: string;
+}
+
+export interface PayrollRunDetail extends PayrollRunListItem {
+  finalized_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  items: PayrollRunItem[];
+  payments: unknown[];
+}
+
+function payrollRunQuery(venueId?: string) {
+  const params = new URLSearchParams();
+  if (venueId) params.set('venue_id', venueId);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export async function getPayrollRunPreview(
+  periodStart: string,
+  periodEnd: string,
+  venueId?: string,
+): Promise<PayrollPreview> {
+  const params = new URLSearchParams({ period_start: periodStart, period_end: periodEnd });
+  if (venueId) params.set('venue_id', venueId);
+  return request<PayrollPreview>(`/payroll-runs/preview?${params.toString()}`);
+}
+
+export interface CreatePayrollRunRequest {
+  title?: string;
+  period_start: string;
+  period_end: string;
+  venue_id?: string;
+  notes?: string;
+}
+
+export async function createPayrollRun(data: CreatePayrollRunRequest): Promise<PayrollRunDetail> {
+  return request<PayrollRunDetail>('/payroll-runs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getPayrollRuns(venueId?: string): Promise<PayrollRunListItem[]> {
+  const runs = await request<PayrollRunListItem[]>(`/payroll-runs${payrollRunQuery(venueId)}`);
+  return Array.isArray(runs) ? runs : [];
+}
+
+export async function getPayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
+  return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}`);
+}
+
 // Admin
 
 export interface AdminCreateUserRequest {
