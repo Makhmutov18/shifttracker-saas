@@ -441,6 +441,27 @@ export interface PayrollRunDetail extends PayrollRunListItem {
   payments: unknown[];
 }
 
+export interface PersonalPayrollPayment {
+  amount: string;
+  payment_date: string;
+  method: string | null;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface PersonalPayrollRun {
+  payroll_run_id: string;
+  title: string;
+  period_start: string;
+  period_end: string;
+  venue_name: string;
+  status: 'finalized' | 'paid' | string;
+  final_amount: string;
+  paid_amount: string;
+  remaining_amount: string;
+  payments: PersonalPayrollPayment[];
+}
+
 function payrollRunQuery(venueId?: string) {
   const params = new URLSearchParams();
   if (venueId) params.set('venue_id', venueId);
@@ -480,6 +501,11 @@ export async function getPayrollRuns(venueId?: string): Promise<PayrollRunListIt
 
 export async function getPayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
   return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}`);
+}
+
+export async function getMyPayrollRuns(): Promise<PersonalPayrollRun[]> {
+  const runs = await request<PersonalPayrollRun[]>('/me/payroll-runs');
+  return Array.isArray(runs) ? runs : [];
 }
 
 export async function finalizePayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
