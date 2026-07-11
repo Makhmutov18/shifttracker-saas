@@ -189,6 +189,9 @@ class Shift(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="shifts")
     venue: Mapped["Venue"] = relationship("Venue", back_populates="shifts")
+    payroll_run_sources: Mapped[list["PayrollRunShiftSource"]] = relationship(
+        "PayrollRunShiftSource", back_populates="shift"
+    )
 
     def __repr__(self) -> str:
         return f"<Shift {self.date} {self.user_id}>"
@@ -283,6 +286,9 @@ class Adjustment(Base):
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
     venue: Mapped["Venue"] = relationship("Venue")
+    payroll_run_sources: Mapped[list["PayrollRunAdjustmentSource"]] = relationship(
+        "PayrollRunAdjustmentSource", back_populates="adjustment"
+    )
 
     def __repr__(self) -> str:
         return f"<Adjustment {self.type} {self.amount} for {self.user_id}>"
@@ -329,6 +335,16 @@ class PayrollRun(Base):
     venue: Mapped[Optional["Venue"]] = relationship("Venue", back_populates="payroll_runs")
     items: Mapped[list["PayrollRunItem"]] = relationship(
         "PayrollRunItem",
+        back_populates="payroll_run",
+        cascade="all, delete-orphan",
+    )
+    shift_sources: Mapped[list["PayrollRunShiftSource"]] = relationship(
+        "PayrollRunShiftSource",
+        back_populates="payroll_run",
+        cascade="all, delete-orphan",
+    )
+    adjustment_sources: Mapped[list["PayrollRunAdjustmentSource"]] = relationship(
+        "PayrollRunAdjustmentSource",
         back_populates="payroll_run",
         cascade="all, delete-orphan",
     )
@@ -385,6 +401,54 @@ class PayrollRunItem(Base):
 
     def __repr__(self) -> str:
         return f"<PayrollRunItem {self.payroll_run_id} {self.user_id}>"
+
+
+class PayrollRunShiftSource(Base):
+    __tablename__ = "payroll_run_shift_sources"
+    __table_args__ = (UniqueConstraint("payroll_run_id", "shift_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    payroll_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payroll_runs.id"), nullable=False
+    )
+    shift_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("shifts.id"), nullable=False
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    payroll_run: Mapped["PayrollRun"] = relationship(
+        "PayrollRun", back_populates="shift_sources"
+    )
+    shift: Mapped["Shift"] = relationship("Shift", back_populates="payroll_run_sources")
+
+
+class PayrollRunAdjustmentSource(Base):
+    __tablename__ = "payroll_run_adjustment_sources"
+    __table_args__ = (UniqueConstraint("payroll_run_id", "adjustment_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    payroll_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payroll_runs.id"), nullable=False
+    )
+    adjustment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("adjustments.id"), nullable=False
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    payroll_run: Mapped["PayrollRun"] = relationship(
+        "PayrollRun", back_populates="adjustment_sources"
+    )
+    adjustment: Mapped["Adjustment"] = relationship(
+        "Adjustment", back_populates="payroll_run_sources"
+    )
 
 
 class PayrollPayment(Base):

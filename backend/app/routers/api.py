@@ -15,6 +15,7 @@ from app.database import get_session
 from app.models import (
     User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
     PayrollRun, PayrollRunItem, PayrollRunStatus, PayrollPayment,
+    PayrollRunShiftSource, PayrollRunAdjustmentSource,
 )
 from app.permissions import has_permission
 from app.schemas import (
@@ -727,24 +728,65 @@ async def create_payroll_run(
     if payroll_data.period_start > payroll_data.period_end:
         raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
 
-    venue_filter = (
-        PayrollRun.venue_id.is_(None)
-        if payroll_data.venue_id is None
-        else PayrollRun.venue_id == payroll_data.venue_id
-    )
-    duplicate_result = await session.execute(
-        select(PayrollRun.id).where(
-            PayrollRun.period_start == payroll_data.period_start,
-            PayrollRun.period_end == payroll_data.period_end,
-            venue_filter,
-            PayrollRun.status.in_((PayrollRunStatus.draft, PayrollRunStatus.finalized)),
-        ).limit(1)
-    )
-    if duplicate_result.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status_code=409,
-            detail="An active payroll run already exists for this period and venue",
+    source_shifts_query = (
+        select(Shift.id)
+        .outerjoin(User, Shift.user_id == User.id)
+        .where(
+            Shift.status == "approved",
+            Shift.date >= payroll_data.period_start,
+            Shift.date <= payroll_data.period_end,
         )
+    )
+    if payroll_data.venue_id is not None:
+        source_shifts_query = source_shifts_query.where(
+            or_(
+                Shift.venue_id == payroll_data.venue_id,
+                User.venue_id == payroll_data.venue_id,
+            )
+        )
+    source_shifts_result = await session.execute(source_shifts_query)
+    source_shift_ids = list(source_shifts_result.scalars().all())
+
+    source_adjustments_query = select(Adjustment.id).where(
+        Adjustment.year * 100 + Adjustment.month >= payroll_data.period_start.year * 100 + payroll_data.period_start.month,
+        Adjustment.year * 100 + Adjustment.month <= payroll_data.period_end.year * 100 + payroll_data.period_end.month,
+    )
+    if payroll_data.venue_id is not None:
+        source_adjustments_query = source_adjustments_query.where(
+            Adjustment.venue_id == payroll_data.venue_id
+        )
+    source_adjustments_result = await session.execute(source_adjustments_query)
+    source_adjustment_ids = list(source_adjustments_result.scalars().all())
+
+    active_run_statuses = (
+        PayrollRunStatus.draft,
+        PayrollRunStatus.finalized,
+        PayrollRunStatus.paid,
+    )
+    if source_shift_ids:
+        shift_conflict_result = await session.execute(
+            select(PayrollRunShiftSource.shift_id)
+            .join(PayrollRun, PayrollRun.id == PayrollRunShiftSource.payroll_run_id)
+            .where(
+                PayrollRunShiftSource.shift_id.in_(source_shift_ids),
+                PayrollRun.status.in_(active_run_statuses),
+            )
+            .limit(1)
+        )
+        if shift_conflict_result.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=409, detail="An approved shift is already included in another payroll run")
+    if source_adjustment_ids:
+        adjustment_conflict_result = await session.execute(
+            select(PayrollRunAdjustmentSource.adjustment_id)
+            .join(PayrollRun, PayrollRun.id == PayrollRunAdjustmentSource.payroll_run_id)
+            .where(
+                PayrollRunAdjustmentSource.adjustment_id.in_(source_adjustment_ids),
+                PayrollRun.status.in_(active_run_statuses),
+            )
+            .limit(1)
+        )
+        if adjustment_conflict_result.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=409, detail="An adjustment is already included in another payroll run")
 
     preview = await payroll_run_preview(
         period_start=payroll_data.period_start,
@@ -780,6 +822,13 @@ async def create_payroll_run(
             remaining_amount=row.total_amount,
         )
         for row in preview.rows
+    ]
+    payroll_run.shift_sources = [
+        PayrollRunShiftSource(shift_id=shift_id) for shift_id in source_shift_ids
+    ]
+    payroll_run.adjustment_sources = [
+        PayrollRunAdjustmentSource(adjustment_id=adjustment_id)
+        for adjustment_id in source_adjustment_ids
     ]
 
     try:

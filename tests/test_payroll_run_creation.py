@@ -46,14 +46,17 @@ class PayrollRunCreationTests(unittest.TestCase):
         self.assertIn("PayrollRunItem", source)
         self.assertNotIn("PayrollPayment(", source)
 
-    def test_duplicate_guard_allows_cancelled_runs_only(self) -> None:
+    def test_creation_deduplicates_sources_not_periods(self) -> None:
         source = _endpoint_source("create_payroll_run")
-        self.assertIn("period_start == payroll_data.period_start", source)
-        self.assertIn("period_end == payroll_data.period_end", source)
+        self.assertIn("source_shift_ids", source)
+        self.assertIn("source_adjustment_ids", source)
+        self.assertIn("PayrollRunShiftSource.shift_id.in_(source_shift_ids)", source)
+        self.assertIn("PayrollRunAdjustmentSource.adjustment_id.in_(source_adjustment_ids)", source)
         self.assertIn("PayrollRunStatus.draft", source)
         self.assertIn("PayrollRunStatus.finalized", source)
+        self.assertIn("PayrollRunStatus.paid", source)
         self.assertIn("status_code=409", source)
-        self.assertNotIn("PayrollRunStatus.cancelled", source)
+        self.assertNotIn("An active payroll run already exists for this period and venue", source)
 
     def test_creation_rolls_back_on_failure(self) -> None:
         source = _endpoint_source("create_payroll_run")
@@ -67,6 +70,8 @@ class PayrollRunCreationTests(unittest.TestCase):
         self.assertNotIn("total_expenses", source)
         self.assertIn("preview.total_amount", source)
         self.assertIn("preview.rows", source)
+        self.assertIn("payroll_run.shift_sources", source)
+        self.assertIn("payroll_run.adjustment_sources", source)
 
 
 if __name__ == "__main__":
