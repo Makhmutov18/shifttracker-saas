@@ -22,7 +22,7 @@ from app.schemas import (
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
-    PayrollRunCreate, PayrollRunRead,
+    PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
 )
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
@@ -58,6 +58,16 @@ def _can_view_team_history_scope(user: User) -> bool:
 
 def _can_view_general_audit(user: User) -> bool:
     return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
+
+
+def _can_view_payroll_runs(user: User) -> bool:
+    return has_permission(user, "can_view_team_payroll")
+
+
+def _payroll_run_is_visible(run: PayrollRun, user: User) -> bool:
+    if _can_manage_all_venue_shifts(user):
+        return True
+    return run.venue_id is not None and run.venue_id == user.venue_id
 
 
 def _can_send_shift_reminders(user: User) -> bool:
@@ -786,6 +796,128 @@ async def create_payroll_run(
         raise
 
     return saved_run
+
+
+@router.get("/payroll-runs", response_model=list[PayrollRunListItem])
+async def list_payroll_runs(
+    venue_id: uuid.UUID | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not _can_view_payroll_runs(user):
+        raise HTTPException(status_code=403, detail="Only users with payroll access can view payroll runs")
+
+    query = (
+        select(PayrollRun)
+        .options(
+            selectinload(PayrollRun.items),
+            selectinload(PayrollRun.venue),
+            selectinload(PayrollRun.created_by_user),
+        )
+        .order_by(PayrollRun.period_end.desc(), PayrollRun.created_at.desc())
+    )
+    if _can_manage_all_venue_shifts(user):
+        if venue_id is not None:
+            query = query.where(PayrollRun.venue_id == venue_id)
+    else:
+        query = query.where(PayrollRun.venue_id == user.venue_id)
+        if venue_id is not None and venue_id != user.venue_id:
+            return []
+
+    result = await session.execute(query)
+    runs = result.scalars().all()
+    return [
+        PayrollRunListItem(
+            id=run.id,
+            title=run.title,
+            period_start=run.period_start,
+            period_end=run.period_end,
+            venue_id=run.venue_id,
+            venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Все точки",
+            status=run.status.value if hasattr(run.status, "value") else str(run.status),
+            employees_count=len(run.items),
+            total_amount=run.total_amount,
+            total_paid=run.total_paid,
+            created_by_id=run.created_by_id,
+            created_by_name=safe_text(getattr(run.created_by_user, "name", None), "Пользователь"),
+            created_at=run.created_at,
+        )
+        for run in runs
+    ]
+
+
+@router.get("/payroll-runs/{payroll_run_id}", response_model=PayrollRunRead)
+async def get_payroll_run(
+    payroll_run_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not _can_view_payroll_runs(user):
+        raise HTTPException(status_code=403, detail="Only users with payroll access can view payroll runs")
+
+    result = await session.execute(
+        select(PayrollRun)
+        .options(
+            selectinload(PayrollRun.items).selectinload(PayrollRunItem.user),
+            selectinload(PayrollRun.payments),
+            selectinload(PayrollRun.venue),
+            selectinload(PayrollRun.created_by_user),
+        )
+        .where(PayrollRun.id == payroll_run_id)
+    )
+    run = result.scalar_one_or_none()
+    if run is None or not _payroll_run_is_visible(run, user):
+        raise HTTPException(status_code=404, detail="Payroll run not found")
+
+    return PayrollRunRead(
+        id=run.id,
+        title=run.title,
+        period_start=run.period_start,
+        period_end=run.period_end,
+        status=run.status.value if hasattr(run.status, "value") else str(run.status),
+        total_amount=run.total_amount,
+        total_paid=run.total_paid,
+        created_by_id=run.created_by_id,
+        venue_id=run.venue_id,
+        venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Все точки",
+        created_by_name=safe_text(getattr(run.created_by_user, "name", None), "Пользователь"),
+        created_at=run.created_at,
+        finalized_at=run.finalized_at,
+        paid_at=run.paid_at,
+        notes=run.notes,
+        items=[
+            PayrollRunItemRead(
+                id=item.id,
+                payroll_run_id=item.payroll_run_id,
+                user_id=item.user_id,
+                user_name=safe_text(getattr(item.user, "name", None), "Сотрудник"),
+                approved_shifts_count=item.approved_shifts_count,
+                approved_hours=item.approved_hours,
+                base_amount=item.base_amount,
+                bonus_amount=item.bonus_amount,
+                deduction_amount=item.deduction_amount,
+                final_amount=item.final_amount,
+                paid_amount=item.paid_amount,
+                remaining_amount=item.remaining_amount,
+                created_at=item.created_at,
+            )
+            for item in run.items
+        ],
+        payments=[
+            PayrollPaymentRead(
+                id=payment.id,
+                payroll_run_id=payment.payroll_run_id,
+                user_id=payment.user_id,
+                amount=payment.amount,
+                payment_date=payment.payment_date,
+                method=payment.method,
+                comment=payment.comment,
+                created_by_id=payment.created_by_id,
+                created_at=payment.created_at,
+            )
+            for payment in run.payments
+        ],
+    )
 
 
 @router.post("/expenses", response_model=ExpenseOut)

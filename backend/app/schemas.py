@@ -235,6 +235,7 @@ class PayrollRunItemRead(BaseModel):
     id: uuid.UUID
     payroll_run_id: uuid.UUID
     user_id: uuid.UUID
+    user_name: Optional[str] = None
     approved_shifts_count: int = 0
     approved_hours: Decimal = Decimal("0.00")
     base_amount: Decimal = Decimal("0.00")
@@ -296,6 +297,8 @@ class PayrollRunRead(BaseModel):
     total_paid: Decimal = Decimal("0.00")
     created_by_id: uuid.UUID
     venue_id: Optional[uuid.UUID] = None
+    venue_name: Optional[str] = None
+    created_by_name: Optional[str] = None
     created_at: datetime
     finalized_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None
@@ -304,3 +307,19 @@ class PayrollRunRead(BaseModel):
     payments: list[PayrollPaymentRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
+
+
+class PayrollRunListItem(BaseModel):
+    id: uuid.UUID
+    title: str
+    period_start: date
+    period_end: date
+    venue_id: Optional[uuid.UUID] = None
+    venue_name: Optional[str] = None
+    status: str
+    employees_count: int = 0
+    total_amount: Decimal = Decimal("0.00")
+    total_paid: Decimal = Decimal("0.00")
+    created_by_id: uuid.UUID
+    created_by_name: Optional[str] = None
+    created_at: datetime
