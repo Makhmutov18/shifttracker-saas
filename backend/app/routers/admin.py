@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from app.database import get_session
 from app.models import User, UserRole, AuditLog, PayModel, Venue, Shift
 from app.schemas import AdminCreateUser, AdminCreateUserResponse, UserOut, VenueOut, VenueCreate, VenueUpdate
-from app.auth import validate_init_data, extract_user_from_init_data
+from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.config import settings
 from app.permissions import has_permission, validate_permission_map
 
@@ -130,6 +130,7 @@ async def get_admin_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    ensure_user_is_active(user)
     if not has_permission(user, "can_manage_team"):
         raise HTTPException(status_code=403, detail="Team management access required")
 

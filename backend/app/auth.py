@@ -3,6 +3,8 @@ import hashlib
 import json
 from urllib.parse import parse_qsl, unquote
 
+from fastapi import HTTPException
+
 from app.config import settings
 
 
@@ -53,3 +55,12 @@ def extract_user_from_init_data(init_data: str) -> dict | None:
     except Exception:
         return None
     return None
+
+
+def ensure_user_is_active(user: object) -> None:
+    """Reject archived users from every authenticated API flow."""
+    if not getattr(user, "is_active", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Пользователь деактивирован. Обратитесь к администратору.",
+        )

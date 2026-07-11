@@ -20,7 +20,7 @@ from app.schemas import (
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow,
 )
-from app.auth import validate_init_data, extract_user_from_init_data
+from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.utils import (
     calculate_hours,
     calculate_salary,
@@ -95,6 +95,7 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found. Please start the bot first.")
 
+    ensure_user_is_active(user)
     return user
 
 
