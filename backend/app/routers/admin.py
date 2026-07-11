@@ -16,6 +16,7 @@ from app.schemas import AdminCreateUser, AdminCreateUserResponse, UserOut, Venue
 from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
 from app.config import settings
 from app.permissions import has_permission, validate_permission_map
+from app.role_authorization import can_assign_owner_role
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,18 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def _can_manage_team_access(user: User) -> bool:
     return user.role in (UserRole.owner, UserRole.admin) or has_permission(user, "can_manage_team")
+
+
+def _ensure_owner_role_assignment_allowed(
+    actor: User,
+    requested_role: UserRole,
+    current_role: UserRole | None = None,
+) -> None:
+    if not can_assign_owner_role(actor.role, requested_role, current_role):
+        raise HTTPException(
+            status_code=403,
+            detail="Только владелец может назначить роль владельца.",
+        )
 
 
 async def _ensure_user_can_be_deactivated(
@@ -281,6 +294,8 @@ async def create_user(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
 
+    _ensure_owner_role_assignment_allowed(admin, role)
+
     try:
         permissions = validate_permission_map(body.permissions)
     except ValueError as exc:
@@ -390,6 +405,10 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    requested_role = UserRole(body.role) if body.role is not None else None
+    if requested_role is not None:
+        _ensure_owner_role_assignment_allowed(admin, requested_role, user.role)
+
     if body.role is not None and user.id == admin.id and body.role not in ("owner", "admin"):
         other_admins_result = await session.execute(
             select(func.count())
@@ -415,9 +434,9 @@ async def update_user(
     if body.position is not None:
         old_values["position"] = user.position
         user.position = body.position.strip() or None
-    if body.role is not None:
+    if requested_role is not None:
         old_values["role"] = user.role.value
-        user.role = UserRole(body.role)
+        user.role = requested_role
     if body.venue_id is not None and body.venue_id != user.venue_id:
         venue = await _get_venue_or_404(session, body.venue_id)
         old_values["venue_id"] = str(user.venue_id)
