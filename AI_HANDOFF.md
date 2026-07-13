@@ -19,6 +19,7 @@
 - [ROADMAP_TO_LAUNCH.md](ROADMAP_TO_LAUNCH.md)
 - [SMOKE_TESTS.md](SMOKE_TESTS.md)
 - [MVP_RELEASE_CHECKLIST.md](MVP_RELEASE_CHECKLIST.md)
+- [UX_UI_DESIGN_RULES.md](UX_UI_DESIGN_RULES.md) - обязательный документ перед frontend/UI/web-admin задачами
 
 ## Current Product State
 
