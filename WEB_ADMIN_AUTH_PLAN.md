@@ -2,27 +2,26 @@
 
 ## Текущее безопасное поведение
 
-Web-admin принимает только Telegram `initData` и передаёт его backend в заголовке `X-Init-Data`. В production вне Telegram вход закрыт. `VITE_TELEGRAM_INIT_DATA` разрешён только в dev-mode и не является production bypass.
+Web-admin поддерживает два пути: внутри Telegram использует `initData` и заголовок `X-Init-Data`, а в обычном браузере использует Telegram OpenID Connect Authorization Code Flow + PKCE. В production вне этих путей вход закрыт. `VITE_TELEGRAM_INIT_DATA` разрешён только в dev-mode и не является production bypass.
 
-InitData, токены и персональные данные не сохраняются в `localStorage` и не выводятся в лог.
+OAuth tokens, raw session token, initData и персональные данные не сохраняются в `localStorage` и не выводятся в лог. В базе хранится только SHA-256 hash session token.
 
-## Будущий web-login
+## Реализованный web-login
 
-1. Пользователь запрашивает вход в web-admin.
-2. Telegram-бот создаёт одноразовую подписанную ссылку с коротким сроком жизни.
-3. Backend проверяет одноразовый код, роль, активность пользователя и отзывает код после первого использования.
-4. Код обменивается на серверную сессию в `httpOnly`, `Secure`, `SameSite` cookie.
-5. Backend хранит идентификатор сессии и позволяет владельцу отозвать отдельную или все web-сессии.
-6. Чувствительные действия продолжают проверять текущие roles/permissions и venue scope на backend.
+1. Пользователь открывает `/admin/` и нажимает «Войти через Telegram».
+2. Backend создаёт state, nonce и PKCE verifier в короткоживущей подписанной HttpOnly cookie.
+3. Telegram callback проверяет state, обменивает code server-side и валидирует id_token по Telegram JWKS.
+4. Backend находит существующего активного User и проверяет административный доступ.
+5. Создаётся WebSession; raw token хранится только в HttpOnly cookie, а в БД — только hash.
+6. Изменяющие cookie-запросы защищены CSRF token; роли, permissions и venue scope проверяются текущими backend dependencies.
 
 ## Требования перед production
 
-- защита от повторного использования ссылки;
-- TTL в несколько минут;
-- rate limit на выпуск и обмен кодов;
-- CSRF-защита для cookie-session;
+- включить все OIDC env и проверить Redirect URI;
+- включить HTTPS, чтобы Secure cookie работала;
+- добавить rate limit на выпуск и обмен кодов;
 - явный logout и отзыв сессий;
 - аудит входов без сохранения токенов;
 - отдельный security review с учётом 152-ФЗ.
 
-Этот flow в текущей задаче не реализован и не подменяется клиентской авторизацией.
+Telegram Mini App auth через `X-Init-Data` остаётся отдельным и совместимым flow.

@@ -11,6 +11,7 @@ from app.config import settings
 from app.database import init_db
 from app.routers.api import router as api_router
 from app.routers.admin import router as admin_router
+from app.routers.web_auth import router as web_auth_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -132,6 +133,7 @@ app.add_middleware(
 # ─── API routes — registered FIRST, highest priority ────────────────────────
 app.include_router(api_router)
 app.include_router(admin_router)
+app.include_router(web_auth_router)
 
 
 # ─── Telegram webhook endpoint ──────────────────────────────────────────────
@@ -158,9 +160,18 @@ async def telegram_webhook(request: Request):
 
 # ─── Frontend static files ──────────────────────────────────────────────────
 frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+web_admin_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web-admin", "dist")
 if os.path.isdir(frontend_dist):
     # Mount static assets (JS, CSS, images) at /assets
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+
+    if os.path.isdir(web_admin_dist):
+        app.mount("/admin/assets", StaticFiles(directory=os.path.join(web_admin_dist, "assets")), name="web_admin_assets")
+
+        @app.get("/admin")
+        @app.get("/admin/{full_path:path}")
+        async def serve_web_admin(full_path: str = ""):
+            return FileResponse(os.path.join(web_admin_dist, "index.html"))
 
     # SPA fallback: serve index.html for all non-API, non-webhook routes
     @app.get("/{full_path:path}")

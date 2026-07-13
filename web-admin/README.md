@@ -25,7 +25,28 @@ npm run build
 
 ## Auth
 
-Внутри Telegram используется `window.Telegram.WebApp.initData`. В production вне Telegram приложение показывает закрытый экран и не выполняет API-запросы. Будущий самостоятельный web-login описан в [`../WEB_ADMIN_AUTH_PLAN.md`](../WEB_ADMIN_AUTH_PLAN.md).
+Внутри Telegram используется `window.Telegram.WebApp.initData`. В обычном браузере кнопка «Войти через Telegram» запускает backend OIDC Authorization Code Flow + PKCE. После успешного callback backend устанавливает HttpOnly web-session cookie. В production токены не сохраняются в браузере и не проходят через frontend. Подробности — в [`../WEB_ADMIN_AUTH_PLAN.md`](../WEB_ADMIN_AUTH_PLAN.md).
+
+## Настройка Telegram OIDC
+
+В BotFather/панели Telegram Login зарегистрируйте:
+
+- Allowed origin: `https://your-app.railway.app`;
+- Redirect URI: `https://your-app.railway.app/api/web-auth/telegram/callback`;
+- Client ID и Client Secret положите только в Railway Variables.
+
+Backend env:
+
+```text
+TELEGRAM_OIDC_CLIENT_ID=
+TELEGRAM_OIDC_CLIENT_SECRET=
+TELEGRAM_OIDC_REDIRECT_URI=https://your-app.railway.app/api/web-auth/telegram/callback
+WEB_ADMIN_PUBLIC_URL=https://your-app.railway.app
+WEB_SESSION_SECRET=длинный-случайный-секрет
+WEB_SESSION_DAYS=14
+```
+
+После deploy откройте `https://your-app.railway.app/admin/`. `WEB_SESSION_SECRET`, Client Secret и реальные токены нельзя коммитить или логировать.
 
 ## Структура
 
@@ -49,5 +70,9 @@ npm run build
 - `GET/POST/PATCH/DELETE /api/admin/users`
 - `GET/POST/PATCH/DELETE /api/admin/venues`
 - `GET /api/audit-logs`
+- `GET /api/web-auth/telegram/start`
+- `GET /api/web-auth/telegram/callback`
+- `GET /api/web-auth/session`
+- `POST /api/web-auth/logout`
 
 Известные ограничения перечислены в [`../WEB_ADMIN_GAPS.md`](../WEB_ADMIN_GAPS.md).

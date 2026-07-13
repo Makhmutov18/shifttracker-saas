@@ -2,7 +2,7 @@ import secrets
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from app.database import get_session
 from app.models import User, UserRole, AuditLog, PayModel, Venue, Shift
 from app.schemas import AdminCreateUser, AdminCreateUserResponse, UserOut, VenueOut, VenueCreate, VenueUpdate
-from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
+from app.auth import authenticate_request
 from app.config import settings
 from app.permissions import has_permission, validate_permission_map
 from app.role_authorization import can_assign_owner_role
@@ -121,29 +121,12 @@ async def _ensure_venue_can_be_deactivated(
 
 
 async def get_admin_user(
-    init_data: str = Header(..., alias="X-Init-Data"),
+    request: Request,
+    init_data: str | None = Header(None, alias="X-Init-Data"),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    """Dependency: validates initData and returns the admin user."""
-    if not validate_init_data(init_data):
-        raise HTTPException(status_code=401, detail="Invalid init data")
-
-    user_data = extract_user_from_init_data(init_data)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="User not found in init data")
-
-    telegram_id = user_data.get("id")
-    if not telegram_id:
-        raise HTTPException(status_code=401, detail="Telegram ID not found")
-
-    result = await session.execute(
-        select(User).where(User.telegram_id == int(telegram_id))
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    ensure_user_is_active(user)
+    """Dependency: authenticates through Telegram initData or the secure web session."""
+    user = await authenticate_request(request, init_data, session)
     if not has_permission(user, "can_manage_team"):
         raise HTTPException(status_code=403, detail="Team management access required")
 

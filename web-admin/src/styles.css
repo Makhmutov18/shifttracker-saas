@@ -70,6 +70,8 @@ a { color: inherit; }
 .user-summary div:last-child { min-width: 0; }
 .user-summary strong, .user-summary span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-summary span { margin-top: 3px; color: var(--text-muted); font-size: 11px; }
+.logout-button { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; border: 0; background: transparent; color: var(--text-muted); padding: 0; cursor: pointer; }
+.logout-button:hover { color: var(--danger); }
 .topbar { height: 72px; position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 0 28px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(12px); }
 .topbar-title { margin-right: auto; font-size: 17px; font-weight: 700; }
 .topbar select, .field select, .field input, .field textarea, .filter-bar select, .filter-bar input { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 8px; padding: 0 12px; outline: none; }
@@ -151,7 +153,9 @@ tbody tr:hover { background: var(--surface-hover); }
 .dialog h2 { margin: 0; font-size: 18px; }
 .dialog p { color: var(--text-muted); line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.fatal-state, .auth-gate { min-height: 100vh; display: grid; place-items: center; align-content: center; text-align: center; padding: 24px; }
+.fatal-state, .auth-gate { min-height: 100vh; display: grid; place-items: center; align-content: center; text-align: center; padding: 24px; background: var(--bg); }
+.auth-gate { gap: 12px; }
+.auth-mark { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 12px; background: var(--accent); color: var(--text-on-accent); font-size: 24px; font-weight: 800; }
 .fatal-state svg, .auth-gate svg { width: 44px; height: 44px; color: var(--accent); }
 .fatal-state h1, .auth-gate h1 { margin: 18px 0 8px; }
 .fatal-state p, .auth-gate p { color: var(--text-muted); max-width: 520px; }

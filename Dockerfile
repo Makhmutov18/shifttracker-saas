@@ -9,6 +9,15 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
+# ─── Stage 1b: Build Web Admin ─────────────────────────────────────────────
+FROM node:20-alpine AS web-admin-builder
+
+WORKDIR /app/web-admin
+COPY web-admin/package*.json ./
+RUN npm ci
+COPY web-admin/ .
+RUN npm run build
+
 # ─── Stage 2: Build Backend ──────────────────────────────────────────────────
 FROM python:3.12-slim AS backend-builder
 
@@ -28,6 +37,7 @@ COPY backend/ .
 
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+COPY --from=web-admin-builder /app/web-admin/dist /app/web-admin/dist
 
 # Expose port
 EXPOSE 8000

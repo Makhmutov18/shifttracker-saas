@@ -4,8 +4,9 @@
 
 ## Auth
 
-- Самостоятельный web-login отсутствует. Production-доступ возможен только внутри Telegram.
-- Безопасный будущий flow описан в `WEB_ADMIN_AUTH_PLAN.md`.
+- Самостоятельный вход через Telegram OIDC + PKCE реализован в текущем MVP.
+- Перед production нужно включить OIDC env, настроить BotFather/Redirect URI, HTTPS и rate limit.
+- Полноценное управление web-сессиями для владельца пока не вынесено в отдельный экран.
 
 ## Смены
 

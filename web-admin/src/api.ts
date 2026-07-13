@@ -20,26 +20,34 @@ function errorText(status: number, detail?: string): string {
   return 'Не удалось выполнить запрос. Попробуйте ещё раз.';
 }
 
+async function responseError(response: Response): Promise<ApiError> {
+  let detail = '';
+  try {
+    const body = await response.json() as { detail?: string | Array<{ msg?: string }> };
+    detail = typeof body.detail === 'string' ? body.detail : body.detail?.map((item) => item.msg).filter(Boolean).join(', ') ?? '';
+  } catch {
+    detail = '';
+  }
+  return new ApiError(response.status, errorText(response.status, detail));
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const auth = resolveAuth();
-  if (!auth.initData) throw new ApiError(401, 'Веб-вход пока не настроен. Откройте админку через Telegram.');
+  if (auth.source === 'unavailable') throw new ApiError(401, 'Войдите через Telegram, чтобы открыть web-админку.');
+  const method = (options.method ?? 'GET').toUpperCase();
+  const csrfToken = document.cookie.split('; ').find((item) => item.startsWith('shifttracker_web_csrf='))?.split('=').slice(1).join('=') ?? '';
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'X-Init-Data': auth.initData,
+      ...(auth.initData ? { 'X-Init-Data': auth.initData } : {}),
+      ...(auth.source === 'web' && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS' && csrfToken ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) } : {}),
       ...(options.headers ?? {}),
     },
   });
   if (!response.ok) {
-    let detail = '';
-    try {
-      const body = await response.json() as { detail?: string | Array<{ msg?: string }> };
-      detail = typeof body.detail === 'string' ? body.detail : body.detail?.map((item) => item.msg).filter(Boolean).join(', ') ?? '';
-    } catch {
-      detail = '';
-    }
-    throw new ApiError(response.status, errorText(response.status, detail));
+    throw await responseError(response);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -55,6 +63,13 @@ function query(params: Record<string, string | number | boolean | null | undefin
 }
 
 export const api = {
+  beginWebLogin: () => { window.location.assign(`${API_BASE}/api/web-auth/telegram/start?return_to=/admin/`); },
+  webSession: async () => {
+    const response = await fetch(`${API_BASE}/api/web-auth/session`, { credentials: 'include' });
+    if (!response.ok) throw await responseError(response);
+    return response.json() as Promise<{ authenticated: boolean; csrf_token?: string }>;
+  },
+  logout: () => request<{ ok: boolean }>('/api/web-auth/logout', { method: 'POST' }),
   me: () => request<User>('/api/me'),
   shifts: (month: number, year: number, venueId?: string) => request<Shift[]>(`/api/shifts${query({ month, year, venue_id: venueId })}`),
   pendingShifts: () => request<Shift[]>('/api/shifts/pending'),

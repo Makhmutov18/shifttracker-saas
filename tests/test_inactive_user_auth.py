@@ -29,13 +29,24 @@ def _load_active_check():
     return namespace["ensure_user_is_active"]
 
 
-def _dependency_calls_active_check(path: Path, dependency_name: str) -> bool:
+def _dependency_uses_shared_auth(path: Path, dependency_name: str) -> bool:
     module = ast.parse(path.read_text(encoding="utf-8"))
     dependency = next(
         node
         for node in module.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == dependency_name
     )
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "authenticate_request"
+        for node in ast.walk(dependency)
+    )
+
+
+def _shared_auth_calls_active_check() -> bool:
+    module = ast.parse(AUTH_PATH.read_text(encoding="utf-8"))
+    dependency = next(node for node in module.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "authenticate_request")
     return any(
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -62,10 +73,11 @@ class CurrentUserAuthenticationTests(unittest.TestCase):
         )
 
     def test_main_current_user_dependency_enforces_active_check(self) -> None:
-        self.assertTrue(_dependency_calls_active_check(API_PATH, "get_current_user"))
+        self.assertTrue(_dependency_uses_shared_auth(API_PATH, "get_current_user"))
+        self.assertTrue(_shared_auth_calls_active_check())
 
     def test_admin_dependency_cannot_bypass_active_check(self) -> None:
-        self.assertTrue(_dependency_calls_active_check(ADMIN_PATH, "get_admin_user"))
+        self.assertTrue(_dependency_uses_shared_auth(ADMIN_PATH, "get_admin_user"))
 
 
 if __name__ == "__main__":

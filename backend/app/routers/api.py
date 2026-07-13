@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
@@ -26,7 +26,7 @@ from app.schemas import (
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
 )
-from app.auth import ensure_user_is_active, extract_user_from_init_data, validate_init_data
+from app.auth import authenticate_request
 from app.utils import (
     calculate_hours,
     calculate_salary,
@@ -96,32 +96,12 @@ def _serialize_audit_logs(logs: list[AuditLog]) -> list[AuditLogOut]:
 
 
 async def get_current_user(
+    request: Request,
     init_data: str | None = Header(None, alias="X-Init-Data"),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    """Dependency: validates initData and returns the authenticated user."""
-    if not init_data or not validate_init_data(init_data):
-        raise HTTPException(status_code=401, detail="Invalid init data")
-
-    user_data = extract_user_from_init_data(init_data)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="User not found in init data")
-
-    telegram_id = user_data.get("id")
-    if not telegram_id:
-        raise HTTPException(status_code=401, detail="Telegram ID not found")
-
-    result = await session.execute(
-        select(User)
-        .options(selectinload(User.venue))
-        .where(User.telegram_id == int(telegram_id))
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found. Please start the bot first.")
-
-    ensure_user_is_active(user)
-    return user
+    """Dependency: validates Telegram initData or the secure web session."""
+    return await authenticate_request(request, init_data, session)
 
 
 # ─── User / Profile ──────────────────────────────────────────────────────────

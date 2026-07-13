@@ -80,8 +80,7 @@ class ReminderAccessTests(unittest.TestCase):
         )
         source = ast.get_source_segment(API_SOURCE, dependency) or ""
         self.assertIn("Header(None, alias=\"X-Init-Data\")", source)
-        self.assertIn("if not init_data or not validate_init_data(init_data)", source)
-        self.assertIn("status_code=401", source)
+        self.assertIn("return await authenticate_request(request, init_data, session)", source)
 
     def test_notification_sender_remains_independent_of_http_auth(self) -> None:
         notifications_module = ast.parse(NOTIFICATIONS_PATH.read_text(encoding="utf-8"))

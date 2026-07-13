@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     BOT_TOKEN: str = ""
     BOT_USERNAME: str = ""
     WEBAPP_URL: str = "https://localhost:8000"
+    TELEGRAM_OIDC_CLIENT_ID: str = ""
+    TELEGRAM_OIDC_CLIENT_SECRET: str = ""
+    TELEGRAM_OIDC_REDIRECT_URI: str = ""
+    WEB_ADMIN_PUBLIC_URL: str = ""
+    WEB_SESSION_SECRET: str = ""
+    WEB_SESSION_DAYS: int = 14
 
     # Railway auto-provided public domain (e.g. shifttracker-saas-production.up.railway.app)
     RAILWAY_PUBLIC_DOMAIN: Optional[str] = None
