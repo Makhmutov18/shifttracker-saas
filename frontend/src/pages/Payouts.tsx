@@ -1,15 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Clock3, CircleAlert, Wallet } from 'lucide-react';
-import { PersonalPayrollRun, User, getMonthlyStats, getMyPayrollRuns } from '../utils/api';
+import { CalendarDays, ChevronDown, CircleAlert, Clock3, ReceiptText } from 'lucide-react';
+import { PersonalPayrollRun, User, getErrorMessage, getMonthlyStats, getMyPayrollRuns } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
-import {
-  getCurrentMonth,
-  getCurrentYear,
-  formatCurrency,
-  formatDate,
-  formatHours,
-} from '../utils/helpers';
-import { getErrorMessage } from '../utils/api';
+import BottomSheet from '../components/BottomSheet';
+import { formatCurrency, formatDate, formatHours, getCurrentMonth, getCurrentYear } from '../utils/helpers';
 
 interface Props {
   user: User;
@@ -35,89 +29,22 @@ function toNumber(value: string | number | null | undefined) {
 function getShiftSortKey(date?: string, createdAt?: string) {
   const dateValue = date ? new Date(`${date}T00:00:00`).getTime() : 0;
   const createdValue = createdAt ? new Date(createdAt).getTime() : 0;
-  return Number.isFinite(createdValue) && createdValue > 0 ? createdValue : Number.isFinite(dateValue) ? dateValue : 0;
+  return Number.isFinite(createdValue) && createdValue > 0
+    ? createdValue
+    : Number.isFinite(dateValue) ? dateValue : 0;
 }
 
-function getStatusLabel(status: ShiftStatus | string) {
-  if (status === 'approved') return 'Утверждена';
-  if (status === 'rejected') return 'Отклонена';
-  return 'На подтверждении';
-}
-
-function getPayoutLabel(status: ShiftStatus | string) {
-  if (status === 'approved') return 'Начислено по утверждённым сменам';
-  if (status === 'rejected') return 'Не входит в расчёт';
-  return 'Предварительно';
-}
-
-function getStatusTone(status: ShiftStatus | string) {
-  if (status === 'approved') {
-    return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
-  }
-  if (status === 'rejected') {
-    return 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300';
-  }
-  return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
-}
-
-function getPayoutTone(status: ShiftStatus | string) {
-  if (status === 'approved') {
-    return 'bg-tg-primary/10 text-tg-primary';
-  }
-  if (status === 'rejected') {
-    return 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300';
-  }
-  return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
-}
-
-function PayoutRow({ date, hours, amount, status }: { date: string; hours: string | number; amount: string | number; status: ShiftStatus | string }) {
-  return (
-    <div className="surface-card rounded-[1.15rem] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-tg-text">{date || 'Дата не указана'}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusTone(status)}`}>
-              {getStatusLabel(status)}
-            </span>
-            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getPayoutTone(status)}`}>
-              {getPayoutLabel(status)}
-            </span>
-          </div>
-        </div>
-
-        <div className="text-right">
-          <p className="text-sm font-semibold text-tg-text">{formatCurrency(amount)}</p>
-          <p className="mt-1 text-xs text-tg-hint">{formatHours(hours)}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryMetric({
-  title,
-  value,
-  hint,
-}: {
-  title: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="surface-muted rounded-[1.15rem] p-4">
-      <p className="text-xs text-tg-hint">{title}</p>
-      <p className="mt-1 text-sm font-semibold text-tg-text">{value}</p>
-      <p className="mt-1 text-[11px] text-tg-hint">{hint}</p>
-    </div>
-  );
+function getShiftPresentation(status: ShiftStatus | string) {
+  if (status === 'approved') return { status: 'Утверждена', amount: 'Начислено' };
+  if (status === 'rejected') return { status: 'Отклонена', amount: 'Не входит в начисления' };
+  return { status: 'На подтверждении', amount: 'Предварительно' };
 }
 
 export default function Payouts({ user }: Props) {
-  const [viewDate, setViewDate] = useState(() => ({
-    month: getCurrentMonth(),
-    year: getCurrentYear(),
-  }));
+  const initialMonthValue = `${getCurrentYear()}-${String(getCurrentMonth()).padStart(2, '0')}`;
+  const [viewDate, setViewDate] = useState(() => ({ month: getCurrentMonth(), year: getCurrentYear() }));
+  const [monthSheetOpen, setMonthSheetOpen] = useState(false);
+  const [draftMonth, setDraftMonth] = useState(initialMonthValue);
   const [monthStats, setMonthStats] = useState<Awaited<ReturnType<typeof getMonthlyStats>> | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -128,74 +55,62 @@ export default function Payouts({ user }: Props) {
   const { month, year } = viewDate;
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
 
+  const monthOptions = useMemo<MonthOption[]>(() => {
+    const current = new Date(getCurrentYear(), getCurrentMonth() - 1, 1);
+    return Array.from({ length: 18 }, (_, index) => {
+      const date = new Date(current.getFullYear(), current.getMonth() - index, 1);
+      return {
+        value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: formatMonthLabel(date),
+      };
+    });
+  }, []);
+
+  const currentMonthValue = `${year}-${String(month).padStart(2, '0')}`;
+  const selectedMonthLabel =
+    monthOptions.find((option) => option.value === currentMonthValue)?.label
+    ?? formatMonthLabel(new Date(year, month - 1, 1));
+
   useEffect(() => {
     let cancelled = false;
-
-    const loadPayrollRuns = async () => {
-      try {
-        setPayrollRunsLoading(true);
-        setPayrollRunsError(null);
-        const data = await getMyPayrollRuns();
-        if (!cancelled) {
-          setPayrollRuns(Array.isArray(data) ? data : []);
-        }
-      } catch (error) {
+    setPayrollRunsLoading(true);
+    setPayrollRunsError(null);
+    getMyPayrollRuns()
+      .then((data) => {
+        if (!cancelled) setPayrollRuns(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
         if (!cancelled) {
           setPayrollRuns([]);
           setPayrollRunsError(getErrorMessage(error, 'Не удалось загрузить историю выплат.'));
         }
-      } finally {
-        if (!cancelled) {
-          setPayrollRunsLoading(false);
-        }
-      }
-    };
-
-    loadPayrollRuns();
+      })
+      .finally(() => {
+        if (!cancelled) setPayrollRunsLoading(false);
+      });
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const monthOptions = useMemo<MonthOption[]>(() => {
-    const current = new Date(getCurrentYear(), getCurrentMonth() - 1, 1);
-    return Array.from({ length: 18 }, (_, index) => {
-      const date = new Date(current.getFullYear(), current.getMonth() - index, 1);
-      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      return { value, label: formatMonthLabel(date) };
-    });
-  }, []);
-
-  const currentMonthValue = `${year}-${String(month).padStart(2, '0')}`;
-  const selectedMonthLabel =
-    monthOptions.find((option) => option.value === currentMonthValue)?.label ?? formatMonthLabel(new Date(year, month - 1, 1));
-  const isCurrentPeriod = month === getCurrentMonth() && year === getCurrentYear();
-
   useEffect(() => {
     let cancelled = false;
-
-    const loadStats = async () => {
-      try {
-        setStatsLoading(true);
-        setStatsError(null);
-        const data = await getMonthlyStats(month, year);
-        if (!cancelled) {
-          setMonthStats(data);
-        }
-      } catch (error) {
+    setStatsLoading(true);
+    setStatsError(null);
+    getMonthlyStats(month, year)
+      .then((data) => {
+        if (!cancelled) setMonthStats(data);
+      })
+      .catch((error) => {
         if (!cancelled) {
           setMonthStats(null);
           setStatsError(getErrorMessage(error, 'Не удалось загрузить начисления.'));
         }
-      } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
-      }
-    };
-
-    loadStats();
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -203,281 +118,194 @@ export default function Payouts({ user }: Props) {
   }, [month, year]);
 
   const monthShifts = useMemo(
-    () =>
-      [...(shifts ?? [])].sort((left, right) => {
-        return getShiftSortKey(right.date, right.created_at) - getShiftSortKey(left.date, left.created_at);
-      }),
+    () => [...(shifts ?? [])].sort((left, right) => getShiftSortKey(right.date, right.created_at) - getShiftSortKey(left.date, left.created_at)),
     [shifts]
   );
-
   const approvedShifts = useMemo(() => monthShifts.filter((shift) => shift.status === 'approved'), [monthShifts]);
   const pendingShifts = useMemo(() => monthShifts.filter((shift) => shift.status === 'pending'), [monthShifts]);
   const rejectedShifts = useMemo(() => monthShifts.filter((shift) => shift.status === 'rejected'), [monthShifts]);
+  const approvedAmount = useMemo(() => approvedShifts.reduce((total, shift) => total + toNumber(shift.salary_earned), 0), [approvedShifts]);
+  const pendingAmount = useMemo(() => pendingShifts.reduce((total, shift) => total + toNumber(shift.salary_earned), 0), [pendingShifts]);
 
-  const approvedAmount = useMemo(
-    () => approvedShifts.reduce((total, shift) => total + toNumber(shift.salary_earned), 0),
-    [approvedShifts]
-  );
-  const pendingAmount = useMemo(
-    () => pendingShifts.reduce((total, shift) => total + toNumber(shift.salary_earned), 0),
-    [pendingShifts]
-  );
-  const rejectedAmount = useMemo(
-    () => rejectedShifts.reduce((total, shift) => total + toNumber(shift.salary_earned), 0),
-    [rejectedShifts]
-  );
-
-  const totalPayout = useMemo(() => {
-    if (!monthStats) {
-      return 0;
-    }
-
-    return toNumber(monthStats.total_payout);
-  }, [monthStats]);
-
-  const totalHours = monthStats ? monthStats.total_hours : '0';
-  const totalShifts = monthShifts.length;
-  const approvedCount = approvedShifts.length;
-  const pendingCount = pendingShifts.length;
-  const rejectedCount = rejectedShifts.length;
-
-  const resetToCurrent = () => {
-    setViewDate({
-      month: getCurrentMonth(),
-      year: getCurrentYear(),
-    });
-  };
-
-  const setSelectedMonth = (value: string) => {
-    const [nextYear, nextMonth] = value.split('-').map(Number);
-    if (!Number.isNaN(nextYear) && !Number.isNaN(nextMonth)) {
+  const applyMonth = () => {
+    const [nextYear, nextMonth] = draftMonth.split('-').map(Number);
+    if (Number.isFinite(nextYear) && Number.isFinite(nextMonth)) {
       setViewDate({ year: nextYear, month: nextMonth });
     }
+    setMonthSheetOpen(false);
   };
 
-  const hasAnyShifts = monthShifts.length > 0;
+  const resetMonth = () => setDraftMonth(initialMonthValue);
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-6 pt-6">
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-tg-text">Выплаты</h1>
-        <p className="text-sm text-tg-hint">Сводка по вашим сменам за выбранный месяц.</p>
-        <p className="text-xs text-tg-hint">Показаны личные начисления для {user.name}.</p>
-      </div>
-
-      <section className="surface-card rounded-[1.4rem] p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-tg-text">Период</p>
-            <p className="mt-1 text-xs text-tg-hint">Выберите месяц, чтобы посмотреть начисления и список смен.</p>
-          </div>
-          <button
-            type="button"
-            onClick={resetToCurrent}
-            disabled={isCurrentPeriod}
-            className="surface-muted shrink-0 rounded-xl px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
-          >
-            Текущий месяц
-          </button>
+    <div className="payouts-page mx-auto max-w-lg px-4 pb-6 pt-6" aria-label={`Личные выплаты: ${user.name || 'Сотрудник'}`}>
+      <header className="payouts-header">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold text-tg-text">Выплаты</h1>
+          <p className="mt-1 truncate text-sm text-tg-hint">{selectedMonthLabel}</p>
         </div>
+        <button type="button" className="payouts-period-button" onClick={() => setMonthSheetOpen(true)} aria-label="Выбрать месяц">
+          <CalendarDays className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </header>
 
-        <div className="space-y-2">
-          <label className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Месяц</label>
-          <div className="relative">
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tg-hint" />
-            <select
-              value={currentMonthValue}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-              className="w-full rounded-xl border border-tg-border bg-tg-bg py-3 pl-10 pr-4 text-sm font-medium text-tg-text outline-none focus:ring-2 focus:ring-tg-primary/40"
-            >
-              {monthOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="text-xs text-tg-hint">Сейчас выбран: {selectedMonthLabel}</p>
-        </div>
-      </section>
-
-      <section className="surface-card rounded-[1.45rem] p-4 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-tg-text">Начислено за месяц</p>
-            <p className="mt-1 text-xs text-tg-hint">Сводка считается по вашим сменам за {selectedMonthLabel}.</p>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-tg-primary/10 text-tg-primary">
-            <Wallet className="h-5 w-5" />
-          </div>
+      <section className="payouts-current" aria-labelledby="payouts-current-title">
+        <div>
+          <p id="payouts-current-title" className="text-sm text-tg-hint">Начислено за месяц</p>
+          <p className="payouts-current-amount">
+            {statsLoading || !monthStats ? '—' : formatCurrency(monthStats.total_payout)}
+          </p>
         </div>
 
         {statsLoading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-20 rounded-[1.35rem] bg-tg-bg/70" />
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((index) => (
-                <div key={index} className="h-20 rounded-[1.15rem] bg-tg-bg/70" />
-              ))}
-            </div>
-          </div>
+          <div className="payouts-loading-lines" aria-label="Загружаем начисления"><span /><span /></div>
         ) : statsError ? (
-          <div className="rounded-[1.2rem] bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">
-            <p className="font-medium">Сводка начислений недоступна</p>
-            <p className="mt-1 text-xs">{statsError}</p>
+          <p className="payouts-inline-error">Сводка начислений недоступна. {statsError}</p>
+        ) : monthStats ? (
+          <div className="payouts-current-facts">
+            <div><span>Утверждено</span><strong>{approvedShifts.length} · {formatCurrency(approvedAmount)}</strong></div>
+            <div><span>Предварительно</span><strong>{pendingShifts.length} · {formatCurrency(pendingAmount)}</strong></div>
+            <div><span>Часы и смены</span><strong>{formatHours(monthStats.total_hours)} · {monthShifts.length}</strong></div>
+            {rejectedShifts.length > 0 && <div><span>Не входит в начисления</span><strong>{rejectedShifts.length} смен</strong></div>}
           </div>
-        ) : (
-          <>
-            <div className="surface-muted rounded-[1.35rem] p-4">
-              <p className="text-xs uppercase tracking-wide text-tg-hint">Начислено</p>
-              <p className="mt-1 text-3xl font-semibold tracking-tight text-tg-text">
-                {formatCurrency(totalPayout)}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-tg-hint">
-                <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
-                  {formatHours(totalHours)}
-                </span>
-                <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
-                  {totalShifts} смен
-                </span>
-                <span className="rounded-full bg-tg-bg px-2.5 py-1 font-medium text-tg-text">
-                  {selectedMonthLabel}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SummaryMetric
-                title="Утверждено"
-                value={`${approvedCount} смен · ${formatCurrency(approvedAmount)}`}
-                hint="Смены учтены в начислениях"
-              />
-              <SummaryMetric
-                title="На подтверждении"
-                value={`${pendingCount} смен · ${formatCurrency(pendingAmount)}`}
-                hint="Это предварительная сумма"
-              />
-              <SummaryMetric
-                title="Не входит в расчёт"
-                value={`${rejectedCount} смен · ${formatCurrency(rejectedAmount)}`}
-                hint="Отклонённые смены не учитываются"
-              />
-            </div>
-          </>
-        )}
+        ) : null}
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
+      <section aria-labelledby="payouts-history-title">
+        <div className="payouts-section-heading">
           <div>
-            <p className="text-sm font-medium text-tg-text">Смены, влияющие на начисления</p>
-            <p className="mt-1 text-xs text-tg-hint">Список показывает, как каждая смена попадает в расчёт.</p>
+            <h2 id="payouts-history-title">История выплат</h2>
+            <p>Зафиксированные работодателем расчёты</p>
           </div>
-          <p className="text-xs text-tg-hint">{hasAnyShifts ? `${monthShifts.length} смен` : 'Нет смен'}</p>
-        </div>
-
-        {shiftsLoading ? (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((index) => (
-              <div key={index} className="h-24 rounded-[1.15rem] bg-tg-bg/70" />
-            ))}
-          </div>
-        ) : shiftsError ? (
-          <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
-            <CircleAlert className="mx-auto mb-3 h-12 w-12 text-rose-400" />
-            <p className="text-sm font-medium text-tg-text">Не удалось загрузить смены</p>
-            <p className="mt-2 text-xs text-tg-hint">{shiftsError}</p>
-          </div>
-        ) : hasAnyShifts ? (
-          <div className="space-y-3">
-            {monthShifts.map((shift) => (
-              <PayoutRow
-                key={shift.id}
-                date={shift.date ? formatDate(shift.date) : 'Дата не указана'}
-                hours={shift.total_hours}
-                amount={shift.salary_earned}
-                status={shift.status}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="surface-card rounded-[1.4rem] px-4 py-10 text-center">
-            <Clock3 className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
-            <p className="text-sm font-medium text-tg-text">За выбранный месяц начислений пока нет</p>
-            <p className="mt-1 text-xs text-tg-hint">Когда появятся смены, они отобразятся здесь с суммой и статусом.</p>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-sm font-medium text-tg-text">История выплат</p>
-          <p className="mt-1 text-xs text-tg-hint">Здесь отображаются расчёты и фактические выплаты, зафиксированные работодателем.</p>
+          <ReceiptText className="h-5 w-5 text-tg-hint" aria-hidden="true" />
         </div>
 
         {payrollRunsLoading ? (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2].map((index) => (
-              <div key={index} className="h-36 rounded-[1.15rem] bg-tg-bg/70" />
-            ))}
-          </div>
+          <div className="payouts-list-loading" aria-label="Загружаем историю выплат"><span /><span /></div>
         ) : payrollRunsError ? (
-          <div className="surface-card rounded-[1.4rem] px-4 py-6 text-center">
-            <CircleAlert className="mx-auto mb-3 h-10 w-10 text-rose-400" />
-            <p className="text-sm font-medium text-tg-text">Не удалось загрузить историю выплат</p>
-            <p className="mt-2 text-xs text-tg-hint">{payrollRunsError}</p>
+          <div className="payouts-state">
+            <CircleAlert className="h-6 w-6 text-tg-hint" aria-hidden="true" />
+            <p className="font-medium text-tg-text">Не удалось загрузить историю выплат</p>
+            <p>{payrollRunsError}</p>
           </div>
         ) : payrollRuns.length === 0 ? (
-          <div className="surface-card rounded-[1.4rem] px-4 py-8 text-center">
-            <p className="text-sm font-medium text-tg-text">Истории выплат пока нет</p>
-            <p className="mt-1 text-xs text-tg-hint">Здесь появятся выплаты, зафиксированные работодателем.</p>
+          <div className="payouts-state">
+            <p className="font-medium text-tg-text">Истории выплат пока нет</p>
+            <p>Здесь появятся выплаты, зафиксированные работодателем.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {payrollRuns.map((run) => {
-              const isPaid = run.status === 'paid';
-              const hasPayments = (run.payments ?? []).length > 0;
+          <div className="payouts-runs-list">
+            {payrollRuns.map((run) => (
+              <PayrollRunRow key={run.payroll_run_id} run={run} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="payouts-shifts-title">
+        <div className="payouts-section-heading">
+          <div>
+            <h2 id="payouts-shifts-title">Смены за период</h2>
+            <p>{monthShifts.length > 0 ? `${monthShifts.length} смен` : selectedMonthLabel}</p>
+          </div>
+        </div>
+
+        {shiftsLoading ? (
+          <div className="payouts-list-loading" aria-label="Загружаем смены"><span /><span /><span /></div>
+        ) : shiftsError ? (
+          <div className="payouts-state">
+            <CircleAlert className="h-6 w-6 text-tg-hint" aria-hidden="true" />
+            <p className="font-medium text-tg-text">Не удалось загрузить смены</p>
+            <p>{shiftsError}</p>
+          </div>
+        ) : monthShifts.length === 0 ? (
+          <div className="payouts-state">
+            <Clock3 className="h-6 w-6 text-tg-hint" aria-hidden="true" />
+            <p className="font-medium text-tg-text">За выбранный месяц выплат пока нет</p>
+            <p>Смены появятся здесь после сохранения.</p>
+          </div>
+        ) : (
+          <div className="payouts-shifts-list">
+            {monthShifts.map((shift) => {
+              const presentation = getShiftPresentation(shift.status);
               return (
-                <article key={run.payroll_run_id} className="surface-card space-y-3 rounded-[1.25rem] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-tg-text">{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</p>
-                      <p className="mt-1 text-xs text-tg-hint">{formatDate(run.period_start)} — {formatDate(run.period_end)}</p>
-                      <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Основная точка'}</p>
+                <article key={shift.id} className="payouts-shift-row">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate font-medium text-tg-text">{shift.date ? formatDate(shift.date) : 'Дата не указана'}</p>
+                      <span className="payouts-status" data-status={shift.status}>{presentation.status}</span>
                     </div>
-                    <span className="shrink-0 rounded-full surface-muted px-2.5 py-1 text-[11px] font-medium text-tg-text">
-                      {isPaid ? 'Выплачено' : 'Ожидает выплаты'}
-                    </span>
+                    <p className="mt-1 text-sm text-tg-hint">{formatHours(shift.total_hours || 0)} · {presentation.amount}</p>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-[11px]">
-                    <span className="text-tg-hint">Начислено <b className="mt-0.5 block text-sm text-tg-text">{formatCurrency(run.final_amount)}</b></span>
-                    <span className="text-tg-hint">Выплачено <b className="mt-0.5 block text-sm text-tg-text">{formatCurrency(run.paid_amount)}</b></span>
-                    <span className="text-tg-hint">Осталось <b className="mt-0.5 block text-sm text-tg-text">{formatCurrency(run.remaining_amount)}</b></span>
-                  </div>
-
-                  {!hasPayments && !isPaid ? (
-                    <p className="text-xs text-tg-hint">Выплата ещё не зафиксирована</p>
-                  ) : (
-                    <div className="space-y-2 border-t border-tg-hint/10 pt-3">
-                      {(run.payments ?? []).map((payment, index) => (
-                        <div key={`${run.payroll_run_id}-${payment.created_at}-${index}`} className="surface-muted rounded-xl px-3 py-2.5 text-xs">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-tg-hint">{formatDate(payment.payment_date)}</span>
-                            <b className="text-tg-text">{formatCurrency(payment.amount)}</b>
-                          </div>
-                          {payment.method && <p className="mt-1 text-tg-hint">Способ: {payment.method}</p>}
-                          {payment.comment && <p className="mt-1 text-tg-hint">{payment.comment}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <strong>{formatCurrency(shift.salary_earned || 0)}</strong>
                 </article>
               );
             })}
           </div>
         )}
       </section>
+
+      <BottomSheet open={monthSheetOpen} title="Выберите месяц" onClose={() => setMonthSheetOpen(false)}>
+        <div className="payouts-period-field">
+          <label htmlFor="payouts-month">Месяц</label>
+          <select id="payouts-month" value={draftMonth} onChange={(event) => setDraftMonth(event.target.value)}>
+            {monthOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="bottom-sheet-actions">
+          <button type="button" className="bottom-sheet-secondary" onClick={resetMonth}>Сбросить</button>
+          <button type="button" className="bottom-sheet-primary" onClick={applyMonth}>Применить</button>
+        </div>
+      </BottomSheet>
     </div>
+  );
+}
+
+function PayrollRunRow({ run }: { run: PersonalPayrollRun }) {
+  const [expanded, setExpanded] = useState(false);
+  const payments = Array.isArray(run.payments) ? run.payments : [];
+  const isPaid = run.status === 'paid';
+  const period = `${formatDate(run.period_start)} – ${formatDate(run.period_end)}`;
+
+  return (
+    <article className="payouts-run-row">
+      <button type="button" className="payouts-run-main" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+        <div className="min-w-0 text-left">
+          <p className="truncate font-semibold text-tg-text">{run.title || period}</p>
+          <p className="mt-1 truncate text-sm text-tg-hint">{period} · {run.venue_name || 'Основная точка'}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <span className="payouts-run-status" data-status={run.status}>{isPaid ? 'Выплачено' : 'Ожидает выплаты'}</span>
+          <ChevronDown className={`ml-auto mt-2 h-4 w-4 text-tg-hint transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </div>
+      </button>
+
+      <div className="payouts-run-totals">
+        <div><span>Начислено</span><strong>{formatCurrency(run.final_amount)}</strong></div>
+        <div><span>Выплачено</span><strong>{formatCurrency(run.paid_amount)}</strong></div>
+        <div><span>Осталось</span><strong>{formatCurrency(run.remaining_amount)}</strong></div>
+      </div>
+
+      {expanded && (
+        <div className="payouts-payments">
+          {payments.length === 0 ? (
+            <p>Выплата ещё не зафиксирована</p>
+          ) : (
+            payments.map((payment, index) => (
+              <div key={`${run.payroll_run_id}-${payment.created_at}-${index}`} className="payouts-payment-row">
+                <div>
+                  <span>{payment.payment_date ? formatDate(payment.payment_date) : 'Дата не указана'}</span>
+                  {payment.method && <p>Способ: {payment.method}</p>}
+                  {payment.comment && <p>{payment.comment}</p>}
+                </div>
+                <strong>{formatCurrency(payment.amount)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </article>
   );
 }

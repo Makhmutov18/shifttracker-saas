@@ -1218,6 +1218,316 @@ body, button, input, select, textarea {
   }
 }
 
+.payouts-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.payouts-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.payouts-period-button {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.payouts-period-button:focus-visible,
+.payouts-run-main:focus-visible {
+  outline: 2px solid var(--tg-primary);
+  outline-offset: 2px;
+}
+
+.payouts-current {
+  padding: 1.15rem 1.2rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.payouts-current-amount {
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: clamp(1.85rem, 9vw, 2.45rem);
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.payouts-current-facts {
+  display: grid;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.payouts-current-facts > div {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.payouts-current-facts > div:last-child {
+  border-bottom: 0;
+}
+
+.payouts-current-facts strong {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.payouts-loading-lines {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.payouts-loading-lines span {
+  height: 0.85rem;
+  border-radius: 0.35rem;
+  background: var(--surface-muted);
+  animation: dashboard-pulse 1.5s ease-in-out infinite;
+}
+
+.payouts-loading-lines span:last-child {
+  width: 58%;
+}
+
+.payouts-inline-error {
+  margin-top: 0.9rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.payouts-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.payouts-section-heading h2 {
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+.payouts-section-heading p {
+  margin-top: 0.2rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.payouts-runs-list,
+.payouts-shifts-list {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.payouts-run-row + .payouts-run-row,
+.payouts-shift-row + .payouts-shift-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.payouts-run-main {
+  display: flex;
+  width: 100%;
+  min-height: 4.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem 0.65rem;
+}
+
+.payouts-run-status,
+.payouts-status {
+  display: inline-block;
+  max-width: 9rem;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payouts-run-status {
+  padding: 0.25rem 0.5rem;
+}
+
+.payouts-run-status[data-status='paid'],
+.payouts-status[data-status='approved'],
+.payouts-status[data-status='pending'] {
+  color: var(--tg-primary);
+}
+
+.payouts-run-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0 1rem 0.95rem;
+}
+
+.payouts-run-totals > div {
+  min-width: 0;
+}
+
+.payouts-run-totals span,
+.payouts-run-totals strong {
+  display: block;
+}
+
+.payouts-run-totals span {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.payouts-run-totals strong {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.payouts-payments {
+  margin-inline: 1rem;
+  padding-block: 0.8rem 0.95rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.payouts-payment-row {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.55rem;
+}
+
+.payouts-payment-row + .payouts-payment-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.payouts-payment-row p {
+  margin-top: 0.2rem;
+}
+
+.payouts-payment-row strong {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.payouts-shift-row {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.payouts-shift-row > strong {
+  flex: 0 0 auto;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.payouts-status {
+  padding: 0.2rem 0.45rem;
+}
+
+.payouts-state {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+  padding: 1.1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.payouts-list-loading {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.payouts-list-loading span {
+  height: 5.5rem;
+  border-radius: 0.85rem;
+  background: var(--surface-muted);
+  animation: dashboard-pulse 1.5s ease-in-out infinite;
+}
+
+.payouts-period-field {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1.25rem;
+}
+
+.payouts-period-field label {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.payouts-period-field select {
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--tg-control-border);
+  border-radius: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 1rem;
+}
+
+@media (max-width: 374px) {
+  .payouts-run-main,
+  .payouts-shift-row {
+    padding-inline: 0.85rem;
+  }
+
+  .payouts-run-totals {
+    gap: 0.4rem;
+    padding-inline: 0.85rem;
+  }
+
+  .payouts-run-totals span {
+    font-size: 0.6875rem;
+  }
+}
+
 /* Safe area for bottom nav */
 .safe-area-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
