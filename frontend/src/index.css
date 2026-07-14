@@ -1735,6 +1735,449 @@ body, button, input, select, textarea {
   animation: dashboard-pulse 1.5s ease-in-out infinite;
 }
 
+/* Owner management hub and section controls */
+.owner-panel-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.owner-hub-header,
+.owner-section-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.owner-hub-header h1,
+.owner-section-header h1 {
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.owner-hub-header p,
+.owner-section-header p {
+  margin-top: 0.2rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.owner-hub-icon,
+.owner-hub-row-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+  color: var(--tg-primary);
+}
+
+.owner-hub-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+}
+
+.owner-section-back,
+.owner-icon-button {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.8rem;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.owner-management-hub {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-management-hub > button {
+  display: flex;
+  width: 100%;
+  min-height: 4.5rem;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 1rem;
+  color: var(--text-primary);
+}
+
+.owner-management-hub > button + button {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-management-hub > button:active {
+  background: var(--surface-muted);
+}
+
+.owner-hub-row-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.75rem;
+}
+
+.owner-hub-row-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.owner-management-hub strong,
+.owner-management-hub small {
+  display: block;
+}
+
+.owner-management-hub strong {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.owner-management-hub small {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.owner-empty-state {
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.owner-summary-panel,
+.owner-form-surface {
+  padding: 1rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-summary-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.owner-inline-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding-block: 0.8rem;
+  border-block: 1px solid var(--border-subtle);
+}
+
+.owner-inline-stat {
+  min-width: 0;
+}
+
+.owner-inline-stat span,
+.owner-inline-stat strong {
+  display: block;
+}
+
+.owner-inline-stat span {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
+.owner-inline-stat strong {
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.owner-summary-footer {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.owner-text-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--tg-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.owner-employee-card,
+.owner-approval-card {
+  padding: 0.95rem;
+  border-radius: 1rem;
+  background: var(--surface-muted);
+}
+
+.owner-employee-card[data-archived='true'] {
+  opacity: 0.78;
+}
+
+.owner-employee-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.owner-employee-heading p {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.owner-employee-role {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.owner-status-badge {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
+.owner-status-badge[data-status='active'],
+.owner-status-badge[data-status='pending'] {
+  background: color-mix(in srgb, var(--tg-primary) 10%, var(--surface-elevated));
+  color: var(--tg-primary);
+}
+
+.owner-employee-details {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-employee-details p,
+.owner-approval-facts p {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.owner-employee-details span,
+.owner-approval-facts span {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.owner-employee-details strong,
+.owner-approval-facts strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.owner-danger-zone {
+  margin-top: 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-status-action,
+.owner-self-label {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding-inline: 0.85rem;
+  border-radius: 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.owner-status-action[data-action='restore'] {
+  color: var(--tg-primary);
+}
+
+.owner-status-action:disabled {
+  opacity: 0.55;
+}
+
+.owner-approval-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.owner-approval-facts {
+  display: grid;
+  gap: 0.45rem;
+  padding-block: 0.75rem;
+  border-block: 1px solid var(--border-subtle);
+}
+
+.owner-edit-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border-radius: 0.85rem;
+  background: var(--surface-elevated);
+}
+
+.owner-field-control {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--tg-control-border);
+  border-radius: 0.8rem;
+  color: var(--text-primary);
+  background: var(--tg-control-bg);
+  font-size: 0.875rem;
+}
+
+.owner-comment {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.owner-primary-action,
+.owner-secondary-action,
+.owner-reject-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding-inline: 0.85rem;
+  border-radius: 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.owner-primary-action {
+  background: var(--tg-primary);
+  color: var(--tg-button-text);
+}
+
+.owner-secondary-action {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.owner-reject-action {
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.owner-primary-action:disabled,
+.owner-secondary-action:disabled,
+.owner-reject-action:disabled {
+  opacity: 0.55;
+}
+
+.owner-approval-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.owner-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.9rem;
+  background: var(--surface-muted);
+}
+
+.owner-segmented-control button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.7rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.owner-segmented-control button[data-active='true'] {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-section-back:focus-visible,
+.owner-management-hub > button:focus-visible,
+.owner-icon-button:focus-visible,
+.owner-text-button:focus-visible,
+.owner-status-action:focus-visible,
+.owner-primary-action:focus-visible,
+.owner-secondary-action:focus-visible,
+.owner-reject-action:focus-visible,
+.owner-segmented-control button:focus-visible {
+  outline: 2px solid var(--tg-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 374px) {
+  .owner-panel-page {
+    padding-inline: 0.85rem;
+  }
+
+  .owner-inline-stats {
+    gap: 0.5rem;
+  }
+
+  .owner-inline-stat strong {
+    font-size: 0.8125rem;
+  }
+
+  .owner-approval-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 374px) {
   .profile-theme-control button {
     flex-direction: column;
