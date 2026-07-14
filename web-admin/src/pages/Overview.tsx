@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Ban, Building2, Clock3, FileClock, Store, UserRoundX } from 'lucide-react';
 import { api } from '../api';
-import { ErrorState, LoadingState, MoneyValue, StatusBadge } from '../components/ui';
+import { AvatarStack, ErrorState, IconBadge, LoadingState, MoneyValue, Sparkline, StatusBadge, type BadgeVariant } from '../components/ui';
 import type { PayrollRunListItem, PayrollSummary, Shift, User, Venue } from '../types';
 import { currentMonthValue, formatDate, formatTime, hasPermission, monthBounds, monthParts } from '../utils';
 import type { RoutePath } from '../components/shell';
@@ -34,12 +34,9 @@ function TrendChart({ accruals, revenue }: { accruals: number[]; revenue: number
   const hasData = accruals.some(Boolean) || revenue.some(Boolean);
   if (!hasData) return <div className="chart-empty">Нет данных для динамики за выбранный период</div>;
   const max = Math.max(...accruals, ...revenue, 1);
-  return <div className="trend-chart"><div className="chart-legend"><span><i className="legend-accrual" />Начисления</span><span><i className="legend-revenue" />Выручка</span></div><svg viewBox="0 0 640 170" role="img" aria-label="Динамика начислений и выручки за месяц" preserveAspectRatio="none"><line x1="12" y1="158" x2="628" y2="158" className="chart-axis" /><path d={linePath(revenue, 640, 170, 12, max)} className="chart-line chart-line-revenue" /><path d={linePath(accruals, 640, 170, 12, max)} className="chart-line chart-line-accrual" /></svg></div>;
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  if (!values.some(Boolean)) return <span className="sparkline-empty">Нет активности</span>;
-  return <svg className="sparkline" viewBox="0 0 96 30" role="img" aria-label="Динамика выручки точки"><path d={linePath(values, 96, 30, 3)} /></svg>;
+  const revenueLine = linePath(revenue, 640, 170, 12, max);
+  const accrualLine = linePath(accruals, 640, 170, 12, max);
+  return <div className="trend-chart"><div className="chart-legend"><span><i className="legend-accrual" />Начисления</span><span><i className="legend-revenue" />Выручка</span></div><svg viewBox="0 0 640 170" role="img" aria-label="Динамика начислений и выручки за месяц" preserveAspectRatio="none"><defs><linearGradient id="accrual-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" className="chart-stop-accrual" /><stop offset="1" className="chart-stop-transparent" /></linearGradient><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" className="chart-stop-revenue" /><stop offset="1" className="chart-stop-transparent" /></linearGradient></defs><line x1="12" y1="158" x2="628" y2="158" className="chart-axis" /><path d={`${revenueLine} L628,158 L12,158 Z`} className="chart-area chart-area-revenue" /><path d={`${accrualLine} L628,158 L12,158 Z`} className="chart-area chart-area-accrual" /><path d={revenueLine} className="chart-line chart-line-revenue" /><path d={accrualLine} className="chart-line chart-line-accrual" /></svg></div>;
 }
 
 export function Overview({ user, venues, venueId, navigate }: { user: User; venues: Venue[]; venueId: string; navigate: (path: RoutePath) => void }) {
@@ -90,18 +87,29 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
   const venueMap = useMemo(() => new Map(venues.map((venue) => [venue.id, venue])), [venues]);
   const selectedVenue = venueId ? venueMap.get(venueId)?.name ?? 'Точка не указана' : 'Все точки';
   const attention = [
-    pending.length ? { icon: Clock3, text: `${pending.length} ${plural(pending.length, ['смена ждёт', 'смены ждут', 'смен ждут'])} подтверждения`, action: 'Открыть смены', path: '/shifts' as RoutePath } : null,
-    missingPay.length ? { icon: UserRoundX, text: `${missingPay.length} ${plural(missingPay.length, ['сотрудник без', 'сотрудника без', 'сотрудников без'])} настроенной оплаты`, action: 'Открыть команду', path: '/employees' as RoutePath } : null,
-    draftRuns.length ? { icon: FileClock, text: `${draftRuns.length} ${plural(draftRuns.length, ['черновик расчёта требует', 'черновика расчёта требуют', 'черновиков расчёта требуют'])} решения`, action: 'Открыть расчёты', path: '/payroll' as RoutePath } : null,
-    unpaidRuns.length ? { icon: AlertCircle, text: `${unpaidRuns.length} ${plural(unpaidRuns.length, ['расчёт имеет', 'расчёта имеют', 'расчётов имеют'])} остаток`, action: 'Открыть расчёты', path: '/payroll' as RoutePath } : null,
-    rejected.length ? { icon: Ban, text: `${rejected.length} ${plural(rejected.length, ['смена отклонена', 'смены отклонены', 'смен отклонено'])} за месяц`, action: 'Проверить смены', path: '/shifts' as RoutePath } : null,
-    inactiveVenues.length ? { icon: Store, text: `${inactiveVenues.length} ${plural(inactiveVenues.length, ['точка находится', 'точки находятся', 'точек находятся'])} в архиве`, action: 'Открыть точки', path: '/venues' as RoutePath } : null,
-  ].filter(Boolean) as Array<{ icon: typeof Clock3; text: string; action: string; path: RoutePath }>;
+    pending.length ? { icon: Clock3, tone: 'warning' as BadgeVariant, text: `${pending.length} ${plural(pending.length, ['смена ждёт', 'смены ждут', 'смен ждут'])} подтверждения`, action: 'Открыть смены', path: '/shifts' as RoutePath } : null,
+    missingPay.length ? { icon: UserRoundX, tone: 'danger' as BadgeVariant, text: `${missingPay.length} ${plural(missingPay.length, ['сотрудник без', 'сотрудника без', 'сотрудников без'])} настроенной оплаты`, action: 'Открыть команду', path: '/employees' as RoutePath } : null,
+    draftRuns.length ? { icon: FileClock, tone: 'info' as BadgeVariant, text: `${draftRuns.length} ${plural(draftRuns.length, ['черновик расчёта требует', 'черновика расчёта требуют', 'черновиков расчёта требуют'])} решения`, action: 'Открыть расчёты', path: '/payroll' as RoutePath } : null,
+    unpaidRuns.length ? { icon: AlertCircle, tone: 'warning' as BadgeVariant, text: `${unpaidRuns.length} ${plural(unpaidRuns.length, ['расчёт имеет', 'расчёта имеют', 'расчётов имеют'])} остаток`, action: 'Открыть расчёты', path: '/payroll' as RoutePath } : null,
+    rejected.length ? { icon: Ban, tone: 'danger' as BadgeVariant, text: `${rejected.length} ${plural(rejected.length, ['смена отклонена', 'смены отклонены', 'смен отклонено'])} за месяц`, action: 'Проверить смены', path: '/shifts' as RoutePath } : null,
+    inactiveVenues.length ? { icon: Store, tone: 'neutral' as BadgeVariant, text: `${inactiveVenues.length} ${plural(inactiveVenues.length, ['точка находится', 'точки находятся', 'точек находятся'])} в архиве`, action: 'Открыть точки', path: '/venues' as RoutePath } : null,
+  ].filter(Boolean) as Array<{ icon: typeof Clock3; tone: BadgeVariant; text: string; action: string; path: RoutePath }>;
   const daysInMonth = new Date(year, month, 0).getDate();
   const approvedShifts = shifts.filter((shift) => shift.status === 'approved');
   const accrualSeries = Array.from({ length: daysInMonth }, (_, index) => approvedShifts.filter((shift) => Number(shift.date.slice(8, 10)) === index + 1).reduce((sum, shift) => sum + Number(shift.salary_earned || 0), 0));
   const revenueSeries = Array.from({ length: daysInMonth }, (_, index) => approvedShifts.filter((shift) => Number(shift.date.slice(8, 10)) === index + 1).reduce((sum, shift) => sum + Number(shift.revenue || 0), 0));
   const visibleVenues = (venues ?? []).filter((venue) => venue.is_active && (!venueId || venue.id === venueId));
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const timeNow = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const activeUserIds = new Set(shifts.filter((shift) => {
+    if (shift.date !== today || shift.status === 'rejected') return false;
+    const start = (shift.start_time || '').slice(0, 5);
+    const end = (shift.end_time || '').slice(0, 5);
+    if (!start || !end) return false;
+    return end >= start ? timeNow >= start && timeNow <= end : timeNow >= start || timeNow <= end;
+  }).map((shift) => shift.user_id));
+  const activeNow = activeUsers.filter((employee) => activeUserIds.has(employee.id));
 
   if (loading) return <LoadingState text="Собираем данные за месяц…" />;
   if (error && !shifts.length) return <ErrorState message={error} retry={load} />;
@@ -128,9 +136,9 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
 
       <section className="overview-panel attention-panel">
         <div className="overview-section-header"><div><h2>Требует внимания</h2><span>{attention.length ? `${attention.length} активных задач` : 'Всё под контролем'}</span></div></div>
-        {attention.length ? <div className="attention-list">{attention.map(({ icon: Icon, text, action, path }) => (
+        {attention.length ? <div className="attention-list">{attention.map(({ icon: Icon, tone, text, action, path }) => (
           <button className="attention-row" key={text} onClick={() => navigate(path)}>
-            <span className="attention-icon"><Icon /></span><strong>{text}</strong><span>{action}<ArrowRight /></span>
+            <IconBadge tone={tone} icon={<Icon />} label={text} value={action} /><ArrowRight className="row-arrow" />
           </button>
         ))}</div> : <div className="compact-empty"><span>Критичных действий нет</span><small>Все текущие задачи обработаны.</small></div>}
       </section>
@@ -153,6 +161,11 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
       </section>
 
       <div className="overview-side-stack">
+        <section className="overview-panel on-shift-panel">
+          <div className="overview-section-header"><div><h2>Сейчас на смене</h2><span>Активные сотрудники</span></div></div>
+          {activeNow.length ? <div className="on-shift-content"><AvatarStack items={activeNow.map((employee) => ({ name: employee.name || 'Сотрудник' }))} max={6} /><div><strong>{activeNow.length} {plural(activeNow.length, ['сотрудник', 'сотрудника', 'сотрудников'])}</strong><span>{activeNow.slice(0, 3).map((employee) => employee.name).join(', ')}</span></div></div> : <div className="compact-empty"><span>Сейчас активных смен нет</span><small>Сотрудники появятся здесь в рабочее время.</small></div>}
+        </section>
+
         <section className="overview-panel">
           <div className="overview-section-header"><div><h2>Последние расчёты</h2><span>Зафиксированные начисления</span></div><button className="section-link" onClick={() => navigate('/payroll')}>Все расчёты<ArrowRight /></button></div>
           {runs.length ? <div className="overview-run-list">{runs.slice(0, 3).map((run) => (
@@ -169,7 +182,7 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
             const employeeCount = activeUsers.filter((employee) => employee.venue_id === venue.id).length;
             const shiftCount = shifts.filter((shift) => shift.venue_id === venue.id).length;
             const venueSeries = Array.from({ length: daysInMonth }, (_, index) => approvedShifts.filter((shift) => shift.venue_id === venue.id && Number(shift.date.slice(8, 10)) === index + 1).reduce((sum, shift) => sum + Number(shift.revenue || 0), 0));
-            return <div className="venue-state-row" key={venue.id}><span><strong title={venue.name}>{venue.name}</strong><small>{employeeCount} {plural(employeeCount, ['сотрудник', 'сотрудника', 'сотрудников'])}</small></span><Sparkline values={venueSeries} /><strong>{shiftCount} {plural(shiftCount, ['смена', 'смены', 'смен'])}</strong></div>;
+            return <div className="venue-state-row" key={venue.id}><span><strong title={venue.name}>{venue.name}</strong><small>{employeeCount} {plural(employeeCount, ['сотрудник', 'сотрудника', 'сотрудников'])}</small></span><Sparkline values={venueSeries} label={`Динамика выручки: ${venue.name}`} /><strong>{shiftCount} {plural(shiftCount, ['смена', 'смены', 'смен'])}</strong></div>;
           })}</div> : <div className="compact-empty"><span>Активных точек нет</span><small>Добавьте точку в разделе управления.</small></div>}
         </section>
       </div>

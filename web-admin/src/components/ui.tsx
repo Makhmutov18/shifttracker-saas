@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { AlertCircle, ArrowDown, ArrowUp, CheckCircle2, ChevronLeft, ChevronRight, Inbox, LoaderCircle, Search, X } from 'lucide-react';
 import { formatMoney, statusLabels } from '../utils';
 
@@ -20,6 +20,52 @@ export function MoneyValue({ value, muted = false }: { value: string | number | 
 
 export function Badge({ variant = 'neutral', icon, children }: { variant?: BadgeVariant; icon?: ReactNode; children: ReactNode }) {
   return <span className={`badge badge-${variant}`}>{icon}{children}</span>;
+}
+
+export function IconBadge({ tone = 'neutral', icon, label, value }: { tone?: BadgeVariant; icon: ReactNode; label: string; value?: ReactNode }) {
+  return <span className={`icon-badge icon-badge-${tone}`}><span className="icon-badge-mark">{icon}</span><span className="icon-badge-copy"><strong>{label}</strong>{value !== undefined && <small>{value}</small>}</span></span>;
+}
+
+export interface AvatarStackItem { name: string; url?: string | null }
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : parts[0]?.slice(0, 2) || 'С').toUpperCase();
+}
+
+function avatarTone(name: string): number {
+  return Array.from(name).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 5;
+}
+
+export function AvatarStack({ items, max = 4 }: { items: AvatarStackItem[]; max?: number }) {
+  const safeItems = (items ?? []).filter((item) => item?.name).slice(0, Math.max(0, max));
+  const hidden = Math.max(0, (items ?? []).length - safeItems.length);
+  return <span className="avatar-stack" aria-label={(items ?? []).map((item) => item.name).join(', ') || 'Сотрудники не указаны'}>
+    {safeItems.map((item, index) => <span className={`avatar-stack-item avatar-tone-${avatarTone(item.name)}`} title={item.name} key={`${item.name}-${index}`}>{initials(item.name)}{item.url && <img src={item.url} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}</span>)}
+    {hidden > 0 && <span className="avatar-stack-more">+{hidden}</span>}
+  </span>;
+}
+
+export function RadialStat({ value, max, label, tone = 'info' }: { value: number; max: number; label: string; tone?: BadgeVariant }) {
+  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const percent = Math.round(ratio * 100);
+  const style = { '--radial-offset': 100 - ratio * 100 } as CSSProperties;
+  return <div className={`radial-stat radial-stat-${tone}`}><span className="radial-stat-chart" style={style}><svg viewBox="0 0 42 42" aria-hidden="true"><circle className="radial-track" cx="21" cy="21" r="16" pathLength="100" /><circle className="radial-value" cx="21" cy="21" r="16" pathLength="100" /></svg><strong>{percent}%</strong></span><span><strong>{value} из {max}</strong><small>{label}</small></span></div>;
+}
+
+function sparklinePath(values: number[]): string {
+  if (!values.length) return '';
+  const max = Math.max(...values, 1);
+  return values.map((value, index) => {
+    const x = 3 + index * (90 / Math.max(1, values.length - 1));
+    const y = 27 - value / max * 24;
+    return `${index ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+export function Sparkline({ values, label = 'Динамика' }: { values: number[]; label?: string }) {
+  if (!(values ?? []).some(Boolean)) return <span className="sparkline-empty">Нет активности</span>;
+  return <svg className="sparkline" viewBox="0 0 96 30" role="img" aria-label={label}><path d={sparklinePath(values)} /></svg>;
 }
 
 function statusVariant(status: string): BadgeVariant {
