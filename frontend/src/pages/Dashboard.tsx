@@ -113,7 +113,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
   }, [canApproveShifts]);
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
+    <div className="mx-auto max-w-lg space-y-4 px-4 pb-6 pt-6">
       <button
         type="button"
         onClick={() => onNavigate('profile')}

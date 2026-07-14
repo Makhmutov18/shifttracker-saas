@@ -258,7 +258,7 @@ export default function Payouts({ user }: Props) {
   const hasAnyShifts = monthShifts.length > 0;
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
+    <div className="mx-auto max-w-lg space-y-4 px-4 pb-6 pt-6">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-tg-text">Выплаты</h1>
         <p className="text-sm text-tg-hint">Сводка по вашим сменам за выбранный месяц.</p>

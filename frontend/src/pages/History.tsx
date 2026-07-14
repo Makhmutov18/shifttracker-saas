@@ -179,7 +179,7 @@ export default function History({ user }: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
+    <div className="mx-auto max-w-lg space-y-4 px-4 pb-6 pt-6">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-tg-text">История</h1>
         <p className="text-sm text-tg-hint">Смены, расходы и начисления за выбранный месяц.</p>
