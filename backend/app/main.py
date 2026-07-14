@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import init_db
 from app.routers.api import router as api_router
 from app.routers.admin import router as admin_router
-from app.routers.web_auth import router as web_auth_router
+from app.routers.web_auth import install_oidc_access_log_filter, router as web_auth_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan: init DB, seed admin, setup bot webhook."""
     global _bot, _dispatcher
 
+    install_oidc_access_log_filter()
     logger.info("Starting up...")
     await init_db()
     logger.info("Database initialized")

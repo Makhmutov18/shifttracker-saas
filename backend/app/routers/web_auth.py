@@ -43,6 +43,46 @@ OIDC_AUTH_URL = "https://oauth.telegram.org/auth"
 OIDC_TOKEN_URL = "https://oauth.telegram.org/token"
 OIDC_JWKS_URL = "https://oauth.telegram.org/.well-known/jwks.json"
 STATE_COOKIE = "shifttracker_web_auth_state"
+OIDC_CALLBACK_PATH = "/api/web-auth/telegram/callback"
+POSTGRES_BIGINT_MAX = (1 << 63) - 1
+
+
+def _parse_telegram_user_id(value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError("invalid Telegram user id")
+    if isinstance(value, int):
+        telegram_user_id = value
+    elif isinstance(value, str) and value.isascii() and value.isdecimal():
+        telegram_user_id = int(value)
+    else:
+        raise ValueError("invalid Telegram user id")
+    if telegram_user_id <= 0 or telegram_user_id > POSTGRES_BIGINT_MAX:
+        raise ValueError("Telegram user id is outside PostgreSQL BIGINT range")
+    return telegram_user_id
+
+
+def _redact_oidc_callback_path(path: str) -> str:
+    if path == OIDC_CALLBACK_PATH or path.startswith(f"{OIDC_CALLBACK_PATH}?"):
+        return OIDC_CALLBACK_PATH
+    return path
+
+
+class OidcCallbackAccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if record.name == "uvicorn.access" and isinstance(args, tuple) and len(args) >= 3:
+            request_path = args[2]
+            if isinstance(request_path, str):
+                redacted_args = list(args)
+                redacted_args[2] = _redact_oidc_callback_path(request_path)
+                record.args = tuple(redacted_args)
+        return True
+
+
+def install_oidc_access_log_filter() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, OidcCallbackAccessLogFilter) for item in access_logger.filters):
+        access_logger.addFilter(OidcCallbackAccessLogFilter())
 
 
 def _admin_public_url(path: str = "/admin/") -> str:
@@ -226,11 +266,9 @@ async def telegram_login_callback(
     try:
         token_payload = await _exchange_code(code, str(state_payload["verifier"]))
         claims = await _validate_id_token(str(token_payload["id_token"]), str(state_payload["nonce"]))
-        telegram_id = claims.get("sub") or claims.get("id")
-        if not telegram_id:
-            return _auth_error_redirect("invalid_account")
+        telegram_user_id = _parse_telegram_user_id(claims.get("id"))
         result = await session.execute(
-            select(User).options(selectinload(User.venue)).where(User.telegram_id == int(telegram_id))
+            select(User).options(selectinload(User.venue)).where(User.telegram_id == telegram_user_id)
         )
         user = result.scalar_one_or_none()
         if not user:
