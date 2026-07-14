@@ -1,119 +1,71 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Shift } from '../utils/api';
-import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
+import { formatCurrency, formatHours, formatTime } from '../utils/helpers';
 
 interface Props {
   shift: Shift;
+  venueName?: string;
 }
 
-function StatusBadge({ label, tone }: { label: string; tone: 'approved' | 'pending' | 'rejected' }) {
-  const toneClasses =
-    tone === 'approved'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-      : tone === 'rejected'
-      ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300'
-      : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
-
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses}`}>{label}</span>;
+function getShiftPresentation(status: Shift['status']) {
+  if (status === 'approved') {
+    return { status: 'Утверждена', amount: 'Начислено' };
+  }
+  if (status === 'rejected') {
+    return { status: 'Отклонена', amount: 'Не входит в начисления' };
+  }
+  return { status: 'На подтверждении', amount: 'Предварительно' };
 }
 
-export default function ShiftCard({ shift }: Props) {
+export default function ShiftCard({ shift, venueName = 'Точка не указана' }: Props) {
   const [expanded, setExpanded] = useState(false);
-
-  const isApproved = shift.status === 'approved';
-  const isRejected = shift.status === 'rejected';
-  const isPending = shift.status === 'pending';
-  const statusLabel = isApproved
-    ? 'Утверждена'
-    : isRejected
-      ? 'Отклонена'
-      : isPending
-        ? 'На подтверждении'
-        : 'Статус уточняется';
-  const payoutLabel = isApproved
-    ? 'Начислено'
-    : isPending
-      ? 'Предварительно'
-      : isRejected
-        ? 'Не входит в расчёт'
-        : 'Сумма';
-  const amountClass = isApproved ? 'text-tg-text' : 'text-tg-hint';
+  const presentation = getShiftPresentation(shift.status);
+  const startTime = shift.start_time ? formatTime(shift.start_time) : '';
+  const endTime = shift.end_time ? formatTime(shift.end_time) : '';
+  const timeLabel = startTime && endTime ? `${startTime}–${endTime}` : 'Время не указано';
 
   return (
-    <div
-      className="surface-card rounded-[1.35rem] overflow-hidden shadow-sm transition-all duration-200 cursor-pointer"
-      onClick={() => setExpanded(!expanded)}
-    >
-      <div className="flex items-start justify-between gap-3 p-4">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div
-            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              isApproved
-                ? 'bg-emerald-50 dark:bg-emerald-900/20'
-                : isRejected
-                  ? 'bg-rose-50 dark:bg-rose-900/20'
-                  : 'bg-amber-50 dark:bg-amber-900/20'
-            }`}
-          >
-            {isApproved ? (
-              <CheckCircle className="h-5 w-5 text-emerald-500" />
-            ) : isRejected ? (
-              <XCircle className="h-5 w-5 text-rose-500" />
-            ) : (
-              <Clock className="h-5 w-5 text-amber-500" />
-            )}
+    <article className="history-shift-row">
+      <button
+        type="button"
+        className="history-shift-main"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        <div className="min-w-0 flex-1 text-left">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate font-semibold text-tg-text">{timeLabel}</p>
+            <span className="history-status" data-status={shift.status}>{presentation.status}</span>
           </div>
-
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-tg-text">{formatDate(shift.date)}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <StatusBadge label={statusLabel} tone={isApproved ? 'approved' : isRejected ? 'rejected' : 'pending'} />
-              <span className="inline-flex items-center rounded-full bg-tg-bg px-2.5 py-1 text-[11px] font-medium text-tg-hint">
-                {payoutLabel}
-              </span>
-            </div>
-          </div>
+          <p className="mt-1 truncate text-sm text-tg-hint">
+            {venueName} · {formatHours(shift.total_hours || 0)}
+          </p>
         </div>
+        <ChevronDown className={`h-5 w-5 shrink-0 text-tg-hint transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
 
-        <div className="text-right">
-          <p className={`text-sm font-semibold ${amountClass}`}>{formatCurrency(shift.salary_earned)}</p>
-          <p className="mt-1 text-xs text-tg-hint">{formatHours(shift.total_hours)}</p>
-        </div>
-
-        <div className="ml-1 text-tg-hint">
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </div>
+      <div className="history-shift-amount">
+        <span>{presentation.amount}</span>
+        <strong>{formatCurrency(shift.salary_earned || 0)}</strong>
       </div>
 
-      <div
-        className={`overflow-hidden transition-all duration-200 ${
-          expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="space-y-2 border-t border-tg-border px-4 pb-4 pt-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-tg-hint">Начало смены</span>
-            <span className="font-medium text-tg-text">{formatTime(shift.start_time)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-tg-hint">Конец смены</span>
-            <span className="font-medium text-tg-text">{formatTime(shift.end_time)}</span>
-          </div>
+      {expanded && (
+        <div className="history-shift-details">
           {shift.revenue && parseFloat(shift.revenue) > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-tg-hint">Выручка</span>
-              <span className="font-medium text-tg-text">{formatCurrency(shift.revenue)}</span>
+            <div>
+              <span>Выручка</span>
+              <strong>{formatCurrency(shift.revenue)}</strong>
             </div>
           )}
           {shift.comment && (
-            <div className="border-t border-tg-border pt-2">
-              <p className="mb-1 text-xs text-tg-hint">Комментарий</p>
-              <p className="text-sm text-tg-text">{shift.comment}</p>
+            <div className="history-shift-comment">
+              <span>Комментарий</span>
+              <p>{shift.comment}</p>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      )}
+    </article>
   );
 }
