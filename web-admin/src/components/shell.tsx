@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { User, Venue } from '../types';
 import { hasPermission, roleLabels } from '../utils';
+import { SearchSelect } from './ui';
 
 export type RoutePath = '/overview' | '/shifts' | '/payroll' | '/employees' | '/venues' | '/audit';
 
@@ -100,13 +101,10 @@ export function TopBar({
   return <header className="topbar">
     <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
     <div className="topbar-spacer" />
-    <label className="venue-control">
+    <div className="topbar-venue-filter">
       <Building2 />
-      <select aria-label="Фильтр точки" value={venueId} onChange={(event) => onVenue(event.target.value)}>
-        <option value="">Все точки</option>
-        {venues.filter((venue) => venue.is_active).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
-      </select>
-    </label>
+      <SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} />
+    </div>
     {action}
     <details className="user-menu">
       <summary aria-label="Меню пользователя">
