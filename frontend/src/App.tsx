@@ -70,18 +70,24 @@ export default function App() {
           />
         );
       default:
-        return <Dashboard user={user} onNavigate={setPage} />;
+        return <Dashboard user={user} onNavigate={handleNavigate} />;
     }
   };
 
+  const showBottomNav = page !== 'shift';
+
   return (
-    <div className="min-h-screen bg-tg-bg text-tg-text pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
-      {renderPage()}
-      <BottomNav
-        currentPage={page}
-        onNavigate={handleNavigate}
-        isAdmin={isAdmin}
-      />
+    <div className={`app-shell min-h-screen bg-tg-bg text-tg-text ${showBottomNav ? 'app-shell-with-dock' : 'app-shell-fullscreen'}`}>
+      <main className={showBottomNav ? 'app-page' : 'app-page app-page-shift'}>
+        {renderPage()}
+      </main>
+      {showBottomNav && (
+        <BottomNav
+          currentPage={page}
+          onNavigate={handleNavigate}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
