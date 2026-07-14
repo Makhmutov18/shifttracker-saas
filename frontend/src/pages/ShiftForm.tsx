@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle, Clock, MapPin, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronDown, Clock, MapPin, MessageSquare, Send } from 'lucide-react';
 import { Shift, User, createShift, getErrorMessage } from '../utils/api';
 import { formatCurrency, formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
@@ -13,8 +13,8 @@ interface Props {
 function getPayModelLabel(user: User) {
   if (user.pay_model === 'hourly') return `${formatCurrency(user.hourly_rate)}/ч`;
   if (user.pay_model === 'fixed_shift') return `${formatCurrency(user.hourly_rate)}/смена`;
-  if (user.pay_model === 'revenue') return `${user.revenue_percentage}% от выручки`;
-  return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`;
+  if (user.pay_model === 'revenue') return `${user.revenue_percentage || '0'}% от выручки`;
+  return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage || '0'}%`;
 }
 
 export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
@@ -23,17 +23,20 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const [endTime, setEndTime] = useState('18:00');
   const [revenue, setRevenue] = useState('');
   const [comment, setComment] = useState('');
+  const [commentOpen, setCommentOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<{ hours: string; salary: string; status: Shift['status'] } | null>(null);
 
   const needsRevenue = user.pay_model === 'revenue' || user.pay_model === 'hybrid';
   const venueName = user.venue?.name?.trim() || 'Основная точка';
+  const isToday = date === getTodayDate();
+  const isOvernight = startTime >= endTime;
 
   const totalHours = useMemo(() => {
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
-    let startMin = sh * 60 + sm;
+    const startMin = sh * 60 + sm;
     let endMin = eh * 60 + em;
     if (endMin < startMin) endMin += 24 * 60;
     return ((endMin - startMin) / 60).toFixed(2);
@@ -57,8 +60,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const handleSubmit = async () => {
     if (submitting) return;
 
-    const isOvernight = startTime >= endTime;
-    if (isOvernight && parseFloat(totalHours) > 16) {
+    if (parseFloat(totalHours) > 16) {
       setError('Смена не может длиться более 16 часов');
       return;
     }
@@ -85,194 +87,179 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
     }
   };
 
-  const successTitle =
-    saved?.status === 'pending' ? 'Смена отправлена на подтверждение' : 'Смена создана';
-  const successDescription =
-    saved?.status === 'pending'
-      ? 'Смена сохранена и ждёт подтверждения старшего.'
-      : `${date === getTodayDate() ? 'Сегодня' : 'Вчера'}, ${startTime} - ${endTime}`;
+  const successTitle = saved?.status === 'pending' ? 'Смена отправлена' : 'Смена сохранена';
 
-  return (
-    <div className="mx-auto max-w-lg px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] pt-6">
-      {saved ? (
-        <div className="space-y-4 text-center">
-          <div className="surface-card rounded-[1.4rem] p-5">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-tg-primary/10 text-tg-primary">
-              <CheckCircle className="h-8 w-8" />
-            </div>
-            <h2 className="text-xl font-semibold text-tg-text">{successTitle}</h2>
-            <p className="mt-2 text-sm text-tg-hint">{successDescription}</p>
-
-            <div className="accent-card mt-5 rounded-[1.4rem] p-5 text-white">
-              <p className="text-sm opacity-80">{saved.status === 'pending' ? 'Предварительно' : 'Начислено'}</p>
-              <p className="mt-1 text-3xl font-bold">{formatCurrency(saved.salary)}</p>
-              <p className="mt-1 text-sm opacity-80">{formatHours(saved.hours)}</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={onOpenHistory}
-              className="surface-card w-full rounded-2xl px-6 py-4 text-sm font-semibold text-tg-text transition-transform active:scale-[0.98]"
-            >
-              К истории смен
-            </button>
-            <button
-              onClick={onBack}
-              className="surface-card w-full rounded-2xl px-6 py-4 text-sm font-semibold text-tg-text transition-transform active:scale-[0.98]"
-            >
-              На главную
-            </button>
-          </div>
+  if (saved) {
+    return (
+      <div className="shift-form-page shift-success-page mx-auto max-w-lg px-4 pt-6">
+        <div className="shift-success-icon" aria-hidden="true">
+          <CheckCircle className="h-8 w-8" />
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="rounded-xl p-2 transition-colors hover:bg-tg-secondary-bg">
-              <ArrowLeft className="h-5 w-5 text-tg-text" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold text-tg-text">Новая смена</h1>
-              <p className="text-sm text-tg-hint">Заполните данные смены и сохраните её в историю.</p>
-            </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-tg-text">{successTitle}</h1>
+          <p className="mt-2 text-sm text-tg-hint">
+            {isToday ? 'Сегодня' : 'Вчера'}, {startTime}–{endTime} · {formatHours(saved.hours)}
+          </p>
+        </div>
+
+        <section className="shift-summary" aria-label="Итог смены">
+          <p className="text-sm text-tg-hint">{saved.status === 'pending' ? 'Предварительно' : 'Начислено'}</p>
+          <p className="shift-summary-amount">{formatCurrency(saved.salary)}</p>
+          <div className="shift-summary-meta">
+            <span>{formatHours(saved.hours)}</span>
+            <span>{isToday ? 'Сегодня' : 'Вчера'}, {startTime}–{endTime}</span>
           </div>
+        </section>
 
-          <section className="surface-card rounded-[1.35rem] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-tg-text">Дата смены</p>
-                <p className="mt-1 text-xs text-tg-hint">Выберите день, за который вы вносите смену.</p>
-              </div>
-              <div className="rounded-full bg-tg-primary/10 px-3 py-1 text-xs font-medium text-tg-primary">
-                {date === getTodayDate() ? 'Сегодня' : 'Вчера'}
-              </div>
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => setDate(getTodayDate())}
-                className={`flex-1 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  date === getTodayDate() ? 'bg-tg-primary text-tg-button-text' : 'surface-muted text-tg-text'
-                }`}
-              >
-                Сегодня
-              </button>
-              <button
-                onClick={() => setDate(getYesterdayDate())}
-                className={`flex-1 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  date === getYesterdayDate() ? 'bg-tg-primary text-tg-button-text' : 'surface-muted text-tg-text'
-                }`}
-              >
-                Вчера
-              </button>
-            </div>
-          </section>
-
-          <section className="surface-card rounded-[1.35rem] p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-tg-text">
-              <Clock className="h-4 w-4 text-tg-primary" />
-              Начало и конец смены
-            </div>
-            <p className="mt-1 text-xs text-tg-hint">Укажите рабочее время. Смена может переходить через полночь.</p>
-
-            <div className="mt-4 grid gap-3">
-              <label className="space-y-2">
-                <span className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Начало смены</span>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full rounded-xl border border-tg-border bg-tg-bg px-4 py-3 text-lg font-semibold text-tg-text outline-none appearance-none placeholder:text-tg-hint focus:ring-2 focus:ring-tg-primary/30 [&::-webkit-calendar-picker-indicator]:opacity-50"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="block text-xs font-medium uppercase tracking-wide text-tg-hint">Конец смены</span>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full rounded-xl border border-tg-border bg-tg-bg px-4 py-3 text-lg font-semibold text-tg-text outline-none appearance-none placeholder:text-tg-hint focus:ring-2 focus:ring-tg-primary/30 [&::-webkit-calendar-picker-indicator]:opacity-50"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="surface-card rounded-[1.35rem] p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-tg-text">
-              <MapPin className="h-4 w-4 text-tg-primary" />
-              Точка
-            </div>
-            <p className="mt-1 text-xs text-tg-hint">Смена будет сохранена за текущей точкой сотрудника.</p>
-            <div className="mt-3 rounded-xl bg-tg-secondary-bg/70 px-4 py-3">
-              <p className="text-sm font-medium text-tg-text">{venueName}</p>
-              <p className="mt-0.5 text-xs text-tg-hint">Модель оплаты: {getPayModelLabel(user)}</p>
-            </div>
-          </section>
-
-          {needsRevenue && (
-            <section className="surface-card rounded-[1.35rem] p-4">
-              <label className="block text-sm font-medium text-tg-text">
-                Выручка за смену
-                <span className="mt-1 block text-xs font-normal text-tg-hint">
-                  Нужна для расчёта, если у сотрудника есть процент от выручки.
-                </span>
-              </label>
-              <input
-                type="number"
-                value={revenue}
-                onChange={(e) => setRevenue(e.target.value)}
-                min="0"
-                step="0.01"
-                placeholder="Введите выручку"
-                className="mt-3 w-full rounded-xl border border-tg-border bg-tg-bg px-4 py-3 text-sm text-tg-text outline-none placeholder:text-tg-hint focus:ring-2 focus:ring-tg-primary/30"
-              />
-              {user.pay_model === 'hybrid' && (
-                <p className="mt-2 text-xs text-tg-hint">+ {formatCurrency(user.hourly_rate)}/ч × {formatHours(totalHours)}</p>
-              )}
-              {user.pay_model === 'revenue' && (
-                <p className="mt-2 text-xs text-tg-hint">{user.revenue_percentage}% от выручки</p>
-              )}
-            </section>
-          )}
-
-          <section className="surface-card rounded-[1.35rem] p-4">
-            <label className="block text-sm font-medium text-tg-text">
-              Комментарий
-              <span className="mt-1 block text-xs font-normal text-tg-hint">Необязательно. Можно добавить заметку для истории.</span>
-            </label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Комментарий к смене"
-              rows={3}
-              className="mt-3 w-full resize-none rounded-xl border border-tg-border bg-tg-bg px-4 py-3 text-sm text-tg-text outline-none placeholder:text-tg-hint focus:ring-2 focus:ring-tg-primary/30"
-            />
-          </section>
-
-          <section className="accent-card rounded-[1.4rem] p-5 text-white">
-            <p className="text-sm opacity-80">Предварительный расчёт</p>
-            <div className="mt-1 flex items-baseline justify-between gap-3">
-              <p className="text-3xl font-bold">{formatCurrency(salary)}</p>
-              <p className="text-lg opacity-90">{formatHours(totalHours)}</p>
-            </div>
-            <p className="mt-2 text-sm opacity-80">
-              {date === getTodayDate() ? 'Сегодня' : 'Вчера'} · {startTime} – {endTime}
-            </p>
-          </section>
-
-          {error && <p className="text-center text-sm text-rose-500">{error}</p>}
-
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-tg-primary px-6 py-4 text-sm font-semibold text-tg-button-text transition-transform active:scale-[0.98] disabled:opacity-50"
-          >
-            <Send className="h-5 w-5" />
-            {submitting ? 'Сохранение...' : 'Сохранить смену'}
+        <div className="shift-success-actions">
+          <button type="button" onClick={onOpenHistory} className="shift-primary-button">
+            Открыть историю
+          </button>
+          <button type="button" onClick={onBack} className="shift-secondary-button">
+            На главную
           </button>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="shift-form-page mx-auto max-w-lg px-4 pt-5">
+      <header className="shift-form-header">
+        <button type="button" onClick={onBack} className="shift-back-button" aria-label="Вернуться на главную">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-semibold text-tg-text">Новая смена</h1>
+          <p className="mt-1 truncate text-sm text-tg-hint">{venueName}</p>
+        </div>
+      </header>
+
+      <main className="shift-form-content">
+        <section className="shift-form-section" aria-labelledby="shift-date-title">
+          <h2 id="shift-date-title" className="shift-section-title">Дата</h2>
+          <div className="shift-segmented" role="group" aria-label="Дата смены">
+            <button
+              type="button"
+              aria-pressed={isToday}
+              data-active={isToday}
+              onClick={() => setDate(getTodayDate())}
+            >
+              Сегодня
+            </button>
+            <button
+              type="button"
+              aria-pressed={!isToday}
+              data-active={!isToday}
+              onClick={() => setDate(getYesterdayDate())}
+            >
+              Вчера
+            </button>
+          </div>
+        </section>
+
+        <section className="shift-form-section" aria-labelledby="shift-time-title">
+          <div className="shift-section-heading">
+            <h2 id="shift-time-title" className="shift-section-title">Рабочее время</h2>
+            <Clock className="h-5 w-5 text-tg-hint" aria-hidden="true" />
+          </div>
+          <div className="shift-time-grid">
+            <label>
+              <span>Начало смены</span>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Конец смены</span>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="shift-time-total">
+            <strong>Итого: {formatHours(totalHours)}</strong>
+            {isOvernight && <span>Смена завершится на следующий день</span>}
+          </div>
+        </section>
+
+        <section className="shift-context-row" aria-label="Точка и модель оплаты">
+          <MapPin className="h-5 w-5 shrink-0 text-tg-primary" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-tg-text">{venueName}</p>
+            <p className="mt-0.5 truncate text-sm text-tg-hint">{getPayModelLabel(user)}</p>
+          </div>
+        </section>
+
+        {needsRevenue && (
+          <section className="shift-form-section" aria-labelledby="shift-revenue-title">
+            <label id="shift-revenue-title" htmlFor="shift-revenue" className="shift-section-title">Выручка</label>
+            <input
+              id="shift-revenue"
+              type="number"
+              value={revenue}
+              onChange={(event) => setRevenue(event.target.value)}
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="0 ₽"
+              className="shift-revenue-input"
+            />
+            <p className="mt-2 text-sm text-tg-hint">Модель оплаты: {getPayModelLabel(user)}</p>
+          </section>
+        )}
+
+        <section className="shift-comment-section">
+          <button
+            type="button"
+            className="shift-comment-toggle"
+            onClick={() => setCommentOpen((open) => !open)}
+            aria-expanded={commentOpen}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <MessageSquare className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
+              <span>{comment ? 'Комментарий добавлен' : 'Добавить комментарий'}</span>
+            </span>
+            <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${commentOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+          </button>
+          {commentOpen && (
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              placeholder="Комментарий к смене"
+              rows={3}
+              className="shift-comment-input"
+            />
+          )}
+        </section>
+
+        <section className="shift-summary" aria-label="Предварительный расчёт">
+          <p className="text-sm text-tg-hint">Предварительно</p>
+          <p className="shift-summary-amount">{formatCurrency(salary)}</p>
+          <div className="shift-summary-meta">
+            <span>{formatHours(totalHours)}</span>
+            <span>{isToday ? 'Сегодня' : 'Вчера'}, {startTime}–{endTime}</span>
+          </div>
+        </section>
+
+        {error && <p className="shift-form-error" role="alert">{error}</p>}
+      </main>
+
+      <footer className="shift-action-footer">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="shift-primary-button"
+        >
+          <Send className="h-5 w-5" aria-hidden="true" />
+          {submitting ? 'Сохраняем…' : 'Сохранить смену'}
+        </button>
+      </footer>
     </div>
   );
 }

@@ -121,7 +121,7 @@ body, button, input, select, textarea {
 
 .app-page-shift > :first-child {
   min-height: 100dvh;
-  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: 0 !important;
 }
 
 .bottom-nav {
@@ -477,6 +477,301 @@ body, button, input, select, textarea {
 
   .dashboard-attention-action {
     width: 100%;
+  }
+}
+
+.shift-form-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.shift-form-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shift-back-button {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.shift-back-button:active {
+  background: var(--surface-muted);
+  transform: scale(0.97);
+}
+
+.shift-back-button:focus-visible,
+.shift-segmented button:focus-visible,
+.shift-comment-toggle:focus-visible,
+.shift-primary-button:focus-visible,
+.shift-secondary-button:focus-visible {
+  outline: 2px solid var(--tg-primary);
+  outline-offset: 2px;
+}
+
+.shift-form-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-block: 1.75rem 1.25rem;
+}
+
+.shift-form-section {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.shift-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.shift-section-title {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.shift-segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.9rem;
+  background: var(--surface-muted);
+}
+
+.shift-segmented button {
+  min-height: 2.75rem;
+  border-radius: 0.7rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.shift-segmented button[data-active='true'] {
+  background: var(--surface-elevated);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-primary) 9%, transparent);
+  color: var(--text-primary);
+}
+
+.shift-time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.shift-time-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.shift-time-grid label > span {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.shift-time-grid input {
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  border: 1px solid var(--tg-control-border);
+  border-radius: 0.8rem;
+  padding: 0.7rem 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  appearance: none;
+}
+
+.shift-time-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.shift-time-total strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.shift-context-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.9rem;
+  background: var(--surface-muted);
+}
+
+.shift-revenue-input,
+.shift-comment-input {
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--tg-control-border);
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.shift-comment-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.shift-comment-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.shift-comment-input {
+  resize: vertical;
+}
+
+.shift-summary {
+  padding: 1.1rem 1.2rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.shift-summary-amount {
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: clamp(1.75rem, 9vw, 2.25rem);
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.shift-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.shift-form-error {
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--text-primary) 5%, var(--surface-muted));
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.shift-action-footer {
+  position: sticky;
+  z-index: 10;
+  bottom: 0;
+  margin-inline: -1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  background: var(--tg-bg);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.shift-primary-button,
+.shift-secondary-button {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  transition: transform 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
+}
+
+.shift-primary-button {
+  background: var(--tg-primary);
+  color: var(--tg-button-text);
+}
+
+.shift-secondary-button {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.shift-primary-button:active,
+.shift-secondary-button:active {
+  transform: scale(0.985);
+}
+
+.shift-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.shift-success-page {
+  align-items: stretch;
+  justify-content: center;
+  gap: 1.5rem;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.shift-success-icon {
+  display: flex;
+  width: 4rem;
+  height: 4rem;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tg-primary) 12%, var(--surface));
+  color: var(--tg-primary);
+}
+
+.shift-success-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (max-width: 374px) {
+  .shift-time-grid {
+    gap: 0.55rem;
+  }
+
+  .shift-time-grid input {
+    padding-inline: 0.55rem;
   }
 }
 
