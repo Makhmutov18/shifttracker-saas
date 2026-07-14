@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Clock, Wallet, Gift, AlertTriangle, Monitor, Moon, SunMedium } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BriefcaseBusiness, Gift, MapPin, MinusCircle, Monitor, Moon, SunMedium, Wallet } from 'lucide-react';
 import {
   User as UserType,
   Adjustment,
@@ -10,8 +10,7 @@ import {
   getMyAuditLogs,
   MonthlyStats,
 } from '../utils/api';
-import { formatCurrency, formatHours, getMonthName, getCurrentMonth } from '../utils/helpers';
-import { canAccessOwnerPanel } from '../utils/permissions';
+import { formatCurrency, formatHours, getCurrentMonth, getMonthName } from '../utils/helpers';
 import { getTelegramUser } from '../utils/telegram';
 import type { ThemeMode } from '../hooks/useTelegramTheme';
 import UserAvatar from '../components/UserAvatar';
@@ -25,7 +24,7 @@ interface Props {
 
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Владелец',
-  admin: 'Админ',
+  admin: 'Администратор',
   senior: 'Старший',
   barista: 'Бариста',
   cook: 'Повар',
@@ -35,8 +34,8 @@ const ROLE_LABELS: Record<string, string> = {
 const PAY_MODEL_LABELS: Record<string, string> = {
   hourly: 'Почасовая',
   fixed_shift: 'Фикс за смену',
-  revenue: '% от выручки',
-  hybrid: 'Почасовая + %',
+  revenue: 'Процент от выручки',
+  hybrid: 'Почасовая + процент',
 };
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -44,43 +43,32 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   user_deactivated: 'Сотрудник архивирован',
   shift_created: 'Смена создана',
   shift_edited: 'Смена отредактирована',
+  shift_updated: 'Смена отредактирована',
   shift_approved: 'Смена утверждена',
   shift_rejected: 'Смена отклонена',
 };
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
-  { value: 'system', label: 'Системная', icon: <Monitor className="w-4 h-4" /> },
-  { value: 'light', label: 'Светлая', icon: <SunMedium className="w-4 h-4" /> },
-  { value: 'dark', label: 'Тёмная', icon: <Moon className="w-4 h-4" /> },
+  { value: 'system', label: 'Системная', icon: <Monitor className="h-4 w-4" aria-hidden="true" /> },
+  { value: 'light', label: 'Светлая', icon: <SunMedium className="h-4 w-4" aria-hidden="true" /> },
+  { value: 'dark', label: 'Тёмная', icon: <Moon className="h-4 w-4" aria-hidden="true" /> },
 ];
 
-function getPayModelSummary(user: UserType) {
-  if (user.pay_model === 'hourly') {
-    return `${formatCurrency(user.hourly_rate)}/ч`;
-  }
-  if (user.pay_model === 'fixed_shift') {
-    return `${formatCurrency(user.hourly_rate)}/смена`;
-  }
-  if (user.pay_model === 'revenue') {
-    return `${user.revenue_percentage}% от выручки`;
-  }
-  return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage}%`;
+function getRateLabel(user: UserType) {
+  if (user.pay_model === 'fixed_shift') return `${formatCurrency(user.hourly_rate)}/смена`;
+  if (user.pay_model === 'revenue') return `${user.revenue_percentage || '0'}% от выручки`;
+  if (user.pay_model === 'hybrid') return `${formatCurrency(user.hourly_rate)}/ч + ${user.revenue_percentage || '0'}%`;
+  return `${formatCurrency(user.hourly_rate)}/ч`;
 }
 
 function getAuditActionLabel(action?: string) {
-  return action ? AUDIT_ACTION_LABELS[action] || 'Изменение' : 'Изменение';
+  return action ? AUDIT_ACTION_LABELS[action] || 'Данные изменены' : 'Данные изменены';
 }
 
 function formatAuditTimestamp(value?: string) {
-  if (!value) {
-    return 'Дата не указана';
-  }
-
+  if (!value) return 'Дата не указана';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
+  if (Number.isNaN(date.getTime())) return 'Дата не указана';
   return date.toLocaleString('ru-RU', {
     day: '2-digit',
     month: 'short',
@@ -90,270 +78,227 @@ function formatAuditTimestamp(value?: string) {
   });
 }
 
-export default function Profile({ user, onBack, themeMode, onThemeModeChange }: Props) {
+function formatAdjustmentDate(value?: string) {
+  if (!value) return 'Дата не указана';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Дата не указана' : date.toLocaleDateString('ru-RU');
+}
+
+export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [auditLoading, setAuditLoading] = useState(true);
   const [auditError, setAuditError] = useState<string | null>(null);
-  const isAdminContext = canAccessOwnerPanel(user);
+  const [showAllAudit, setShowAllAudit] = useState(false);
   const telegramUser = getTelegramUser();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsData, adjData] = await Promise.all([getMonthlyStats(), getAdjustments()]);
+    let cancelled = false;
+    setLoading(true);
+    setProfileError(null);
+    Promise.all([getMonthlyStats(), getAdjustments()])
+      .then(([statsData, adjustmentData]) => {
+        if (cancelled) return;
         setStats(statsData);
-        setAdjustments(adjData);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
+        const safeAdjustments = Array.isArray(adjustmentData) ? adjustmentData : [];
+        setAdjustments(safeAdjustments.filter((adjustment) => !adjustment.user_id || adjustment.user_id === user.id));
+      })
+      .catch((error) => {
+        if (!cancelled) setProfileError(getErrorMessage(error, 'Не удалось загрузить данные профиля.'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-    fetchData();
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
     let cancelled = false;
-
-    const fetchAuditLogs = async () => {
-      setAuditLoading(true);
-      setAuditError(null);
-
-      try {
-        const data = await getMyAuditLogs(20);
-        if (!cancelled) {
-          setAuditLogs(Array.isArray(data) ? data : []);
-        }
-      } catch (error) {
+    setAuditLoading(true);
+    setAuditError(null);
+    getMyAuditLogs(20)
+      .then((data) => {
+        if (!cancelled) setAuditLogs(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
         if (!cancelled) {
           setAuditLogs([]);
           setAuditError(getErrorMessage(error, 'Не удалось загрузить историю изменений'));
         }
-      } finally {
-        if (!cancelled) {
-          setAuditLoading(false);
-        }
-      }
-    };
-
-    fetchAuditLogs();
+      })
+      .finally(() => {
+        if (!cancelled) setAuditLoading(false);
+      });
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const netIncome = stats ? parseFloat(stats.total_payout).toFixed(2) : '0.00';
+  const visibleAuditLogs = useMemo(() => showAllAudit ? auditLogs : auditLogs.slice(0, 5), [auditLogs, showAllAudit]);
+  const roleLabel = ROLE_LABELS[user.role] || 'Сотрудник';
+  const positionLabel = user.position?.trim() || roleLabel;
+  const venueName = user.venue?.name?.trim() || 'Основная точка';
 
   return (
-    <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-tg-secondary-bg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-tg-text" />
-        </button>
-        <h1 className="text-lg font-semibold text-tg-text">Профиль</h1>
-      </div>
+    <div className="profile-page mx-auto max-w-lg px-4 pb-6 pt-6">
+      <header className="profile-identity">
+        <UserAvatar
+          name={user.name || 'Сотрудник'}
+          photoUrl={telegramUser?.photo_url}
+          sizeClassName="h-16 w-16"
+          textClassName="text-xl"
+        />
+        <div className="min-w-0">
+          <p className="text-sm text-tg-hint">Профиль</p>
+          <h1 className="mt-1 break-words text-2xl font-semibold text-tg-text">{user.name || 'Сотрудник'}</h1>
+          <p className="mt-1 break-words text-sm text-tg-hint">{roleLabel} · {venueName}</p>
+        </div>
+      </header>
 
-      <div className="glass-header rounded-[1.4rem] p-5 mb-4">
-        <div className="flex items-center gap-4 mb-4">
-          <UserAvatar
-            name={user.name}
-            photoUrl={telegramUser?.photo_url}
-            sizeClassName="w-16 h-16"
-            textClassName="text-xl"
-          />
-          <div>
-            <h2 className="text-xl font-semibold text-tg-text">{user.name}</h2>
-            <p className="text-sm text-tg-hint">{ROLE_LABELS[user.role] || user.role}</p>
-          </div>
+      <section aria-labelledby="profile-work-title">
+        <div className="profile-section-heading">
+          <h2 id="profile-work-title">Условия работы</h2>
         </div>
+        <div className="profile-detail-list">
+          <ProfileDetail icon={<MapPin />} label="Точка" value={venueName} />
+          <ProfileDetail icon={<BriefcaseBusiness />} label="Должность" value={positionLabel} />
+          <ProfileDetail icon={<Wallet />} label="Модель оплаты" value={PAY_MODEL_LABELS[user.pay_model] || 'Не указана'} />
+          <ProfileDetail icon={<Wallet />} label="Ставка" value={getRateLabel(user)} />
+        </div>
+      </section>
 
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2 text-tg-hint">
-            <MapPin className="w-4 h-4" />
-            <span>{user.venue?.name || 'Основная точка'}</span>
-          </div>
-          <div className="flex items-center gap-2 text-tg-hint">
-            <Wallet className="w-4 h-4" />
-            <span>{getPayModelSummary(user)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-tg-hint">
-            <Clock className="w-4 h-4" />
-            <span>Модель: {PAY_MODEL_LABELS[user.pay_model] || user.pay_model}</span>
-          </div>
+      <section aria-labelledby="profile-theme-title">
+        <div className="profile-section-heading">
+          <h2 id="profile-theme-title">Тема</h2>
         </div>
-      </div>
+        <div className="profile-theme-control" role="radiogroup" aria-label="Тема приложения">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={themeMode === option.value}
+              data-active={themeMode === option.value}
+              onClick={() => onThemeModeChange(option.value)}
+            >
+              {option.icon}
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
-      <div className="surface-card rounded-[1.4rem] p-4 mb-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <p className="text-sm font-medium text-tg-text">Тема</p>
-            <p className="text-xs text-tg-hint">Выберите системную, светлую или тёмную тему</p>
-          </div>
+      <section aria-labelledby="profile-month-title">
+        <div className="profile-section-heading">
+          <h2 id="profile-month-title">Сводка месяца</h2>
+          <span>{getMonthName(getCurrentMonth())}</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {THEME_OPTIONS.map((option) => {
-            const active = themeMode === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onThemeModeChange(option.value)}
-                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
-                  active ? 'bg-tg-primary text-tg-button-text' : 'surface-muted text-tg-text'
-                }`}
-              >
-                {option.icon}
-                <span className="text-[11px] leading-none">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="animate-pulse space-y-3 mb-4">
-          <div className="h-32 surface-card rounded-[1.4rem]" />
-        </div>
-      ) : stats ? (
-        <div className="accent-card rounded-[1.4rem] p-5 text-white mb-4">
-          <p className="text-sm opacity-80 mb-1">Начислено за {getMonthName(getCurrentMonth())}</p>
-          <p className="text-3xl font-bold">{formatCurrency(netIncome)}</p>
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-              <p className="text-xs opacity-70">Часы</p>
-              <p className="font-semibold">{formatHours(stats.total_hours)}</p>
+        {loading ? (
+          <div className="profile-loading" aria-label="Загружаем сводку"><span /><span /></div>
+        ) : profileError ? (
+          <div className="profile-state"><p>{profileError}</p></div>
+        ) : stats ? (
+          <div className="profile-month-summary">
+            <div>
+              <span>Начислено</span>
+              <strong>{formatCurrency(stats.total_payout)}</strong>
             </div>
-            <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-              <p className="text-xs opacity-70">Смены</p>
-              <p className="font-semibold">{stats.shifts_count}</p>
+            <div className="profile-month-facts">
+              <span>{formatHours(stats.total_hours)}</span>
+              <span>{stats.shifts_count} смен</span>
+              {parseFloat(String(stats.total_bonuses)) > 0 && <span>Бонусы +{formatCurrency(stats.total_bonuses)}</span>}
+              {parseFloat(String(stats.total_penalties)) > 0 && <span>Удержания −{formatCurrency(stats.total_penalties)}</span>}
             </div>
-            {parseFloat(String(stats.total_bonuses)) > 0 ? (
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Бонусы</p>
-                <p className="font-semibold text-emerald-200">+{formatCurrency(stats.total_bonuses)}</p>
-              </div>
-            ) : (
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Бонусы</p>
-                <p className="font-semibold">Бонусов нет</p>
-              </div>
-            )}
-            {parseFloat(String(stats.total_penalties)) > 0 ? (
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Удержания</p>
-                <p className="font-semibold text-rose-200">-{formatCurrency(stats.total_penalties)}</p>
-              </div>
-            ) : (
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15">
-                <p className="text-xs opacity-70">Удержания</p>
-                <p className="font-semibold">Удержаний нет</p>
-              </div>
-            )}
           </div>
-        </div>
-      ) : null}
+        ) : (
+          <div className="profile-state"><p>Сводка пока недоступна</p></div>
+        )}
+      </section>
 
-      {adjustments.length > 0 ? (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-tg-hint mb-2">Бонусы и удержания за месяц</h3>
-          <div className="space-y-2">
-            {adjustments.map((adj) => (
-              <div key={adj.id} className="surface-card rounded-xl p-3 flex items-center gap-3">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    adj.type === 'bonus' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'
-                  }`}
-                >
-                  {adj.type === 'bonus' ? (
-                    <Gift className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-rose-500" />
-                  )}
+      <section aria-labelledby="profile-adjustments-title">
+        <div className="profile-section-heading">
+          <h2 id="profile-adjustments-title">Бонусы и удержания</h2>
+        </div>
+        {loading ? (
+          <div className="profile-loading" aria-label="Загружаем корректировки"><span /><span /></div>
+        ) : adjustments.length > 0 ? (
+          <div className="profile-list">
+            {adjustments.map((adjustment) => (
+              <article key={adjustment.id} className="profile-adjustment-row">
+                <div className="profile-row-icon" aria-hidden="true">
+                  {adjustment.type === 'bonus' ? <Gift className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
                 </div>
-                <div className="flex-1">
-                  <p className="text-tg-text text-sm">{adj.reason}</p>
-                  <p className="text-tg-hint text-xs">
-                    {adj.creator_name && `от ${adj.creator_name} · `}
-                    {new Date(adj.created_at).toLocaleDateString('ru-RU')}
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-medium text-tg-text">{adjustment.reason || (adjustment.type === 'bonus' ? 'Бонус' : 'Удержание')}</p>
+                  <p className="mt-1 text-sm text-tg-hint">
+                    {formatAdjustmentDate(adjustment.created_at)}{adjustment.creator_name ? ` · ${adjustment.creator_name}` : ''}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                    adj.type === 'bonus'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                      : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
-                  }`}
-                >
-                  {adj.type === 'bonus' ? 'Бонус' : 'Удержание'}
-                </span>
-                <p className={`font-semibold text-sm ${adj.type === 'bonus' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                  {adj.type === 'bonus' ? '+' : '-'}
-                  {formatCurrency(adj.amount)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-4 surface-card rounded-xl p-4 text-center">
-          <p className="text-sm font-medium text-tg-text">Бонусов и удержаний пока нет</p>
-          <p className="mt-1 text-xs text-tg-hint">Когда появятся корректировки, они отобразятся здесь.</p>
-        </div>
-      )}
-
-      <div className="surface-card rounded-[1.4rem] p-4 mb-4">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-tg-text">История изменений</h3>
-            <p className="text-xs text-tg-hint">Показываем только события, связанные с вами.</p>
-          </div>
-        </div>
-
-        {auditLoading ? (
-          <div className="space-y-2">
-            <div className="h-14 rounded-2xl bg-tg-secondary-bg/70 animate-pulse" />
-            <div className="h-14 rounded-2xl bg-tg-secondary-bg/70 animate-pulse" />
-          </div>
-        ) : auditError ? (
-          <div className="rounded-2xl bg-tg-secondary-bg px-4 py-4">
-            <p className="text-sm font-medium text-tg-text">Не удалось загрузить историю изменений</p>
-            <p className="mt-1 text-sm text-tg-hint">{auditError}</p>
-          </div>
-        ) : auditLogs.length > 0 ? (
-          <div className="space-y-2">
-            {auditLogs.map((log) => (
-              <div key={log.id} className="rounded-2xl bg-tg-secondary-bg px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-tg-text">{getAuditActionLabel(log.action)}</p>
-                    <p className="mt-0.5 text-xs text-tg-hint">
-                      {log.user_name ? `Кто изменил: ${log.user_name} · ` : ''}
-                      {formatAuditTimestamp(log.created_at)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                <strong>{adjustment.type === 'bonus' ? '+' : '−'}{formatCurrency(adjustment.amount)}</strong>
+              </article>
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl bg-tg-secondary-bg px-4 py-4">
-            <p className="text-sm font-medium text-tg-text">Изменений пока нет</p>
-            <p className="mt-1 text-sm text-tg-hint">Когда управляющий изменит ваши данные или смены, они появятся здесь.</p>
+          <div className="profile-state">
+            <p className="font-medium text-tg-text">Бонусов и удержаний пока нет</p>
+            <p>Новые корректировки появятся здесь.</p>
           </div>
         )}
-      </div>
+      </section>
 
-      {!isAdminContext && (
-        <div className="surface-muted mt-4 rounded-2xl p-4">
-          <p className="text-sm text-tg-hint">
-            История действий и общий журнал изменений доступны в разделе управления для администраторов.
-          </p>
+      <section aria-labelledby="profile-audit-title">
+        <div className="profile-section-heading">
+          <h2 id="profile-audit-title">История изменений</h2>
         </div>
-      )}
+        {auditLoading ? (
+          <div className="profile-loading" aria-label="Загружаем историю изменений"><span /><span /></div>
+        ) : auditError ? (
+          <div className="profile-state">
+            <p className="font-medium text-tg-text">Не удалось загрузить историю изменений</p>
+            <p>{auditError}</p>
+          </div>
+        ) : visibleAuditLogs.length > 0 ? (
+          <>
+            <div className="profile-list">
+              {visibleAuditLogs.map((log) => (
+                <article key={log.id} className="profile-audit-row">
+                  <p className="font-medium text-tg-text">{getAuditActionLabel(log.action)}</p>
+                  <p className="mt-1 text-sm text-tg-hint">
+                    {formatAuditTimestamp(log.created_at)}{log.user_name ? ` · ${log.user_name}` : ''}
+                  </p>
+                </article>
+              ))}
+            </div>
+            {auditLogs.length > 5 && (
+              <button type="button" className="profile-show-all" onClick={() => setShowAllAudit((value) => !value)}>
+                {showAllAudit ? 'Показать последние' : 'Показать все'}
+              </button>
+            )}
+          </>
+        ) : (
+          <div className="profile-state">
+            <p className="font-medium text-tg-text">Изменений пока нет</p>
+            <p>Изменения ваших данных и смен появятся здесь.</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ProfileDetail({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="profile-detail-row">
+      <span className="profile-row-icon" aria-hidden="true">{icon}</span>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
