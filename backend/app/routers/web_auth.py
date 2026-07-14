@@ -101,21 +101,45 @@ async def _exchange_code(code: str, code_verifier: str) -> dict:
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.post(
             OIDC_TOKEN_URL,
+            auth=httpx.BasicAuth(
+                settings.TELEGRAM_OIDC_CLIENT_ID,
+                settings.TELEGRAM_OIDC_CLIENT_SECRET,
+            ),
             data={
                 "grant_type": "authorization_code",
                 "client_id": settings.TELEGRAM_OIDC_CLIENT_ID,
-                "client_secret": settings.TELEGRAM_OIDC_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": settings.TELEGRAM_OIDC_REDIRECT_URI,
                 "code_verifier": code_verifier,
             },
         )
     if response.status_code >= 400:
+        error = ""
+        error_description = ""
+        try:
+            error_payload = response.json()
+            if isinstance(error_payload, dict):
+                error = str(error_payload.get("error") or "")[:100]
+                error_description = str(error_payload.get("error_description") or "")[:300]
+        except (ValueError, TypeError):
+            pass
+        logger.warning(
+            "Telegram OIDC token exchange failed: status=%s error=%s error_description=%s",
+            response.status_code,
+            error,
+            error_description,
+        )
         raise HTTPException(status_code=401, detail="Telegram временно недоступен.")
     payload = response.json()
     if not isinstance(payload, dict) or not payload.get("id_token"):
         raise HTTPException(status_code=401, detail="Telegram не подтвердил вход.")
     return payload
+
+
+def _validate_nonce(claims: dict, expected_nonce: str) -> None:
+    nonce = claims.get("nonce")
+    if not nonce or not hmac.compare_digest(str(nonce), expected_nonce):
+        raise ValueError("invalid nonce")
 
 
 async def _validate_id_token(id_token: str, expected_nonce: str) -> dict:
@@ -137,8 +161,7 @@ async def _validate_id_token(id_token: str, expected_nonce: str) -> dict:
             issuer="https://oauth.telegram.org",
             options={"require": ["iss", "aud", "exp"]},
         )
-        if claims.get("nonce") and not hmac.compare_digest(str(claims["nonce"]), expected_nonce):
-            raise ValueError("invalid nonce")
+        _validate_nonce(claims, expected_nonce)
         return claims
     except (httpx.HTTPError, jwt.PyJWTError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         logger.warning("Telegram web auth token validation failed: %s", type(exc).__name__)

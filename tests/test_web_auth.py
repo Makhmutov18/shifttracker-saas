@@ -1,4 +1,5 @@
 import ast
+import hmac
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,52 @@ class WebAuthRegressionTests(unittest.TestCase):
         self.assertIn("audience=settings.TELEGRAM_OIDC_CLIENT_ID", self.router_source)
         self.assertIn('"exp"', self.router_source)
         self.assertIn("expected_nonce", self.router_source)
+
+    def test_token_exchange_uses_basic_auth_and_safe_form_body(self) -> None:
+        module = ast.parse(self.router_source)
+        exchange = next(
+            node for node in module.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "_exchange_code"
+        )
+        post_call = next(
+            node
+            for node in ast.walk(exchange)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "post"
+        )
+        keywords = {keyword.arg: keyword.value for keyword in post_call.keywords}
+
+        basic_auth = keywords["auth"]
+        self.assertIsInstance(basic_auth, ast.Call)
+        self.assertEqual(ast.unparse(basic_auth.func), "httpx.BasicAuth")
+        self.assertEqual(
+            [ast.unparse(argument) for argument in basic_auth.args],
+            ["settings.TELEGRAM_OIDC_CLIENT_ID", "settings.TELEGRAM_OIDC_CLIENT_SECRET"],
+        )
+
+        data = keywords["data"]
+        self.assertIsInstance(data, ast.Dict)
+        data_keys = {key.value for key in data.keys if isinstance(key, ast.Constant)}
+        self.assertEqual(
+            data_keys,
+            {"grant_type", "client_id", "code", "redirect_uri", "code_verifier"},
+        )
+        self.assertNotIn("client_secret", data_keys)
+
+    def test_nonce_is_required_and_must_match(self) -> None:
+        module = ast.parse(self.router_source)
+        nonce_function = next(
+            node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "_validate_nonce"
+        )
+        namespace = {"hmac": hmac}
+        exec(compile(ast.Module(body=[nonce_function], type_ignores=[]), str(ROUTER_PATH), "exec"), namespace)
+        validate_nonce = namespace["_validate_nonce"]
+
+        validate_nonce({"nonce": "expected"}, "expected")
+        with self.assertRaises(ValueError):
+            validate_nonce({}, "expected")
+        with self.assertRaises(ValueError):
+            validate_nonce({"nonce": "wrong"}, "expected")
 
     def test_unknown_and_inactive_users_are_rejected_without_creation(self) -> None:
         callback = ast.parse(self.router_source)
