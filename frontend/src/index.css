@@ -352,6 +352,11 @@ body, button, input, select, textarea {
   font-size: 0.875rem;
 }
 
+.dashboard-compact-state span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .dashboard-latest {
   padding: 1.1rem 1.25rem;
 }
@@ -931,6 +936,10 @@ body, button, input, select, textarea {
   line-height: 1.45;
 }
 
+.history-adjustments-line {
+  overflow-wrap: anywhere;
+}
+
 .history-summary-details {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
@@ -1265,6 +1274,8 @@ body, button, input, select, textarea {
 }
 
 .payouts-current-facts strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-primary);
   font-size: 0.875rem;
   font-weight: 600;
@@ -1645,8 +1656,9 @@ body, button, input, select, textarea {
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
   color: var(--text-primary);
-  font-size: 1.65rem;
+  font-size: clamp(1.5rem, 7vw, 1.65rem);
   font-weight: 650;
+  line-height: 1.15;
 }
 
 .profile-month-facts {
