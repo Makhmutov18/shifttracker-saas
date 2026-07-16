@@ -59,18 +59,6 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
   return (
     <nav className="bottom-nav" aria-label="Основная навигация">
       <div className="bottom-nav-inner">
-        <button
-          type="button"
-          className="dock-create-action"
-          aria-label="Создать смену"
-          onClick={() => {
-            hapticFeedback();
-            onNavigate('shift');
-          }}
-        >
-          <Plus className="h-6 w-6" aria-hidden="true" />
-        </button>
-
         <div className="dock-shell">
           {items.map((item) => (
             <NavButton
@@ -82,6 +70,17 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
               onNavigate={onNavigate}
             />
           ))}
+          <button
+            type="button"
+            className="dock-create-action"
+            aria-label="Создать смену"
+            onClick={() => {
+              hapticFeedback();
+              onNavigate('shift');
+            }}
+          >
+            <Plus className="h-6 w-6" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </nav>

@@ -29,7 +29,7 @@
   --dock-active-bg: color-mix(in srgb, var(--tg-primary) 12%, var(--dock-surface));
   --dock-action-bg: var(--tg-primary);
   --dock-action-text: var(--tg-button-text);
-  --dock-action-shadow: 0 6px 16px color-mix(in srgb, var(--tg-primary) 18%, transparent);
+  --dock-reserved-space: 5.75rem;
 }
 
 [data-theme='dark'],
@@ -112,7 +112,7 @@ body, button, input, select, textarea {
 }
 
 .app-shell-with-dock {
-  padding-bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--dock-reserved-space) + env(safe-area-inset-bottom, 0px));
 }
 
 .app-shell-fullscreen {
@@ -141,7 +141,7 @@ body, button, input, select, textarea {
 
 .dock-shell {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 3.25rem;
   gap: 0.2rem;
   align-items: stretch;
   padding: 0.35rem;
@@ -191,21 +191,17 @@ body, button, input, select, textarea {
 }
 
 .dock-create-action {
-  position: absolute;
-  z-index: 1;
-  right: 1.1rem;
-  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   display: flex;
-  width: 3rem;
-  height: 3rem;
+  width: 3.25rem;
+  min-width: 3.25rem;
+  height: 3.25rem;
+  min-height: 3.25rem;
+  align-self: center;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--dock-border);
-  border-radius: 50%;
+  border-radius: 0.9rem;
   background: var(--dock-action-bg);
   color: var(--dock-action-text);
-  box-shadow: var(--dock-action-shadow);
-  pointer-events: auto;
   transition: transform 0.18s ease, opacity 0.18s ease;
 }
 
