@@ -229,14 +229,25 @@ button:disabled {
   padding: 0 0.75rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
 }
 
+.bottom-nav-composition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  pointer-events: none;
+}
+
 .dock-shell {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) 3rem;
-  gap: 0.2rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.1rem;
   align-items: stretch;
-  padding: 0.35rem;
+  min-width: 0;
+  min-height: 4.25rem;
+  padding: 0.3rem;
   border: 1px solid var(--dock-border);
-  border-radius: 1.15rem;
+  border-radius: 1.5rem;
   background: var(--dock-surface);
   box-shadow: var(--dock-shadow);
   pointer-events: auto;
@@ -249,9 +260,9 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  border-radius: 0.85rem;
-  padding: 0.35rem 0.2rem;
+  gap: 0.2rem;
+  border-radius: 1.1rem;
+  padding: 0.35rem 0.1rem;
   color: var(--tg-hint);
   transition: transform var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
 }
@@ -263,7 +274,7 @@ button:disabled {
 .dock-item-label {
   max-width: 100%;
   white-space: nowrap;
-  font-size: clamp(0.65rem, 2.8vw, 0.72rem);
+  font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -282,21 +293,22 @@ button:disabled {
 }
 
 .dock-item-active .dock-item-icon {
-  transform: translateY(-1px) scale(1.04);
+  transform: translateY(-1px) scale(1.03);
 }
 
 .dock-create-action {
   display: flex;
-  width: 2.875rem;
-  min-width: 2.875rem;
-  height: 2.875rem;
-  min-height: 2.875rem;
+  width: 3rem;
+  min-width: 3rem;
+  height: 3rem;
+  min-height: 3rem;
   align-self: center;
   align-items: center;
   justify-content: center;
-  border-radius: 0.8rem;
+  border-radius: 999px;
   background: var(--dock-action-bg);
   color: var(--dock-action-text);
+  pointer-events: auto;
   transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
 }
 
@@ -314,6 +326,28 @@ button:disabled {
 .dock-item:focus-visible {
   outline: 2px solid var(--tg-primary);
   outline-offset: 2px;
+}
+
+@media (max-width: 374px) {
+  .bottom-nav-inner {
+    padding-inline: 0.5rem;
+  }
+
+  .bottom-nav-composition {
+    grid-template-columns: minmax(0, 1fr) 2.875rem;
+    gap: 0.5rem;
+  }
+
+  .dock-shell {
+    padding-inline: 0.25rem;
+  }
+
+  .dock-create-action {
+    width: 2.875rem;
+    min-width: 2.875rem;
+    height: 2.875rem;
+    min-height: 2.875rem;
+  }
 }
 
 .dashboard-page {

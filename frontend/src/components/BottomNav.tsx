@@ -59,17 +59,19 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
   return (
     <nav className="bottom-nav" aria-label="Основная навигация">
       <div className="bottom-nav-inner">
-        <div className="dock-shell">
-          {items.map((item) => (
-            <NavButton
-              key={item.page}
-              page={item.page}
-              label={item.label}
-              icon={item.icon}
-              currentPage={currentPage}
-              onNavigate={onNavigate}
-            />
-          ))}
+        <div className="bottom-nav-composition">
+          <div className="dock-shell">
+            {items.map((item) => (
+              <NavButton
+                key={item.page}
+                page={item.page}
+                label={item.label}
+                icon={item.icon}
+                currentPage={currentPage}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
           <button
             type="button"
             className="dock-create-action"
