@@ -18,7 +18,7 @@ const FOCUSABLE_SELECTOR = [
 
 type SheetPhase = 'opening' | 'open' | 'closing';
 
-const EXIT_FALLBACK_MS = 320;
+const EXIT_FALLBACK_MS = 280;
 
 export default function BottomSheet({ open, title, onClose, children }: Props) {
   const titleId = useId();

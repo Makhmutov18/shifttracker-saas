@@ -33,6 +33,9 @@
   --motion-fast: 140ms;
   --motion-base: 200ms;
   --motion-slow: 280ms;
+  --motion-sheet-backdrop-enter: 240ms;
+  --motion-sheet-enter: 320ms;
+  --motion-sheet-exit: 220ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
@@ -104,8 +107,28 @@ body {
 }
 
 /* Smooth transitions for theme switching */
-body, button, input, select, textarea {
+body, input, select, textarea {
   transition: background-color var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), border-color var(--motion-base) var(--ease-standard);
+}
+
+button:not(.bottom-sheet-backdrop) {
+  min-height: 2.75rem;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), border-color var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard);
+}
+
+button:not(.bottom-sheet-backdrop):active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:not(.bottom-sheet-backdrop):focus-visible {
+  outline: 2px solid var(--tg-primary);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .shift-segmented button,
@@ -146,6 +169,9 @@ body, button, input, select, textarea {
 
 .history-filter-button:active,
 .history-export-button:active,
+.payouts-period-button:active,
+.shift-back-button:active,
+.dashboard-avatar-button:active,
 .owner-section-back:active,
 .owner-icon-button:active {
   transform: scale(0.96);
@@ -320,7 +346,7 @@ body, button, input, select, textarea {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: transform 0.18s ease;
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
 }
 
 .dashboard-avatar-button:active {
@@ -410,7 +436,7 @@ body, button, input, select, textarea {
   color: var(--tg-button-text);
   font-size: 0.8125rem;
   font-weight: 600;
-  transition: transform 0.18s ease, opacity 0.18s ease;
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
 }
 
 .dashboard-attention-action:active {
@@ -559,7 +585,7 @@ body, button, input, select, textarea {
   justify-content: center;
   border-radius: 0.75rem;
   color: var(--text-primary);
-  transition: background-color 0.18s ease, transform 0.18s ease;
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
 }
 
 .shift-back-button:active {
@@ -841,7 +867,7 @@ body, button, input, select, textarea {
   height: 100%;
   background: color-mix(in srgb, var(--text-primary) 38%, transparent);
   opacity: 0;
-  transition: opacity var(--motion-base) var(--ease-exit);
+  transition: opacity var(--motion-sheet-backdrop-enter) var(--ease-enter);
 }
 
 .bottom-sheet-panel {
@@ -855,15 +881,14 @@ body, button, input, select, textarea {
   background: var(--surface-elevated);
   box-shadow: 0 -12px 32px color-mix(in srgb, var(--text-primary) 12%, transparent);
   outline: none;
-  opacity: 0.98;
-  transform: translateY(100%) scale(0.985);
+  opacity: 0.92;
+  transform: translateY(calc(100% + 0.5rem)) scale(0.99);
   transform-origin: bottom center;
-  transition: transform var(--motion-slow) var(--ease-enter), opacity var(--motion-base) var(--ease-enter);
+  transition: transform var(--motion-sheet-enter) var(--ease-enter), opacity var(--motion-sheet-enter) var(--ease-enter);
 }
 
 .bottom-sheet-root[data-state='open'] .bottom-sheet-backdrop {
   opacity: 1;
-  transition-timing-function: var(--ease-standard);
 }
 
 .bottom-sheet-root[data-state='open'] .bottom-sheet-panel {
@@ -873,13 +898,15 @@ body, button, input, select, textarea {
 
 .bottom-sheet-root[data-state='closing'] .bottom-sheet-backdrop {
   opacity: 0;
+  transition-duration: var(--motion-sheet-exit);
+  transition-timing-function: var(--ease-standard);
 }
 
 .bottom-sheet-root[data-state='closing'] .bottom-sheet-panel {
-  opacity: 0.98;
-  transform: translateY(100%) scale(0.985);
-  transition-duration: var(--motion-base);
-  transition-timing-function: var(--ease-exit);
+  opacity: 0.96;
+  transform: translateY(calc(100% + 0.5rem)) scale(0.99);
+  transition-duration: var(--motion-sheet-exit);
+  transition-timing-function: var(--ease-standard);
 }
 
 .bottom-sheet-root[data-state='opening'] .bottom-sheet-backdrop,
@@ -2370,6 +2397,13 @@ body, button, input, select, textarea {
   box-shadow: var(--shadow-card);
 }
 
+.owner-management-access-control button {
+  min-width: 0;
+  padding: 0.5rem 0.55rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .owner-section-note {
   padding-inline: 0.25rem;
   color: var(--text-secondary);
@@ -2423,6 +2457,12 @@ body, button, input, select, textarea {
 @media (max-width: 374px) {
   .owner-panel-page {
     padding-inline: 0.85rem;
+  }
+
+  .owner-management-access-control button {
+    padding-inline: 0.25rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
   }
 
   .owner-inline-stats {

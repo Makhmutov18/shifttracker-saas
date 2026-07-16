@@ -163,24 +163,41 @@ function ManagementAccessSection({
 }) {
   return (
     <div className="owner-form-section space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-tg-text">Доступ к управлению</p>
-          <p className="text-xs text-tg-hint">
-            Если выключено, сотрудник видит только свои смены, историю и профиль.
-          </p>
-        </div>
-        <label className={`inline-flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
-          <input
-            type="checkbox"
-            checked={enabled}
-            disabled={disabled}
-            onChange={(event) => onEnabledChange(event.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-tg-primary focus:ring-tg-primary"
-          />
-          <span className="text-tg-text">{enabled ? 'Включён' : 'Обычный сотрудник'}</span>
-        </label>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-tg-text">Доступ к управлению</p>
+        <p className="text-xs text-tg-hint">Выберите уровень доступа сотрудника.</p>
       </div>
+
+      <div className="owner-segmented-control owner-management-access-control" role="group" aria-label="Доступ к управлению">
+        <button
+          type="button"
+          aria-pressed={!enabled}
+          data-active={!enabled}
+          disabled={disabled}
+          onClick={() => {
+            if (enabled) onEnabledChange(false);
+          }}
+        >
+          Обычный сотрудник
+        </button>
+        <button
+          type="button"
+          aria-pressed={enabled}
+          data-active={enabled}
+          disabled={disabled}
+          onClick={() => {
+            if (!enabled) onEnabledChange(true);
+          }}
+        >
+          Доступ к управлению
+        </button>
+      </div>
+
+      <p className="owner-section-note">
+        {enabled
+          ? 'Получает доступ к разделу управления командой'
+          : 'Видит только свои смены, историю и профиль'}
+      </p>
 
       {enabled ? (
         <div className="space-y-2">
