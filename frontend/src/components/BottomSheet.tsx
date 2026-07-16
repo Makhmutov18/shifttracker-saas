@@ -1,10 +1,12 @@
-import React, { ReactNode, useEffect, useId, useRef, useState } from 'react';
+import React, { ReactNode, RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -20,16 +22,21 @@ type SheetPhase = 'opening' | 'open' | 'closing';
 
 const EXIT_FALLBACK_MS = 280;
 
-export default function BottomSheet({ open, title, onClose, children }: Props) {
+export default function BottomSheet({ open, title, onClose, children, returnFocusRef }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const returnFocusRefRef = useRef(returnFocusRef);
   const [mounted, setMounted] = useState(open);
   const [phase, setPhase] = useState<SheetPhase>(open ? 'opening' : 'closing');
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    returnFocusRefRef.current = returnFocusRef;
+  }, [returnFocusRef]);
 
   useEffect(() => {
     let firstFrame: number | undefined;
@@ -58,12 +65,31 @@ export default function BottomSheet({ open, title, onClose, children }: Props) {
     };
   }, [mounted, open]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mounted) return undefined;
 
-    const previousOverflow = document.body.style.overflow;
+    const body = document.body;
+    const documentElement = document.documentElement;
+    const lockedScrollX = window.scrollX;
+    const lockedScrollY = window.scrollY;
+    const previousBodyStyles = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    const previousScrollBehavior = documentElement.style.scrollBehavior;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    document.body.style.overflow = 'hidden';
+
+    body.style.position = 'fixed';
+    body.style.top = `-${lockedScrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
     const focusFrame = window.requestAnimationFrame(() => panelRef.current?.focus());
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -95,8 +121,19 @@ export default function BottomSheet({ open, title, onClose, children }: Props) {
     return () => {
       window.cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.left = previousBodyStyles.left;
+      body.style.right = previousBodyStyles.right;
+      body.style.width = previousBodyStyles.width;
+      body.style.overflow = previousBodyStyles.overflow;
+
+      documentElement.style.scrollBehavior = 'auto';
+      window.scrollTo({ left: lockedScrollX, top: lockedScrollY, behavior: 'auto' });
+      documentElement.style.scrollBehavior = previousScrollBehavior;
+
+      const focusTarget = returnFocusRefRef.current?.current ?? previousFocus;
+      focusTarget?.focus({ preventScroll: true });
     };
   }, [mounted]);
 
@@ -112,7 +149,7 @@ export default function BottomSheet({ open, title, onClose, children }: Props) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="bottom-sheet-root" data-state={phase}>
       <button type="button" className="bottom-sheet-backdrop" onClick={() => onCloseRef.current()} aria-label="Закрыть" />
       <div
@@ -128,6 +165,7 @@ export default function BottomSheet({ open, title, onClose, children }: Props) {
         <h2 id={titleId} className="bottom-sheet-title">{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

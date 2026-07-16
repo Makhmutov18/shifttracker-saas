@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, CreditCard, Download, SlidersHorizontal, TrendingDown } from 'lucide-react';
 import { User, Venue, PayrollSummary, downloadPayrollExport, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
@@ -29,6 +29,7 @@ function getVenueLabel(venue: Venue) {
 }
 
 export default function History({ user }: Props) {
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
   const initialMonthValue = `${getCurrentYear()}-${String(getCurrentMonth()).padStart(2, '0')}`;
   const [tab, setTab] = useState<Tab>('shifts');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -202,6 +203,7 @@ export default function History({ user }: Props) {
           </p>
         </div>
         <button
+          ref={filterButtonRef}
           type="button"
           className="history-filter-button"
           data-active={hasActiveFilters}
@@ -344,7 +346,12 @@ export default function History({ user }: Props) {
         </section>
       )}
 
-      <BottomSheet open={filtersOpen} title="Фильтры" onClose={() => setFiltersOpen(false)}>
+      <BottomSheet
+        open={filtersOpen}
+        title="Фильтры"
+        onClose={() => setFiltersOpen(false)}
+        returnFocusRef={filterButtonRef}
+      >
         <div className="history-filter-fields">
           <label>
             <span>Месяц</span>
