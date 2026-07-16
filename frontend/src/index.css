@@ -1845,6 +1845,61 @@ body, button, input, select, textarea {
   box-shadow: var(--shadow-card);
 }
 
+.owner-form-surface {
+  display: grid;
+  gap: 0;
+}
+
+.owner-form-section {
+  padding-block: 0.85rem;
+}
+
+.owner-form-section:first-child {
+  padding-top: 0;
+}
+
+.owner-form-section + .owner-form-section {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-compact-summary {
+  padding-inline: 1rem;
+  border-radius: 0.9rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-compact-summary .owner-inline-stats {
+  border-block: 0;
+}
+
+.owner-list-surface {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-list-surface > div:first-child:not(.owner-list-row) {
+  padding: 0.85rem 1rem;
+}
+
+.owner-list-items {
+  padding: 0;
+}
+
+.owner-archive-toggle {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: left;
+}
+
 .owner-summary-panel {
   display: grid;
   gap: 0.9rem;
@@ -1905,9 +1960,20 @@ body, button, input, select, textarea {
 
 .owner-employee-card,
 .owner-approval-card {
-  padding: 0.95rem;
-  border-radius: 1rem;
+  padding: 0.85rem;
+  border-radius: 0.85rem;
   background: var(--surface-muted);
+}
+
+.owner-list-row,
+.owner-list-surface .owner-employee-card {
+  border-radius: 0;
+  background: transparent;
+}
+
+.owner-list-surface .owner-employee-card + .owner-employee-card,
+.owner-list-surface > div + .owner-employee-card {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .owner-employee-card[data-archived='true'] {
@@ -2039,6 +2105,36 @@ body, button, input, select, textarea {
   background: var(--surface-elevated);
 }
 
+.owner-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.owner-date-grid label,
+.owner-panel-page input[type='date'] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.owner-payroll-primary {
+  display: inline-flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.8rem;
+  background: var(--tg-primary);
+  color: var(--tg-button-text);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.owner-payroll-primary:disabled {
+  opacity: 0.55;
+}
+
 .owner-field-control {
   width: 100%;
   min-height: 2.75rem;
@@ -2124,6 +2220,43 @@ body, button, input, select, textarea {
   box-shadow: var(--shadow-card);
 }
 
+.owner-section-note {
+  padding-inline: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.owner-audit-list {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.owner-audit-row {
+  display: flex;
+  min-height: 3.75rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.owner-audit-row + .owner-audit-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-audit-icon {
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.65rem;
+  background: var(--surface-muted);
+  color: var(--tg-primary);
+}
+
 .owner-section-back:focus-visible,
 .owner-management-hub > button:focus-visible,
 .owner-icon-button:focus-visible,
@@ -2151,6 +2284,10 @@ body, button, input, select, textarea {
   }
 
   .owner-approval-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-date-grid {
     grid-template-columns: 1fr;
   }
 }

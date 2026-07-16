@@ -161,7 +161,7 @@ function ManagementAccessSection({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-3">
+    <div className="owner-form-section space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-tg-text">Доступ к управлению</p>
@@ -201,7 +201,7 @@ function EmployeeFormSection({
   description?: string;
 }) {
   return (
-    <div className="rounded-2xl bg-tg-secondary-bg p-4 space-y-4">
+    <div className="owner-form-section space-y-3">
       <div className="space-y-1">
         <p className="text-sm font-medium text-tg-text">{title}</p>
         {description ? <p className="text-xs text-tg-hint">{description}</p> : null}
@@ -471,6 +471,45 @@ function getPayrollRunError(error: unknown) {
   return message || 'Не удалось выполнить операцию.';
 }
 
+function parseDisplayDate(value?: string | null) {
+  if (!value) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatPayrollPeriod(periodStart?: string | null, periodEnd?: string | null) {
+  const start = parseDisplayDate(periodStart);
+  const end = parseDisplayDate(periodEnd);
+  if (!start || !end) return 'период не указан';
+
+  const yearsDiffer = start.getFullYear() !== end.getFullYear();
+  const formatPart = (date: Date) => date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    ...(yearsDiffer ? { year: 'numeric' as const } : {}),
+  });
+  return `${formatPart(start)} — ${formatPart(end)}`;
+}
+
+function getPayrollRunDisplayTitle(run: Pick<PayrollRunListItem, 'title' | 'period_start' | 'period_end'>) {
+  const title = run.title?.trim();
+  if (title && !/^payroll\b/i.test(title)) return title;
+  return `Расчёт за ${formatPayrollPeriod(run.period_start, run.period_end)}`;
+}
+
+function formatCreatedAt(value?: string | null) {
+  const date = parseDisplayDate(value);
+  if (!date) return null;
+  return date.toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate: boolean; userVenueId: string; restrictToVenue: boolean }) {
   const now = new Date();
   const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -683,7 +722,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
           </div>
         </div>
         <form onSubmit={handlePreview} className="mt-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="owner-date-grid">
             <label className="text-xs text-tg-hint">
               Начало периода
               <input
@@ -719,7 +758,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
           <button
             type="submit"
             disabled={previewLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-tg-primary py-3 text-sm font-semibold text-tg-button-text disabled:opacity-60"
+            className="owner-payroll-primary"
           >
             {previewLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
             Предварительный расчёт
@@ -735,7 +774,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-tg-text">Предварительный расчёт</h3>
-              <p className="mt-1 text-xs text-tg-hint">{formatDate(preview.period_start)} — {formatDate(preview.period_end)}</p>
+              <p className="mt-1 text-xs text-tg-hint">{formatPayrollPeriod(preview.period_start, preview.period_end)}</p>
             </div>
             {canCreate && (
               <button
@@ -799,8 +838,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-tg-text">{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</p>
-                  <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Все точки'} · {formatDate(run.period_start)} — {formatDate(run.period_end)}</p>
+                  <p className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(run)}</p>
+                  <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Все точки'} · {formatPayrollPeriod(run.period_start, run.period_end)}</p>
                 </div>
                 <span className="shrink-0 rounded-full surface-muted px-2.5 py-1 text-[11px] font-medium text-tg-text">{getPayrollRunStatusLabel(run.status)}</span>
               </div>
@@ -809,7 +848,9 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                 <span className="text-tg-hint">Начислено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_amount)}</b></span>
                 <span className="text-tg-hint">Выплачено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_paid)}</b></span>
               </div>
-              <p className="mt-3 text-[11px] text-tg-hint">Создано: {formatDate(run.created_at)} · {run.created_by_name || 'Пользователь'}</p>
+              <p className="mt-3 text-[11px] text-tg-hint">
+                {formatCreatedAt(run.created_at) ? `Создано: ${formatCreatedAt(run.created_at)} · ${run.created_by_name || 'Пользователь'}` : 'Дата создания не указана'}
+              </p>
             </button>
           ))
         )}
@@ -820,7 +861,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         <section className="surface-card space-y-3 rounded-2xl p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-tg-text">{selectedRun.title}</h3>
+              <h3 className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(selectedRun)}</h3>
               <p className="mt-1 text-xs text-tg-hint">{getPayrollRunStatusLabel(selectedRun.status)} · {selectedRun.venue_name || 'Все точки'}</p>
             </div>
             <button type="button" onClick={() => setSelectedRun(null)} className="text-xs text-tg-hint">Закрыть</button>
@@ -1002,8 +1043,8 @@ function InviteTab() {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <EmployeeFormSection title="Основное" description="Только базовые данные сотрудника. Управленческий доступ можно включить отдельно ниже.">
+      <form onSubmit={handleSubmit} className="owner-form-surface space-y-3">
+        <EmployeeFormSection title="Основное">
           <div>
             <label className="block text-sm text-tg-hint mb-1.5">Имя сотрудника</label>
             <input
@@ -1109,10 +1150,10 @@ function InviteTab() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-tg-primary text-white py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="owner-primary-action w-full"
         >
           {loading ? (
-            <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+            <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
           ) : (
             <>
               <UserPlus className="w-4 h-4" />
@@ -1123,7 +1164,7 @@ function InviteTab() {
       </form>
 
       {result && (
-        <div className="mt-6 bg-tg-secondary-bg rounded-xl p-4 space-y-3">
+        <div className="surface-card rounded-xl p-4 space-y-3">
           <p className="text-sm text-tg-hint">Сотрудник создан. Отправьте ему эту ссылку:</p>
           <div className="bg-tg-bg rounded-lg px-3 py-2.5 text-sm text-tg-text break-all select-all font-mono">
             {result.invite_link}
@@ -1487,10 +1528,10 @@ function ApproveTab() {
                   <button
                     onClick={() => saveEdit(shiftId)}
                     disabled={isSaving}
-                    className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    className="flex-1 bg-tg-primary text-tg-button-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
                   >
                     {isSaving ? (
-                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
@@ -1669,11 +1710,8 @@ function VenuesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="surface-card rounded-2xl p-4">
-        <p className="text-sm font-medium text-tg-text">Точки</p>
-        <p className="mt-1 text-sm text-tg-hint">Создавайте, переименовывайте и архивируйте точки без потери истории сотрудников и смен.</p>
-        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
-        <div className="owner-inline-stats mt-4">
+      <div className="owner-compact-summary">
+        <div className="owner-inline-stats">
           <EmployeeStat label="Активных" value={venues.filter((venue) => venue.is_active).length} />
           <EmployeeStat label="В архиве" value={venues.filter((venue) => !venue.is_active).length} />
           <EmployeeStat
@@ -1683,7 +1721,7 @@ function VenuesTab() {
         </div>
       </div>
 
-      <form onSubmit={handleCreateVenue} className="surface-card rounded-2xl p-4 space-y-3">
+      <form onSubmit={handleCreateVenue} className="owner-form-surface space-y-3">
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-tg-primary" />
           <p className="text-sm font-medium text-tg-text">Новая точка</p>
@@ -1698,9 +1736,9 @@ function VenuesTab() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-tg-primary text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+          className="owner-primary-action w-full"
         >
-          {submitting ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Plus className="w-4 h-4" />}
+          {submitting ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> : <Plus className="w-4 h-4" />}
           Добавить точку
         </button>
       </form>
@@ -1715,11 +1753,10 @@ function VenuesTab() {
           <p className="mt-1 text-sm text-tg-hint">Добавьте первую точку, чтобы привязывать к ней сотрудников и смены.</p>
         </div>
       ) : (
-        <div className="surface-card rounded-2xl p-4 space-y-3">
+        <div className="owner-list-surface">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-tg-text">Активные точки</p>
-              <p className="text-xs text-tg-hint">Основной список для работы со сменами и сотрудниками.</p>
             </div>
             <p className="text-xs text-tg-hint">Активных: {venues.filter((venue) => venue.is_active).length}</p>
           </div>
@@ -1736,7 +1773,7 @@ function VenuesTab() {
               (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
             ).length;
             return (
-              <div key={venue.id} className="owner-employee-card">
+              <div key={venue.id} className="owner-employee-card owner-list-row">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     {isEditing ? (
@@ -1753,7 +1790,7 @@ function VenuesTab() {
                       <span className="owner-status-badge" data-status="active">
                         Активна
                       </span>
-                      <span className="owner-status-badge">
+                      <span className="text-xs text-tg-hint">
                         {employeeCount} сотрудников
                       </span>
                     </div>
@@ -1816,7 +1853,7 @@ function VenuesTab() {
       <button
         type="button"
         onClick={() => setShowVenueArchive((value) => !value)}
-        className="surface-muted w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-tg-text"
+        className="owner-archive-toggle"
       >
         <div className="flex items-center justify-between gap-3">
           <span>Архив точек</span>
@@ -1825,7 +1862,7 @@ function VenuesTab() {
       </button>
 
       {showVenueArchive && (
-        <div className="surface-card rounded-2xl p-4 space-y-3">
+        <div className="owner-list-surface">
           <div>
             <p className="text-sm font-medium text-tg-text">Архив точек</p>
             <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
@@ -1837,7 +1874,7 @@ function VenuesTab() {
               <p className="mt-1 text-sm text-tg-hint">Неактивные точки появятся здесь после перевода в архив.</p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="owner-list-items">
               {venues.filter((venue) => !venue.is_active).map((venue) => {
                 const isEditing = editingVenueId === venue.id;
                 const isBusy = statusVenueId === venue.id;
@@ -1845,7 +1882,7 @@ function VenuesTab() {
                   (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
                 ).length;
                 return (
-                <div key={venue.id} className="owner-employee-card" data-archived="true">
+                <div key={venue.id} className="owner-employee-card owner-list-row" data-archived="true">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (
@@ -1862,7 +1899,7 @@ function VenuesTab() {
                           <span className="owner-status-badge" data-status="archived">
                             В архиве
                           </span>
-                          <span className="owner-status-badge">
+                          <span className="text-xs text-tg-hint">
                             {employeeCount} сотрудников
                           </span>
                         </div>
@@ -2079,11 +2116,8 @@ function TeamTab({ user }: { user: User }) {
 
   return (
     <div className="space-y-4">
-      <div className="surface-card rounded-2xl p-4">
-        <p className="text-sm font-medium text-tg-text">Команда</p>
-        <p className="mt-1 text-sm text-tg-hint">Управляйте сотрудниками, точками, оплатой и доступом без лишней формы.</p>
-        <p className="mt-2 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
-        <div className="owner-inline-stats mt-4">
+      <div className="owner-compact-summary">
+        <div className="owner-inline-stats">
           <EmployeeStat label="Активных" value={activeUsers.length} />
           <EmployeeStat label="В архиве" value={archivedUsers.length} />
           <EmployeeStat label="Точек" value={activeVenueCount} />
@@ -2093,17 +2127,15 @@ function TeamTab({ user }: { user: User }) {
       {teamError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{teamError}</p>}
       {teamSuccess && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{teamSuccess}</p>}
 
-      <div className="surface-card rounded-2xl p-4 space-y-4">
+      <div className={editingUser ? 'surface-card rounded-xl p-4 space-y-4' : 'hidden'}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-tg-text">Сотрудники</p>
-            <p className="text-xs text-tg-hint">Список, где можно быстро проверить точку, должность, оплату и доступ к управлению.</p>
+            <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
           </div>
-          <RefreshCw className="w-4 h-4 text-tg-hint" />
         </div>
 
         {editingUser ? (
-          <div className="space-y-4 rounded-[1.35rem] bg-tg-bg/60 p-3.5">
+          <div className="space-y-3">
             <EmployeeFormSection title="Основное" description="Имя, должность и точка сотрудника.">
               <div className="space-y-1.5">
                 <label className="block text-sm text-tg-hint">Имя сотрудника</label>
@@ -2214,10 +2246,10 @@ function TeamTab({ user }: { user: User }) {
               <button
                 onClick={saveEdit}
                 disabled={saving}
-                className="flex-1 bg-tg-primary text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
+                className="flex-1 bg-tg-primary text-tg-button-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
               >
                 {saving ? (
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
@@ -2233,19 +2265,13 @@ function TeamTab({ user }: { user: User }) {
               </button>
             </div>
           </div>
-        ) : (
-          <div className="rounded-2xl bg-tg-bg px-4 py-5">
-            <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
-            <p className="mt-1 text-sm text-tg-hint">Нажмите на иконку редактирования у нужного сотрудника.</p>
-          </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="surface-card rounded-2xl p-4 space-y-3">
+      <div className="owner-list-surface">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Активные сотрудники</p>
-            <p className="text-xs text-tg-hint">Неактивные сотрудники убраны в архив, но история и начисления сохраняются.</p>
           </div>
           <p className="text-xs text-tg-hint">Активных: {activeUsers.length}</p>
         </div>
@@ -2256,7 +2282,7 @@ function TeamTab({ user }: { user: User }) {
             <p className="mt-1 text-sm text-tg-hint">Перенесите сотрудника из архива или добавьте нового через приглашение.</p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="owner-list-items">
             {activeUsers.map((u) => (
               <TeamEmployeeCard
                 key={u.id}
@@ -2273,7 +2299,7 @@ function TeamTab({ user }: { user: User }) {
         <button
           type="button"
           onClick={() => setShowArchive((value) => !value)}
-          className="surface-muted w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-tg-text"
+          className="owner-archive-toggle"
         >
           <div className="flex items-center justify-between gap-3">
             <span>Архив сотрудников</span>
@@ -2282,7 +2308,7 @@ function TeamTab({ user }: { user: User }) {
         </button>
 
         {showArchive && (
-          <div className="space-y-2.5 pt-1">
+          <div className="owner-list-items">
             {archivedUsers.length === 0 ? (
               <div className="rounded-2xl bg-tg-bg px-4 py-5">
                 <p className="text-sm font-medium text-tg-text">Архив сотрудников пуст</p>
@@ -2474,11 +2500,6 @@ function AdjustTab({ venueId }: { venueId: string }) {
 
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Причина</label>
-          <p className="mb-1.5 text-xs text-tg-hint">
-            {type === 'bonus'
-              ? 'Например: премия за смену, выход в выходной, помощь команде'
-              : 'Например: аванс, покупка зерна, дриппы в счёт зарплаты'}
-          </p>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -2498,10 +2519,10 @@ function AdjustTab({ venueId }: { venueId: string }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-tg-primary text-white py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="owner-primary-action w-full"
         >
               {loading ? (
-                <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
               ) : (
                 <>
                   {type === 'bonus' ? <Gift className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
@@ -2560,21 +2581,21 @@ function AuditTab() {
     );
   }
 
-  if (logs.length === 0) {
-    return (
-      <div className="surface-card rounded-2xl px-4 py-10 text-center">
-        <History className="w-12 h-12 text-tg-hint mx-auto mb-3 opacity-50" />
-        <p className="text-sm font-medium text-tg-text">История действий пока пуста</p>
-        <p className="mt-1 text-xs text-tg-hint">Когда здесь появятся изменения, они будут сгруппированы по датам.</p>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="owner-empty-state" role="alert">
         <p className="font-medium text-tg-text">Не удалось загрузить историю</p>
         <p className="mt-1">{error}</p>
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="owner-empty-state">
+        <History className="mx-auto mb-2 h-8 w-8 text-tg-hint opacity-60" />
+        <p className="font-medium text-tg-text">История действий пока пуста</p>
+        <p className="mt-1">Изменения команды появятся здесь.</p>
       </div>
     );
   }
@@ -2600,78 +2621,49 @@ function AuditTab() {
   }, {});
 
   return (
-    <div className="space-y-4 pb-6">
-      <div className="surface-card rounded-2xl p-4">
-        <p className="text-sm font-medium text-tg-text">История действий</p>
-        <p className="mt-1 text-sm text-tg-hint">Изменения сгруппированы по датам, чтобы было проще просматривать события команды.</p>
-      </div>
-
-      <div className="surface-card rounded-2xl p-4 space-y-4">
-        {Object.entries(groupedLogs).map(([dateLabel, items]) => (
-          <div key={dateLabel} className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
+    <div className="space-y-4 pb-2">
+      <p className="owner-section-note">События сгруппированы по датам.</p>
+      {Object.entries(groupedLogs).map(([dateLabel, items]) => (
+        <section key={dateLabel} className="space-y-2">
+          <div className="flex items-center justify-between gap-3 px-1">
               <p className="text-sm font-medium text-tg-text">{dateLabel}</p>
               <p className="text-xs text-tg-hint">{items.length}</p>
-            </div>
-
-            <div className="space-y-2">
+          </div>
+          <div className="owner-audit-list">
               {items.map((log) => {
-                const isEmphasis = log.action.includes('approved') || log.action.includes('created') || log.action.includes('updated');
-                const tone = log.action.includes('penalty') || log.action.includes('rejected')
-                  ? 'rose'
-                  : log.action.includes('bonus')
-                    ? 'emerald'
-                    : 'blue';
                 const label = ACTION_LABELS[log.action] || 'Действие';
+                const createdAt = formatCreatedAt(log.created_at);
                 return (
                   <div
                     key={log.id}
-                    className="surface-muted rounded-2xl p-3 flex items-start gap-3"
+                    className="owner-audit-row"
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                      tone === 'rose'
-                        ? 'bg-rose-50 dark:bg-rose-900/20'
-                        : tone === 'emerald'
-                          ? 'bg-emerald-50 dark:bg-emerald-900/20'
-                          : 'bg-blue-50 dark:bg-blue-900/20'
-                    }`}>
-                      {tone === 'rose' ? (
-                        <AlertTriangle className="w-4 h-4 text-rose-500" />
-                      ) : tone === 'emerald' ? (
-                        <Gift className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <History className="w-4 h-4 text-blue-500" />
-                      )}
+                    <div className="owner-audit-icon">
+                      <History className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-tg-text">
-                        <span className={`font-medium ${isEmphasis ? 'text-tg-text' : ''}`}>{log.user_name || 'Пользователь'}</span>{' '}
+                        <span className="font-medium">{log.user_name || 'Пользователь'}</span>{' '}
                         <span className="text-tg-hint">{label}</span>
                         {log.target_user_name && (
                           <> <span className="text-tg-hint">для</span> <span className="font-medium">{log.target_user_name}</span></>
                         )}
                       </p>
                       <p className="mt-0.5 text-xs text-tg-hint">
-                        {new Date(log.created_at).toLocaleString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {createdAt || 'Время не указано'}
                       </p>
                     </div>
                   </div>
                 );
               })}
-            </div>
           </div>
-        ))}
-        {logs.length > 20 && (
-          <button type="button" className="owner-secondary-action w-full" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? 'Показать последние 20' : `Показать ещё ${logs.length - 20}`}
-          </button>
-        )}
-      </div>
+        </section>
+      ))}
+      {logs.length > 20 && (
+        <button type="button" className="owner-secondary-action w-full" onClick={() => setShowAll((value) => !value)}>
+          {showAll ? 'Показать последние 20' : `Показать ещё ${logs.length - 20}`}
+        </button>
+      )}
     </div>
   );
 }
