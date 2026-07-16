@@ -36,6 +36,7 @@
   --motion-sheet-backdrop-enter: 400ms;
   --motion-sheet-enter: 400ms;
   --motion-sheet-exit: 220ms;
+  --motion-sheet-drag-return: 220ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
@@ -886,6 +887,8 @@ button:disabled {
 }
 
 .bottom-sheet-root {
+  --bottom-sheet-drag-offset: 0px;
+  --bottom-sheet-backdrop-opacity: 1;
   position: fixed;
   top: 0;
   right: 0;
@@ -927,12 +930,23 @@ button:disabled {
 }
 
 .bottom-sheet-root[data-state='open'] .bottom-sheet-backdrop {
-  opacity: 1;
+  opacity: var(--bottom-sheet-backdrop-opacity);
 }
 
 .bottom-sheet-root[data-state='open'] .bottom-sheet-panel {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(var(--bottom-sheet-drag-offset)) scale(1);
+}
+
+.bottom-sheet-root[data-drag-state='dragging'] .bottom-sheet-backdrop,
+.bottom-sheet-root[data-drag-state='dragging'] .bottom-sheet-panel {
+  transition: none;
+}
+
+.bottom-sheet-root[data-drag-state='settling'][data-state='open'] .bottom-sheet-backdrop,
+.bottom-sheet-root[data-drag-state='settling'][data-state='open'] .bottom-sheet-panel {
+  transition-duration: var(--motion-sheet-drag-return);
+  transition-timing-function: var(--ease-standard);
 }
 
 .bottom-sheet-root[data-state='closing'] .bottom-sheet-backdrop {
@@ -958,12 +972,33 @@ button:disabled {
   will-change: transform, opacity;
 }
 
+.bottom-sheet-drag-region {
+  display: flex;
+  min-height: 2.75rem;
+  margin: -0.55rem -1rem 0.35rem;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .bottom-sheet-handle {
   width: 2.25rem;
   height: 0.25rem;
-  margin: 0 auto 0.85rem;
   border-radius: 999px;
   background: var(--border-subtle);
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
+}
+
+.bottom-sheet-root[data-drag-state='dragging'] .bottom-sheet-drag-region {
+  cursor: grabbing;
+}
+
+.bottom-sheet-root[data-drag-state='dragging'] .bottom-sheet-handle {
+  opacity: 0.72;
+  transform: scaleX(1.16);
 }
 
 .bottom-sheet-title {
@@ -2558,6 +2593,10 @@ button:disabled {
 
   .bottom-sheet-panel {
     transform: none !important;
+  }
+
+  .bottom-sheet-root[data-drag-state='dragging'] .bottom-sheet-panel {
+    transform: translateY(var(--bottom-sheet-drag-offset)) !important;
   }
 
   .bottom-sheet-root[data-state='closing'] .bottom-sheet-panel {
