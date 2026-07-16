@@ -224,7 +224,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
               <MessageSquare className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
               <span>{comment ? 'Комментарий добавлен' : 'Добавить комментарий'}</span>
             </span>
-            <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${commentOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            <ChevronDown className="disclosure-chevron h-5 w-5 shrink-0" data-open={commentOpen} aria-hidden="true" />
           </button>
           {commentOpen && (
             <textarea
@@ -232,7 +232,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
               onChange={(event) => setComment(event.target.value)}
               placeholder="Комментарий к смене"
               rows={3}
-              className="shift-comment-input"
+              className="shift-comment-input motion-disclosure-content"
             />
           )}
         </section>

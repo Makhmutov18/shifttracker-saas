@@ -42,7 +42,7 @@ export default function ShiftCard({ shift, venueName = 'Точка не указ
             {venueName} · {formatHours(shift.total_hours || 0)}
           </p>
         </div>
-        <ChevronDown className={`h-5 w-5 shrink-0 text-tg-hint transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+        <ChevronDown className="disclosure-chevron h-5 w-5 shrink-0 text-tg-hint" data-open={expanded} aria-hidden="true" />
       </button>
 
       <div className="history-shift-amount">
@@ -51,7 +51,7 @@ export default function ShiftCard({ shift, venueName = 'Точка не указ
       </div>
 
       {expanded && (
-        <div className="history-shift-details">
+        <div className="history-shift-details motion-disclosure-content">
           {shift.revenue && parseFloat(shift.revenue) > 0 && (
             <div>
               <span>Выручка</span>

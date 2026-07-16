@@ -79,7 +79,7 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
               onNavigate('shift');
             }}
           >
-            <Plus className="h-6 w-6" aria-hidden="true" />
+            <Plus className="h-[1.375rem] w-[1.375rem]" aria-hidden="true" />
           </button>
         </div>
       </div>

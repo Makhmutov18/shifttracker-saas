@@ -79,7 +79,9 @@ export default function App() {
   return (
     <div className={`app-shell min-h-screen bg-tg-bg text-tg-text ${showBottomNav ? 'app-shell-with-dock' : 'app-shell-fullscreen'}`}>
       <main className={showBottomNav ? 'app-page' : 'app-page app-page-shift'}>
-        {renderPage()}
+        <div key={page} className={`app-page-transition ${page === 'shift' ? 'app-page-transition-shift' : ''}`}>
+          {renderPage()}
+        </div>
       </main>
       {showBottomNav && (
         <BottomNav

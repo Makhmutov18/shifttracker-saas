@@ -6,6 +6,7 @@ import {
   Calculator,
   Check,
   CheckCircle,
+  ChevronDown,
   ChevronRight,
   Copy,
   Gift,
@@ -396,60 +397,62 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
 
   return (
     <div className="owner-panel-page mx-auto max-w-lg px-4 pb-4 pt-6">
-      {activeTab ? (
-        <header className="owner-section-header">
-          <button type="button" className="owner-section-back" onClick={() => setTab(null)} aria-label="Вернуться к управлению">
-            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <div className="min-w-0">
-            <h1>{activeTab.label}</h1>
-            <p>{activeTab.description}</p>
-          </div>
-        </header>
-      ) : (
-        <header className="owner-hub-header">
-          <div className="owner-hub-icon" aria-hidden="true"><ShieldCheck className="h-5 w-5" /></div>
-          <div>
-            <h1>Управление</h1>
-            <p>Команда, смены и начисления</p>
-          </div>
-        </header>
-      )}
-
-      {!activeTab ? (
-        activeTabs.length > 0 ? (
-          <nav className="owner-management-hub" aria-label="Разделы управления">
-            {activeTabs.map((item) => (
-              <button key={item.id} type="button" onClick={() => setTab(item.id)}>
-                <span className="owner-hub-row-icon" aria-hidden="true">{item.icon}</span>
-                <span className="min-w-0 flex-1 text-left">
-                  <strong>{item.label}</strong>
-                  <small>{item.description}</small>
-                </span>
-                <ChevronRight className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
-              </button>
-            ))}
-          </nav>
+      <div key={activeTab?.id ?? 'hub'} className="owner-panel-view">
+        {activeTab ? (
+          <header className="owner-section-header">
+            <button type="button" className="owner-section-back" onClick={() => setTab(null)} aria-label="Вернуться к управлению">
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <div className="min-w-0">
+              <h1>{activeTab.label}</h1>
+              <p>{activeTab.description}</p>
+            </div>
+          </header>
         ) : (
-          <div className="owner-empty-state">Доступных разделов управления нет</div>
-        )
-      ) : (
-        <OwnerPanelBoundary>
-          {tab === 'invite' && canManageTeam && <InviteTab />}
-          {tab === 'approve' && canApprove && <ApproveTab />}
-          {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
-          {tab === 'audit' && canViewAudit && <AuditTab />}
-          {tab === 'team' && canManageTeam && <TeamTab user={user} />}
-          {tab === 'venues' && canManageTeam && <VenuesTab />}
-          {tab === 'payroll' && canViewPayroll && (
-            <PayrollRunsTab
-              canCreate={canCreatePayroll}
-              userVenueId={user.venue_id}
-              restrictToVenue={!canCreatePayroll}
-            />
-          )}
-        </OwnerPanelBoundary>
-      )}
+          <header className="owner-hub-header">
+            <div className="owner-hub-icon" aria-hidden="true"><ShieldCheck className="h-5 w-5" /></div>
+            <div>
+              <h1>Управление</h1>
+              <p>Команда, смены и начисления</p>
+            </div>
+          </header>
+        )}
+
+        {!activeTab ? (
+          activeTabs.length > 0 ? (
+            <nav className="owner-management-hub" aria-label="Разделы управления">
+              {activeTabs.map((item) => (
+                <button key={item.id} type="button" onClick={() => setTab(item.id)}>
+                  <span className="owner-hub-row-icon" aria-hidden="true">{item.icon}</span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
+                </button>
+              ))}
+            </nav>
+          ) : (
+            <div className="owner-empty-state">Доступных разделов управления нет</div>
+          )
+        ) : (
+          <OwnerPanelBoundary>
+            {tab === 'invite' && canManageTeam && <InviteTab />}
+            {tab === 'approve' && canApprove && <ApproveTab />}
+            {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
+            {tab === 'audit' && canViewAudit && <AuditTab />}
+            {tab === 'team' && canManageTeam && <TeamTab user={user} />}
+            {tab === 'venues' && canManageTeam && <VenuesTab />}
+            {tab === 'payroll' && canViewPayroll && (
+              <PayrollRunsTab
+                canCreate={canCreatePayroll}
+                userVenueId={user.venue_id}
+                restrictToVenue={!canCreatePayroll}
+              />
+            )}
+          </OwnerPanelBoundary>
+        )}
+      </div>
     </div>
   );
 }
@@ -1854,15 +1857,19 @@ function VenuesTab() {
         type="button"
         onClick={() => setShowVenueArchive((value) => !value)}
         className="owner-archive-toggle"
+        aria-expanded={showVenueArchive}
       >
         <div className="flex items-center justify-between gap-3">
           <span>Архив точек</span>
-          <span className="text-xs text-tg-hint">{venues.filter((venue) => !venue.is_active).length}</span>
+          <span className="flex items-center gap-2 text-xs text-tg-hint">
+            {venues.filter((venue) => !venue.is_active).length}
+            <ChevronDown className="disclosure-chevron h-4 w-4" data-open={showVenueArchive} aria-hidden="true" />
+          </span>
         </div>
       </button>
 
       {showVenueArchive && (
-        <div className="owner-list-surface">
+        <div className="owner-list-surface owner-disclosure-content">
           <div>
             <p className="text-sm font-medium text-tg-text">Архив точек</p>
             <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
@@ -2300,15 +2307,19 @@ function TeamTab({ user }: { user: User }) {
           type="button"
           onClick={() => setShowArchive((value) => !value)}
           className="owner-archive-toggle"
+          aria-expanded={showArchive}
         >
           <div className="flex items-center justify-between gap-3">
             <span>Архив сотрудников</span>
-            <span className="text-xs text-tg-hint">{archivedUsers.length}</span>
+            <span className="flex items-center gap-2 text-xs text-tg-hint">
+              {archivedUsers.length}
+              <ChevronDown className="disclosure-chevron h-4 w-4" data-open={showArchive} aria-hidden="true" />
+            </span>
           </div>
         </button>
 
         {showArchive && (
-          <div className="owner-list-items">
+          <div className="owner-list-items owner-disclosure-content">
             {archivedUsers.length === 0 ? (
               <div className="rounded-2xl bg-tg-bg px-4 py-5">
                 <p className="text-sm font-medium text-tg-text">Архив сотрудников пуст</p>
