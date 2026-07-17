@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Check, Eye, Info, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { Check, Info, X } from 'lucide-react';
 import { api } from '../api';
-import { AvatarStack, ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, MoneyValue, PageHeader, Pagination, RadialStat, SearchSelect, StatusBadge, Toast, type SortDirection } from '../components/ui';
+import { AvatarStack, ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, MoneyValue, PageHeader, Pagination, SearchSelect, StatusBadge, Toast, type SortDirection } from '../components/ui';
 import type { Shift, User, Venue } from '../types';
 import { currentMonthValue, formatDate, formatNumber, formatTime, hasPermission, monthBounds, payModelLabels } from '../utils';
 
 type ShiftSort = 'date' | 'employee' | 'revenue' | 'salary';
+type ShiftStatusFilter = '' | 'pending' | 'approved' | 'rejected';
 const PAGE_SIZE = 15;
 
 function monthsInRange(start: string, end: string): Array<{ month: number; year: number }> {
@@ -26,7 +27,7 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
   const bounds = monthBounds(currentMonthValue());
   const [periodStart, setPeriodStart] = useState(bounds.start);
   const [periodEnd, setPeriodEnd] = useState(bounds.end);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<ShiftStatusFilter>('');
   const [employeeId, setEmployeeId] = useState('');
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -76,10 +77,14 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
       const result = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ru-RU');
       return sortDirection === 'asc' ? result : -result;
     }), [shifts, periodStart, periodEnd, status, employeeId, sortKey, sortDirection, userMap]);
+  const statusCounts = useMemo(() => {
+    const scoped = (shifts ?? []).filter((shift) => shift.date >= periodStart && shift.date <= periodEnd && (!employeeId || shift.user_id === employeeId));
+    return scoped.reduce((counts, shift) => {
+      if (shift.status === 'pending' || shift.status === 'approved' || shift.status === 'rejected') counts[shift.status] += 1;
+      return counts;
+    }, { pending: 0, approved: 0, rejected: 0 });
+  }, [shifts, periodStart, periodEnd, employeeId]);
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const approvedCount = filtered.filter((shift) => shift.status === 'approved').length;
-  const rejectedCount = filtered.filter((shift) => shift.status === 'rejected').length;
-  const pendingCount = filtered.filter((shift) => shift.status === 'pending').length;
 
   const toggleSort = (key: string) => {
     const next = key as ShiftSort;
@@ -87,6 +92,13 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
     else { setSortKey(next); setSortDirection(next === 'date' ? 'desc' : 'asc'); }
   };
   const open = (shift: Shift) => { setSelected(shift); setForm({ start_time: (shift.start_time || '').slice(0, 5), end_time: (shift.end_time || '').slice(0, 5), revenue: shift.revenue ?? '', comment: shift.comment ?? '' }); };
+  const openFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>, shift: Shift) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    open(shift);
+  };
+  const toggleStatus = (nextStatus: Exclude<ShiftStatusFilter, ''>) => setStatus((current) => current === nextStatus ? '' : nextStatus);
+  const venueName = (shift: Shift, employee?: User) => venueMap.get(shift.venue_id || '')?.name || employee?.venue?.name || 'Основная точка';
   const save = async (nextStatus?: 'approved' | 'rejected') => {
     if (!selected) return; setSaving(true); setError('');
     try {
@@ -100,30 +112,57 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
 
   if (loading) return <LoadingState text="Загружаем смены…" />;
   if (error && !shifts.length) return <ErrorState message={error} retry={load} />;
-  return <>
+  return <div className="shifts-page">
     <PageHeader title="Смены" description="Проверяйте, редактируйте и утверждайте смены команды." />
     {error && <div className="notice error">{error}</div>}
     <FilterBar>
       <DateRangeFields start={periodStart} end={periodEnd} onStart={setPeriodStart} onEnd={setPeriodEnd} />
-      <label className="field"><span>Статус</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Все статусы</option><option value="pending">На подтверждении</option><option value="approved">Утверждена</option><option value="rejected">Отклонена</option></select></label>
+      <label className="field"><span>Статус</span><select value={status} onChange={(event) => setStatus(event.target.value as ShiftStatusFilter)}><option value="">Все статусы</option><option value="pending">На подтверждении</option><option value="approved">Утверждено</option><option value="rejected">Отклонено</option></select></label>
       <label className="field"><span>Сотрудник</span><SearchSelect value={employeeId} onChange={setEmployeeId} placeholder="Все сотрудники" options={(users ?? []).filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.name || 'Сотрудник' }))} /></label>
       <span className="filter-count">Найдено: {filtered.length}</span>
     </FilterBar>
-    <section className="shift-status-summary" aria-label="Сводка статусов смен">
-      <RadialStat value={approvedCount} max={approvedCount + rejectedCount} label="утверждено среди решённых" tone="success" />
-      <div className="shift-status-counts"><span><strong>{approvedCount}</strong>Утверждено</span><span><strong>{pendingCount}</strong>На подтверждении</span><span><strong>{rejectedCount}</strong>Отклонено</span></div>
+    <section className="shift-status-filters" aria-label="Фильтр по статусу смен">
+      {([
+        { value: 'pending', label: 'На подтверждении', count: statusCounts.pending },
+        { value: 'approved', label: 'Утверждено', count: statusCounts.approved },
+        { value: 'rejected', label: 'Отклонено', count: statusCounts.rejected },
+      ] as const).map((item) => <button
+        type="button"
+        className={`shift-status-filter${status === item.value ? ' is-active' : ''}${item.value === 'pending' && item.count > 0 ? ' is-priority' : ''}`}
+        aria-pressed={status === item.value}
+        onClick={() => toggleStatus(item.value)}
+        key={item.value}
+      >
+        <span>{item.label}</span>
+        <strong className="shift-status-filter-count">{item.count}</strong>
+      </button>)}
     </section>
     <section className="panel">
-      <DataTable label="Смены команды" headers={[{ label: 'Дата', sortKey: 'date' }, { label: 'Сотрудник', sortKey: 'employee' }, 'Точка', 'Начало / конец', 'Часы', { label: 'Выручка', sortKey: 'revenue', align: 'right' }, { label: 'Начислено', sortKey: 'salary', align: 'right' }, 'Статус', '']} sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} empty={!filtered.length}>
-        {pageRows.map((shift, index) => {
+      <DataTable label="Смены команды" headers={[{ label: 'Дата', sortKey: 'date' }, { label: 'Сотрудник', sortKey: 'employee' }, 'Точка', 'Начало / конец', 'Часы', { label: 'Выручка', sortKey: 'revenue', align: 'right' }, { label: 'Начислено', sortKey: 'salary', align: 'right' }, 'Статус']} sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} empty={!filtered.length}>
+        {pageRows.map((shift) => {
           const employee = userMap.get(shift.user_id);
-          const showGroup = sortKey === 'date' && (index === 0 || pageRows[index - 1]?.date !== shift.date);
           const payModel = payModelLabels[employee?.pay_model || ''] || 'Модель оплаты не указана';
-          return <Fragment key={shift.id}>{showGroup && <tr className="date-group-row"><td colSpan={9}>{formatDate(shift.date)}</td></tr>}<tr><td>{formatDate(shift.date)}</td><td><div className="person-cell"><AvatarStack items={[{ name: employee?.name || 'Сотрудник' }]} max={1} /><span><strong>{employee?.name || 'Сотрудник'}</strong><small>{employee?.position || 'Без должности'}</small></span></div></td><td>{venueMap.get(shift.venue_id || '')?.name || employee?.venue?.name || 'Основная точка'}</td><td>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</td><td>{formatNumber(shift.total_hours)} ч</td><td className="align-right"><MoneyValue value={shift.revenue} muted={!shift.revenue} /></td><td className="align-right"><span className="pay-with-info"><MoneyValue value={shift.salary_earned} /><span title={`Модель расчёта: ${payModel}`} aria-label={`Модель расчёта: ${payModel}`}><Info /></span></span></td><td><StatusBadge status={shift.status || 'unknown'} /></td><td><button className="icon-button" onClick={() => open(shift)} aria-label="Открыть смену"><Eye /></button></td></tr></Fragment>;
+          const employeeName = employee?.name || 'Сотрудник';
+          return <tr
+            className="shift-table-row"
+            tabIndex={0}
+            aria-label={`Открыть смену: ${employeeName}, ${formatDate(shift.date)}`}
+            onClick={() => open(shift)}
+            onKeyDown={(event) => openFromKeyboard(event, shift)}
+            key={shift.id}
+          ><td>{formatDate(shift.date)}</td><td><div className="person-cell"><AvatarStack items={[{ name: employeeName }]} max={1} /><span><strong>{employeeName}</strong><small>{employee?.position || 'Без должности'}</small></span></div></td><td>{venueName(shift, employee)}</td><td>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</td><td>{formatNumber(shift.total_hours)} ч</td><td className="align-right"><MoneyValue value={shift.revenue} muted={!shift.revenue} /></td><td className="align-right"><span className="pay-with-info"><MoneyValue value={shift.salary_earned} /><span title={`Модель расчёта: ${payModel}`} aria-label={`Модель расчёта: ${payModel}`}><Info /></span></span></td><td><StatusBadge status={shift.status || 'unknown'} /></td></tr>;
         })}
       </DataTable>
       {!filtered.length && <EmptyState title="Смены не найдены" description="Измените фильтры или выберите другой период." />}
-      <div className="mobile-cards">{pageRows.map((shift) => <button className="mobile-card" key={shift.id} onClick={() => open(shift)}><strong>{userMap.get(shift.user_id)?.name || 'Сотрудник'}</strong><p>{formatDate(shift.date)} · {formatTime(shift.start_time)}–{formatTime(shift.end_time)}</p><StatusBadge status={shift.status || 'unknown'} /></button>)}</div>
+      <div className="mobile-cards">{pageRows.map((shift) => {
+        const employee = userMap.get(shift.user_id);
+        const employeeName = employee?.name || 'Сотрудник';
+        return <button className="mobile-card shift-mobile-card" type="button" key={shift.id} onClick={() => open(shift)} aria-label={`Открыть смену: ${employeeName}, ${formatDate(shift.date)}`}>
+          <span className="shift-mobile-card-head"><span className="person-cell"><AvatarStack items={[{ name: employeeName }]} max={1} /><span><strong>{employeeName}</strong><small>{employee?.position || 'Без должности'}</small></span></span><StatusBadge status={shift.status || 'unknown'} /></span>
+          <span className="shift-mobile-card-details"><span><small>Дата</small><strong>{formatDate(shift.date)}</strong></span><span><small>Время</small><strong>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</strong></span></span>
+          <span className="shift-mobile-card-footer"><span><small>Точка</small><strong>{venueName(shift, employee)}</strong></span><span className="align-right"><small>Начислено</small><MoneyValue value={shift.salary_earned} /></span></span>
+        </button>;
+      })}</div>
       <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
     </section>
     <Drawer title="Детали смены" open={Boolean(selected)} onClose={() => setSelected(null)} footer={<><button className="button secondary" onClick={() => setSelected(null)}>Закрыть</button>{selected?.status === 'pending' && canApprove && <><button className="button secondary" disabled={saving} onClick={() => setConfirm('rejected')}><X />Отклонить</button><button className="button primary" disabled={saving} onClick={() => setConfirm('approved')}><Check />Утвердить</button></>}</>}>
@@ -131,5 +170,5 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
     </Drawer>
     <ConfirmationDialog open={Boolean(confirm)} title={confirm === 'approved' ? 'Утвердить смену?' : 'Отклонить смену?'} text={confirm === 'approved' ? 'Смена войдёт в начисления сотрудника.' : 'Отклонённая смена не войдёт в начисления.'} confirmLabel={confirm === 'approved' ? 'Утвердить' : 'Отклонить'} danger={confirm === 'rejected'} onClose={() => setConfirm(null)} onConfirm={() => confirm && void save(confirm)} />
     <Toast message={success} onClose={() => setSuccess('')} />
-  </>;
+  </div>;
 }
