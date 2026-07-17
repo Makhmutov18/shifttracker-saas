@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
@@ -25,6 +25,7 @@ from app.schemas import (
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
+    VenueStatsRow,
 )
 from app.auth import authenticate_request
 from app.utils import (
@@ -143,6 +144,137 @@ async def list_active_venues(
 
 # ─── Shifts ──────────────────────────────────────────────────────────────────
 
+@router.get("/venues/stats", response_model=list[VenueStatsRow])
+async def list_venue_stats(
+    month: int | None = Query(default=None, ge=1, le=12),
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    include_inactive: bool = Query(default=False),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not (
+        _can_manage_all_venue_shifts(user)
+        or has_permission(user, "can_manage_team")
+        or has_permission(user, "can_view_team_payroll")
+    ):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра статистики точек")
+
+    now = datetime.now(timezone.utc)
+    selected_month = month or now.month
+    selected_year = year or now.year
+
+    venues_query = select(Venue)
+    if not include_inactive:
+        venues_query = venues_query.where(Venue.is_active == True)
+    if not _can_manage_all_venue_shifts(user):
+        venues_query = venues_query.where(Venue.id == user.venue_id)
+    venues_result = await session.execute(venues_query.order_by(Venue.name, Venue.id))
+    venues = venues_result.scalars().all()
+    venue_ids = [venue.id for venue in venues]
+    if not venue_ids:
+        return []
+
+    assigned_result = await session.execute(
+        select(User.venue_id, func.count(User.id))
+        .where(User.is_active == True, User.venue_id.in_(venue_ids))
+        .group_by(User.venue_id)
+    )
+    assigned_by_venue = {venue_id: int(count or 0) for venue_id, count in assigned_result.all()}
+
+    approved_status = Shift.status == "approved"
+    pending_status = Shift.status == "pending"
+    shift_result = await session.execute(
+        select(
+            Shift.venue_id,
+            func.count(func.distinct(case((approved_status, Shift.user_id), else_=None))),
+            func.count(case((approved_status, Shift.id), else_=None)),
+            func.count(case((pending_status, Shift.id), else_=None)),
+            func.coalesce(func.sum(case((approved_status, Shift.total_hours), else_=0)), 0),
+            func.coalesce(func.sum(case((approved_status, Shift.salary_earned), else_=0)), 0),
+            func.coalesce(func.sum(case((approved_status, Shift.revenue), else_=0)), 0),
+        )
+        .where(
+            Shift.venue_id.in_(venue_ids),
+            func.extract("month", Shift.date) == selected_month,
+            func.extract("year", Shift.date) == selected_year,
+        )
+        .group_by(Shift.venue_id)
+    )
+    shifts_by_venue = {
+        venue_id: {
+            "worked": int(worked or 0),
+            "approved": int(approved or 0),
+            "pending": int(pending or 0),
+            "hours": safe_decimal(hours),
+            "accruals": safe_decimal(accruals),
+            "revenue": safe_decimal(revenue),
+        }
+        for venue_id, worked, approved, pending, hours, accruals, revenue in shift_result.all()
+    }
+
+    adjustment_result = await session.execute(
+        select(
+            Adjustment.venue_id,
+            func.coalesce(
+                func.sum(case((Adjustment.type == AdjustmentType.bonus, Adjustment.amount), else_=0)),
+                0,
+            ),
+            func.coalesce(
+                func.sum(case((Adjustment.type == AdjustmentType.penalty, Adjustment.amount), else_=0)),
+                0,
+            ),
+        )
+        .where(
+            Adjustment.venue_id.in_(venue_ids),
+            Adjustment.month == selected_month,
+            Adjustment.year == selected_year,
+        )
+        .group_by(Adjustment.venue_id)
+    )
+    adjustments_by_venue = {
+        venue_id: {
+            "bonuses": safe_decimal(bonuses),
+            "deductions": safe_decimal(deductions),
+        }
+        for venue_id, bonuses, deductions in adjustment_result.all()
+    }
+
+    rows: list[VenueStatsRow] = []
+    for venue in venues:
+        shift_stats = shifts_by_venue.get(venue.id, {})
+        adjustment_stats = adjustments_by_venue.get(venue.id, {})
+        shift_accruals = shift_stats.get("accruals", Decimal("0.00"))
+        bonuses = adjustment_stats.get("bonuses", Decimal("0.00"))
+        deductions = adjustment_stats.get("deductions", Decimal("0.00"))
+        revenue = shift_stats.get("revenue", Decimal("0.00"))
+        total_accruals = calculate_payout_total(shift_accruals, bonuses, deductions)
+        payroll_share_percent = None
+        if revenue > Decimal("0.00"):
+            payroll_share_percent = (
+                total_accruals / revenue * Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        rows.append(
+            VenueStatsRow(
+                venue_id=venue.id,
+                venue_name=venue.name,
+                is_active=venue.is_active,
+                assigned_employees_count=assigned_by_venue.get(venue.id, 0),
+                worked_employees_count=shift_stats.get("worked", 0),
+                approved_shifts_count=shift_stats.get("approved", 0),
+                pending_shifts_count=shift_stats.get("pending", 0),
+                approved_hours=shift_stats.get("hours", Decimal("0.00")),
+                shift_accruals=shift_accruals,
+                bonuses=bonuses,
+                deductions=deductions,
+                total_accruals=total_accruals,
+                revenue=revenue,
+                payroll_share_percent=payroll_share_percent,
+            )
+        )
+    return rows
+
+
 @router.post("/shifts", response_model=ShiftOut)
 async def create_shift(
     shift_data: ShiftCreate,
@@ -253,12 +385,7 @@ async def list_shifts(
     elif _can_manage_all_venue_shifts(user):
         pass
     elif _can_view_team_history_scope(user):
-        query = query.where(
-            or_(
-                Shift.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        query = query.where(Shift.venue_id == user.venue_id)
     else:
         query = query.where(Shift.user_id == user.id)
 
@@ -427,16 +554,6 @@ async def payroll_summary(
     m = month or now.month
     y = year or now.year
 
-    users_query = select(User).where(User.is_active == True)
-    if venue_id is not None and _can_manage_all_venue_shifts(user):
-        users_query = users_query.where(User.venue_id == venue_id)
-    elif not _can_manage_all_venue_shifts(user):
-        users_query = users_query.where(User.venue_id == user.venue_id)
-    users_query = users_query.order_by(User.name)
-
-    users_result = await session.execute(users_query)
-    scoped_users = users_result.scalars().all()
-
     shifts_query = (
         select(Shift, User)
         .outerjoin(User, Shift.user_id == User.id)
@@ -446,19 +563,9 @@ async def payroll_summary(
         )
     )
     if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(
-                Shift.venue_id == venue_id,
-                User.venue_id == venue_id,
-            )
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(
-                Shift.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == user.venue_id)
     shifts_query = shifts_query.order_by(User.name, Shift.date)
 
     shifts_result = await session.execute(shifts_query)
@@ -475,29 +582,13 @@ async def payroll_summary(
     if venue_id is not None and _can_manage_all_venue_shifts(user):
         adjustments_query = adjustments_query.where(Adjustment.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        adjustments_query = adjustments_query.where(
-            or_(
-                Adjustment.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        adjustments_query = adjustments_query.where(Adjustment.venue_id == user.venue_id)
     adjustments_query = adjustments_query.order_by(User.name)
 
     adjustments_result = await session.execute(adjustments_query)
     adjustments_with_users = adjustments_result.all()
 
-    rows_by_user: dict[uuid.UUID, dict] = {
-        member.id: {
-            "user_id": member.id,
-            "user_name": member.name,
-            "approved_shifts_count": 0,
-            "total_hours": Decimal("0.00"),
-            "shift_payout": Decimal("0.00"),
-            "bonuses": Decimal("0.00"),
-            "penalties": Decimal("0.00"),
-        }
-        for member in scoped_users
-    }
+    rows_by_user: dict[uuid.UUID, dict] = {}
 
     pending_shifts_count = 0
     approved_shifts_count = 0
@@ -619,7 +710,7 @@ async def payroll_run_preview(
     shifts_query = (
         select(Shift, User)
         .outerjoin(User, Shift.user_id == User.id)
-        .options(selectinload(Shift.venue), selectinload(User.venue))
+        .options(selectinload(Shift.venue))
         .where(
             Shift.status == "approved",
             Shift.date >= period_start,
@@ -627,19 +718,16 @@ async def payroll_run_preview(
         )
     )
     if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(Shift.venue_id == venue_id, User.venue_id == venue_id)
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(Shift.venue_id == user.venue_id, User.venue_id == user.venue_id)
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == user.venue_id)
     shifts_result = await session.execute(shifts_query.order_by(User.name, Shift.date))
     approved_shifts = shifts_result.all()
 
     adjustments_query = (
         select(Adjustment, User)
         .join(User, Adjustment.user_id == User.id)
+        .options(selectinload(Adjustment.venue))
         .where(
             Adjustment.year * 100 + Adjustment.month >= period_start.year * 100 + period_start.month,
             Adjustment.year * 100 + Adjustment.month <= period_end.year * 100 + period_end.month,
@@ -648,9 +736,7 @@ async def payroll_run_preview(
     if venue_id is not None and _can_manage_all_venue_shifts(user):
         adjustments_query = adjustments_query.where(Adjustment.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        adjustments_query = adjustments_query.where(
-            or_(Adjustment.venue_id == user.venue_id, User.venue_id == user.venue_id)
-        )
+        adjustments_query = adjustments_query.where(Adjustment.venue_id == user.venue_id)
     adjustments_result = await session.execute(adjustments_query)
     adjustments = adjustments_result.all()
 
@@ -663,7 +749,7 @@ async def payroll_run_preview(
             {
                 "user_id": shift.user_id,
                 "user_name": safe_text(shift_user.name, "Сотрудник"),
-                "venue_name": "Основная точка",
+                "venue_names": set(),
                 "shifts_count": 0,
                 "total_hours": Decimal("0.00"),
                 "base_amount": Decimal("0.00"),
@@ -672,8 +758,8 @@ async def payroll_run_preview(
             },
         )
         shift_venue_name = safe_text(getattr(getattr(shift, "venue", None), "name", None), "")
-        user_venue_name = safe_text(getattr(getattr(shift_user, "venue", None), "name", None), "")
-        row["venue_name"] = shift_venue_name or user_venue_name or "Основная точка"
+        if shift_venue_name:
+            row["venue_names"].add(shift_venue_name)
         row["shifts_count"] += 1
         row["total_hours"] += safe_decimal(shift.total_hours)
         row["base_amount"] += safe_decimal(shift.salary_earned)
@@ -686,7 +772,7 @@ async def payroll_run_preview(
             {
                 "user_id": adjustment.user_id,
                 "user_name": safe_text(adjustment_user.name, "Сотрудник"),
-                "venue_name": safe_text(getattr(getattr(adjustment_user, "venue", None), "name", None), "Основная точка"),
+                "venue_names": set(),
                 "shifts_count": 0,
                 "total_hours": Decimal("0.00"),
                 "base_amount": Decimal("0.00"),
@@ -694,21 +780,35 @@ async def payroll_run_preview(
                 "deductions": Decimal("0.00"),
             },
         )
+        adjustment_venue_name = safe_text(getattr(getattr(adjustment, "venue", None), "name", None), "")
+        if adjustment_venue_name:
+            row["venue_names"].add(adjustment_venue_name)
         if adjustment.type == AdjustmentType.bonus:
             row["bonuses"] += safe_decimal(adjustment.amount)
         else:
             row["deductions"] += safe_decimal(adjustment.amount)
 
-    preview_rows = [
-        PayrollPreviewRow(
-            **row,
-            total_amount=calculate_payout_total(
-                row["base_amount"], row["bonuses"], row["deductions"]
-            ),
+    preview_rows: list[PayrollPreviewRow] = []
+    for row in rows_by_user.values():
+        if not (row["shifts_count"] > 0 or row["bonuses"] or row["deductions"]):
+            continue
+        venue_names = sorted(row.pop("venue_names"))
+        venue_name = (
+            venue_names[0]
+            if len(venue_names) == 1
+            else "Несколько точек"
+            if len(venue_names) > 1
+            else "Точка не указана"
         )
-        for row in rows_by_user.values()
-        if row["shifts_count"] > 0 or row["bonuses"] or row["deductions"]
-    ]
+        preview_rows.append(
+            PayrollPreviewRow(
+                **row,
+                venue_name=venue_name,
+                total_amount=calculate_payout_total(
+                    row["base_amount"], row["bonuses"], row["deductions"]
+                ),
+            )
+        )
     preview_rows.sort(key=lambda row: (row.user_name.lower(), row.user_id.hex))
 
     total_hours = sum((row.total_hours for row in preview_rows), Decimal("0.00"))
@@ -746,7 +846,6 @@ async def create_payroll_run(
 
     source_shifts_query = (
         select(Shift.id)
-        .outerjoin(User, Shift.user_id == User.id)
         .where(
             Shift.status == "approved",
             Shift.date >= payroll_data.period_start,
@@ -754,12 +853,7 @@ async def create_payroll_run(
         )
     )
     if payroll_data.venue_id is not None:
-        source_shifts_query = source_shifts_query.where(
-            or_(
-                Shift.venue_id == payroll_data.venue_id,
-                User.venue_id == payroll_data.venue_id,
-            )
-        )
+        source_shifts_query = source_shifts_query.where(Shift.venue_id == payroll_data.venue_id)
     source_shifts_result = await session.execute(source_shifts_query)
     source_shift_ids = list(source_shifts_result.scalars().all())
 
@@ -1389,10 +1483,15 @@ async def create_adjustment(
     if not has_permission(user, "can_manage_adjustments"):
         raise HTTPException(status_code=403, detail="Only users with adjustment access can create adjustments")
 
+    adjustment_venue_id = adjustment_data.venue_id or user.venue_id
+    if not _can_manage_all_venue_shifts(user) and adjustment_venue_id != user.venue_id:
+        raise HTTPException(status_code=403, detail="Корректировку можно отнести только к своей точке")
+    adjustment_venue = await _get_active_venue(session, adjustment_venue_id)
+
     now = datetime.now(timezone.utc)
     adjustment = Adjustment(
         user_id=adjustment_data.user_id,
-        venue_id=user.venue_id,
+        venue_id=adjustment_venue_id,
         type=AdjustmentType(adjustment_data.type),
         amount=adjustment_data.amount,
         reason=adjustment_data.reason,
@@ -1408,11 +1507,16 @@ async def create_adjustment(
     log = AuditLog(
         user_id=user.id,
         target_user_id=adjustment_data.user_id,
-        venue_id=user.venue_id,
+        venue_id=adjustment.venue_id,
         action=f"{adjustment_data.type}_added",
         entity_type="adjustment",
         entity_id=adjustment.id,
-        new_value={"type": adjustment_data.type, "amount": str(adjustment_data.amount), "reason": adjustment_data.reason},
+        new_value={
+            "type": adjustment_data.type,
+            "amount": str(adjustment_data.amount),
+            "reason": adjustment_data.reason,
+            "venue_id": str(adjustment.venue_id),
+        },
     )
     session.add(log)
     await session.commit()
@@ -1436,6 +1540,8 @@ async def create_adjustment(
     return AdjustmentOut(
         id=adjustment.id,
         user_id=adjustment.user_id,
+        venue_id=adjustment.venue_id,
+        venue_name=adjustment_venue.name,
         type=adjustment.type.value,
         amount=adjustment.amount,
         reason=adjustment.reason,
@@ -1459,7 +1565,11 @@ async def list_adjustments(
 
     query = (
         select(Adjustment)
-        .options(selectinload(Adjustment.user), selectinload(Adjustment.creator))
+        .options(
+            selectinload(Adjustment.user),
+            selectinload(Adjustment.creator),
+            selectinload(Adjustment.venue),
+        )
         .where(
             Adjustment.user_id == user.id,
             Adjustment.month == m,
@@ -1474,6 +1584,8 @@ async def list_adjustments(
         AdjustmentOut(
             id=a.id,
             user_id=a.user_id,
+            venue_id=a.venue_id,
+            venue_name=a.venue.name if a.venue else None,
             type=a.type.value,
             amount=a.amount,
             reason=a.reason,
@@ -1511,7 +1623,6 @@ async def export_csv(
         .outerjoin(User, Shift.user_id == User.id)
         .options(
             selectinload(Shift.venue),
-            selectinload(User.venue),
         )
         .where(
             Shift.status == "approved",
@@ -1520,19 +1631,9 @@ async def export_csv(
         )
     )
     if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(
-                Shift.venue_id == venue_id,
-                User.venue_id == venue_id,
-            )
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(
-            or_(
-                Shift.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        shifts_query = shifts_query.where(Shift.venue_id == user.venue_id)
     shifts_query = shifts_query.order_by(User.name, Shift.date)
     result = await session.execute(shifts_query)
     shifts_with_users = result.all()
@@ -1548,12 +1649,7 @@ async def export_csv(
     if venue_id is not None and _can_manage_all_venue_shifts(user):
         adj_query = adj_query.where(Adjustment.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
-        adj_query = adj_query.where(
-            or_(
-                Adjustment.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        adj_query = adj_query.where(Adjustment.venue_id == user.venue_id)
     adj_result = await session.execute(adj_query)
     adjustments_with_users = adj_result.all()
 
@@ -1649,16 +1745,12 @@ async def export_csv(
     for shift, shift_user in shifts_with_users:
         user_name = safe_text(getattr(shift_user, "name", None), "Сотрудник")
         position = safe_text(getattr(shift_user, "position", None), "")
-        venue_name = "Основная точка"
+        venue_name = "Точка не указана"
         pay_model_value = normalize_pay_model(getattr(shift_user, "pay_model", None) if shift_user is not None else None)
 
-        if shift_user is not None:
-            venue_name = safe_text(getattr(getattr(shift_user, "venue", None), "name", None), venue_name)
         shift_venue = getattr(shift, "venue", None)
         if shift_venue is not None:
             venue_name = safe_text(getattr(shift_venue, "name", None), venue_name)
-        elif safe_text(getattr(shift, "venue_id", None), "") == "":
-            venue_name = "Основная точка"
 
         total_hours = safe_decimal(getattr(shift, "total_hours", None))
         hourly_rate = safe_decimal(getattr(shift_user, "hourly_rate", None) if shift_user is not None else None)

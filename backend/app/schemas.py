@@ -215,11 +215,14 @@ class AdjustmentCreate(BaseModel):
     type: str = Field(..., pattern="^(bonus|penalty)$")
     amount: Decimal = Field(..., gt=0)
     reason: str = Field(..., min_length=1, max_length=500)
+    venue_id: Optional[uuid.UUID] = None
 
 
 class AdjustmentOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    venue_id: uuid.UUID
+    venue_name: Optional[str] = None
     type: str
     amount: Decimal
     reason: str
@@ -231,6 +234,23 @@ class AdjustmentOut(BaseModel):
     creator_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class VenueStatsRow(BaseModel):
+    venue_id: uuid.UUID
+    venue_name: str
+    is_active: bool
+    assigned_employees_count: int = 0
+    worked_employees_count: int = 0
+    approved_shifts_count: int = 0
+    pending_shifts_count: int = 0
+    approved_hours: Decimal = Decimal("0.00")
+    shift_accruals: Decimal = Decimal("0.00")
+    bonuses: Decimal = Decimal("0.00")
+    deductions: Decimal = Decimal("0.00")
+    total_accruals: Decimal = Decimal("0.00")
+    revenue: Decimal = Decimal("0.00")
+    payroll_share_percent: Optional[Decimal] = None
 
 
 # ═════ Payroll Runs ═════

@@ -47,9 +47,9 @@ class PayrollPreviewTests(unittest.TestCase):
         source = _preview_source()
         self.assertIn("venue_id", source)
         self.assertIn("Shift.venue_id == venue_id", source)
-        self.assertIn("User.venue_id == venue_id", source)
+        self.assertNotIn("User.venue_id == venue_id", source)
         self.assertIn("selectinload(Shift.venue)", source)
-        self.assertIn("selectinload(User.venue)", source)
+        self.assertIn('"Несколько точек"', source)
 
     def test_preview_is_read_only(self) -> None:
         source = _preview_source()
