@@ -116,7 +116,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
     : '';
 
   return (
-    <div className="dashboard-page mx-auto max-w-lg px-4 pb-6 pt-6">
+    <div className="dashboard-page mx-auto max-w-lg px-4 pb-6 pt-5">
       <header className="dashboard-profile-header">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold text-tg-text">{user.name || 'Сотрудник'}</h1>

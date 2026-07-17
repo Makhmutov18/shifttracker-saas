@@ -194,7 +194,7 @@ export default function History({ user }: Props) {
   };
 
   return (
-    <div className="history-page mx-auto max-w-lg px-4 pb-6 pt-6">
+    <div className="history-page mx-auto max-w-lg px-4 pb-6 pt-5">
       <header className="history-header">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-tg-text">История</h1>
