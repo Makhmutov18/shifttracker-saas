@@ -23,7 +23,8 @@ type VenueOverview = {
 
 function monthLabel(value: string): string {
   const [year, month] = value.split('-').map(Number);
-  return new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+  const monthName = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date(year, month - 1, 1));
+  return `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`;
 }
 
 function plural(value: number, forms: [string, string, string]): string {
@@ -118,7 +119,7 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
   const inactiveVenues = (venues ?? []).filter((venue) => !venue.is_active);
   const userMap = useMemo(() => new Map(users.map((employee) => [employee.id, employee])), [users]);
   const venueMap = useMemo(() => new Map((venues ?? []).map((venue) => [venue.id, venue])), [venues]);
-  const selectedVenue = venueId ? venueMap.get(venueId)?.name ?? 'Точка не указана' : 'Все точки';
+  const selectedVenue = venueId ? venueMap.get(venueId)?.name ?? 'Точка не указана' : 'Сводка по всем точкам';
   const attention = [
     pending.length ? { icon: Clock3, tone: 'warning' as BadgeVariant, text: `${pending.length} ${plural(pending.length, ['смена ждёт', 'смены ждут', 'смен ждут'])} подтверждения`, action: 'Открыть смены', path: '/shifts' as RoutePath } : null,
     missingPay.length ? { icon: UserRoundX, tone: 'danger' as BadgeVariant, text: `${missingPay.length} ${plural(missingPay.length, ['сотрудник без', 'сотрудника без', 'сотрудников без'])} настроенной оплаты`, action: 'Открыть команду', path: '/employees' as RoutePath } : null,
@@ -171,7 +172,7 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
 
   return <div className="overview-page">
     <header className="overview-header">
-      <div><h1>Обзор</h1><div className="overview-context"><span>{monthLabel(periodValue)}</span><span><Building2 />{selectedVenue}</span></div></div>
+      <div className="overview-context"><strong>{monthLabel(periodValue)}</strong><span><Building2 />{selectedVenue}</span></div>
     </header>
 
     <section className="overview-metrics" aria-label="Финансовая сводка за месяц">
