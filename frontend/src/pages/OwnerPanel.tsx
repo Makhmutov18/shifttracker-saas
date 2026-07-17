@@ -417,7 +417,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
   const activeTab = tab ? activeTabs.find((item) => item.id === tab) ?? null : null;
 
   return (
-    <div className="owner-panel-page mx-auto max-w-lg px-4 pb-4 pt-6">
+    <div className="owner-panel-page mx-auto max-w-lg px-4 pb-4 pt-5">
       <div key={activeTab?.id ?? 'hub'} className="owner-panel-view">
         {activeTab ? (
           <header className="owner-section-header">
@@ -1444,7 +1444,7 @@ function ApproveTab() {
 
   if (safeShifts.length === 0) {
     return (
-      <div className="rounded-2xl bg-tg-secondary-bg px-4 py-5 text-center">
+      <div className="owner-empty-state owner-approval-empty">
         <p className="text-sm font-medium text-tg-text">Смен на подтверждении нет</p>
         <p className="mt-1 text-sm text-tg-hint">Новые заявки сотрудников появятся здесь.</p>
       </div>
@@ -2368,7 +2368,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
 
   return (
     <div className="owner-form-surface">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-sm text-tg-hint mb-1.5">Сотрудник</label>
           <select
@@ -2541,10 +2541,10 @@ function AuditTab() {
   }, {});
 
   return (
-    <div className="space-y-4 pb-2">
+    <div className="space-y-3 pb-2">
       <p className="owner-section-note">События сгруппированы по датам.</p>
       {Object.entries(groupedLogs).map(([dateLabel, items]) => (
-        <section key={dateLabel} className="space-y-2">
+        <section key={dateLabel} className="space-y-1.5">
           <div className="flex items-center justify-between gap-3 px-1">
               <p className="text-sm font-medium text-tg-text">{dateLabel}</p>
               <p className="text-xs text-tg-hint">{items.length}</p>

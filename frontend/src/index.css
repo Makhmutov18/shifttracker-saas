@@ -2015,14 +2015,14 @@ button:disabled {
 .owner-panel-page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .owner-panel-view {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   animation: content-fade-enter var(--motion-base) var(--ease-enter) both;
 }
 
@@ -2031,7 +2031,7 @@ button:disabled {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .owner-hub-header h1,
@@ -2067,7 +2067,7 @@ button:disabled {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   background: var(--surface-muted);
   color: var(--text-secondary);
 }
@@ -2082,10 +2082,10 @@ button:disabled {
 .owner-management-hub > button {
   display: flex;
   width: 100%;
-  min-height: 4.5rem;
+  min-height: 4rem;
   align-items: center;
-  gap: 0.8rem;
-  padding: 0.75rem 1rem;
+  gap: 0.7rem;
+  padding: 0.65rem 0.9rem;
   color: var(--text-primary);
   transition: background-color var(--motion-fast) var(--ease-standard);
 }
@@ -2099,14 +2099,14 @@ button:disabled {
 }
 
 .owner-hub-row-icon {
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 0.75rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.7rem;
 }
 
 .owner-hub-row-icon svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .owner-management-hub strong,
@@ -2120,7 +2120,7 @@ button:disabled {
 }
 
 .owner-management-hub small {
-  margin-top: 0.2rem;
+  margin-top: 0.1rem;
   overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-size: 0.75rem;
@@ -2128,7 +2128,7 @@ button:disabled {
 }
 
 .owner-empty-state {
-  padding: 1.25rem;
+  padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
@@ -2138,9 +2138,14 @@ button:disabled {
   text-align: center;
 }
 
+.owner-approval-empty {
+  max-width: 24rem;
+  margin: clamp(1rem, 8vh, 3rem) auto 0;
+}
+
 .owner-summary-panel,
 .owner-form-surface {
-  padding: 1rem;
+  padding: 0.9rem;
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
@@ -2152,7 +2157,7 @@ button:disabled {
 }
 
 .owner-form-section {
-  padding-block: 0.85rem;
+  padding-block: 0.7rem;
 }
 
 .owner-form-section:first-child {
@@ -2204,14 +2209,14 @@ button:disabled {
 
 .owner-summary-panel {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.75rem;
 }
 
 .owner-inline-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
-  padding-block: 0.8rem;
+  padding-block: 0.65rem;
   border-block: 1px solid var(--border-subtle);
 }
 
@@ -2262,7 +2267,7 @@ button:disabled {
 
 .owner-employee-card,
 .owner-approval-card {
-  padding: 0.85rem;
+  padding: 0.75rem;
   border-radius: 0.85rem;
 }
 
@@ -2397,13 +2402,13 @@ button:disabled {
 
 .owner-approval-card {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.65rem;
 }
 
 .owner-approval-facts {
   display: grid;
-  gap: 0.45rem;
-  padding-block: 0.75rem;
+  gap: 0.35rem;
+  padding-block: 0.6rem;
   border-block: 1px solid var(--border-subtle);
 }
 
@@ -2662,7 +2667,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding-inline: 0.85rem;
+  padding-inline: 0.75rem;
   border-radius: 0.8rem;
   font-size: 0.8125rem;
   font-weight: 650;
@@ -2736,7 +2741,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.7rem;
   color: var(--text-primary);
   font-size: 0.8125rem;
 }
@@ -2765,10 +2770,10 @@ button:disabled {
 
 .owner-audit-row {
   display: flex;
-  min-height: 3.75rem;
+  min-height: 3.5rem;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
 }
 
 .owner-audit-row + .owner-audit-row {
@@ -2777,8 +2782,8 @@ button:disabled {
 
 .owner-audit-icon {
   display: flex;
-  width: 2rem;
-  height: 2rem;
+  width: 1.85rem;
+  height: 1.85rem;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
