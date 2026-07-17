@@ -6,7 +6,6 @@ import {
   Calculator,
   Check,
   CheckCircle,
-  ChevronDown,
   ChevronRight,
   Copy,
   Gift,
@@ -15,12 +14,12 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  ShieldCheck,
   UserPlus,
   UserX,
   Users,
   XCircle,
 } from 'lucide-react';
+import UserAvatar from '../components/UserAvatar';
 import {
   AdminCreateUserResponse,
   AuditLog,
@@ -121,13 +120,11 @@ function PermissionsChecklist({ value, onChange, disabled = false }: PermissionT
   const safeValue = value ?? {};
 
   return (
-    <div className="grid gap-2">
+    <div className="owner-permissions-list">
       {MANAGEMENT_PERMISSION_OPTIONS.map(({ key, label }) => (
         <label
           key={key}
-          className={`flex items-center justify-between gap-3 rounded-xl bg-tg-bg px-3 py-3 text-sm ${
-            disabled ? 'opacity-60' : 'hover:bg-tg-bg/90'
-          }`}
+          className={`owner-permission-row ${disabled ? 'opacity-60' : ''}`}
         >
           <span className="text-tg-text">{label}</span>
           <input
@@ -306,14 +303,20 @@ function TeamEmployeeCard({
   return (
     <article className="owner-employee-card" data-archived={archived ? 'true' : 'false'}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="owner-employee-heading">
-            <p>{employee.name || 'Сотрудник'}</p>
-            <span className="owner-status-badge" data-status={archived ? 'archived' : 'active'}>
-              {archived ? 'В архиве' : 'Активен'}
-            </span>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <UserAvatar
+            name={employee.name || 'Сотрудник'}
+            photoUrl={employee.telegram_photo_url}
+            sizeClassName="h-10 w-10"
+            textClassName="text-xs"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="owner-employee-heading">
+              <p>{employee.name || 'Сотрудник'}</p>
+              {archived && <span className="owner-status-badge" data-status="archived">В архиве</span>}
+            </div>
+            <p className="owner-employee-role">{getPositionLabel(employee)} · {getManagementRoleLabel(employee)}</p>
           </div>
-          <p className="owner-employee-role">{getManagementRoleLabel(employee)} · {getManagementBadge(employee)}</p>
         </div>
         <button
           type="button"
@@ -326,7 +329,7 @@ function TeamEmployeeCard({
       </div>
 
       <div className="owner-employee-details">
-        <p><span>Работа</span><strong>{getPositionLabel(employee)} · {getShortVenueLabel(employee.venue)}</strong></p>
+        <p><span>Точка</span><strong>{getShortVenueLabel(employee.venue)}</strong></p>
         <p>
           <span>Оплата</span>
           <strong>
@@ -334,6 +337,7 @@ function TeamEmployeeCard({
             {hasRevenueShare ? ` · ${employee.revenue_percentage}%` : ''}
           </strong>
         </p>
+        <p><span>Доступ</span><strong>{getManagementBadge(employee)}</strong></p>
       </div>
 
       <div className="owner-danger-zone">
@@ -427,7 +431,6 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
           </header>
         ) : (
           <header className="owner-hub-header">
-            <div className="owner-hub-icon" aria-hidden="true"><ShieldCheck className="h-5 w-5" /></div>
             <div>
               <h1>Управление</h1>
               <p>Команда, смены и начисления</p>
@@ -1728,6 +1731,10 @@ function VenuesTab() {
     );
   }
 
+  const activeVenues = venues.filter((venue) => venue.is_active);
+  const archivedVenues = venues.filter((venue) => !venue.is_active);
+  const visibleVenues = showVenueArchive ? archivedVenues : activeVenues;
+
   return (
     <div className="space-y-4">
       <div className="owner-compact-summary">
@@ -1773,140 +1780,35 @@ function VenuesTab() {
           <p className="mt-1 text-sm text-tg-hint">Добавьте первую точку, чтобы привязывать к ней сотрудников и смены.</p>
         </div>
       ) : (
-        <div className="owner-list-surface">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-tg-text">Активные точки</p>
-            </div>
-            <p className="text-xs text-tg-hint">Активных: {venues.filter((venue) => venue.is_active).length}</p>
+        <>
+          <div className="owner-segmented-control owner-list-tabs" role="tablist" aria-label="Статус точек">
+            <button type="button" role="tab" aria-selected={!showVenueArchive} data-active={!showVenueArchive} onClick={() => setShowVenueArchive(false)}>
+              Активные · {activeVenues.length}
+            </button>
+            <button type="button" role="tab" aria-selected={showVenueArchive} data-active={showVenueArchive} onClick={() => setShowVenueArchive(true)}>
+              Архив · {archivedVenues.length}
+            </button>
           </div>
-
-          {venues.filter((venue) => venue.is_active).length === 0 ? (
-            <div className="rounded-2xl bg-tg-bg px-4 py-5">
-              <p className="text-sm font-medium text-tg-text">Активных точек пока нет</p>
-              <p className="mt-1 text-sm text-tg-hint">Переведите точку из архива или добавьте новую.</p>
+          <div className="owner-list-surface owner-disclosure-content">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-tg-text">{showVenueArchive ? 'Архив точек' : 'Активные точки'}</p>
+              <p className="text-xs text-tg-hint">{visibleVenues.length}</p>
             </div>
-          ) : venues.filter((venue) => venue.is_active).map((venue) => {
-            const isEditing = editingVenueId === venue.id;
-            const isBusy = statusVenueId === venue.id;
-            const employeeCount = users.filter(
-              (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
-            ).length;
-            return (
-              <div key={venue.id} className="owner-employee-card owner-list-row">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="w-full bg-tg-bg text-tg-text rounded-xl px-4 py-2.5 text-sm outline-none"
-                        placeholder="Название точки"
-                      />
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-tg-text">{venue.name}</p>
-                      <span className="owner-status-badge" data-status="active">
-                        Активна
-                      </span>
-                      <span className="text-xs text-tg-hint">
-                        {employeeCount} сотрудников
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {!isEditing && (
-                    <button
-                      onClick={() => {
-                        setEditingVenueId(venue.id);
-                        setEditingName(venue.name);
-                      }}
-                    className="owner-icon-button"
-                      aria-label={`Редактировать ${venue.name}`}
-                    >
-                      <Pencil className="w-4 h-4 text-tg-hint" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  {isEditing ? (
-                    <>
-                      <button
-                        onClick={() => handleRenameVenue(venue.id)}
-                        disabled={isBusy}
-                      className="owner-primary-action flex-1"
-                      >
-                        <Check className="w-4 h-4" />
-                        Сохранить изменения
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingVenueId(null);
-                          setEditingName('');
-                        }}
-                        disabled={isBusy}
-                      className="owner-secondary-action flex-1"
-                      >
-                        Отмена
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => handleToggleVenue(venue)}
-                      disabled={isBusy}
-                    className="owner-status-action"
-                    data-action="archive"
-                    >
-                      {isBusy ? <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" /> : <XCircle className="w-3.5 h-3.5" />}
-                      В архив
-                    </button>
-                  )}
-                </div>
+            {visibleVenues.length === 0 ? (
+              <div className="px-4 py-5">
+                <p className="text-sm font-medium text-tg-text">{showVenueArchive ? 'Архив точек пуст' : 'Активных точек пока нет'}</p>
+                <p className="mt-1 text-sm text-tg-hint">{showVenueArchive ? 'Неактивные точки появятся здесь после перевода в архив.' : 'Переведите точку из архива или добавьте новую.'}</p>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setShowVenueArchive((value) => !value)}
-        className="owner-archive-toggle"
-        aria-expanded={showVenueArchive}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <span>Архив точек</span>
-          <span className="flex items-center gap-2 text-xs text-tg-hint">
-            {venues.filter((venue) => !venue.is_active).length}
-            <ChevronDown className="disclosure-chevron h-4 w-4" data-open={showVenueArchive} aria-hidden="true" />
-          </span>
-        </div>
-      </button>
-
-      {showVenueArchive && (
-        <div className="owner-list-surface owner-disclosure-content">
-          <div>
-            <p className="text-sm font-medium text-tg-text">Архив точек</p>
-            <p className="mt-1 text-xs text-tg-hint">Архив сохраняет смены, начисления и историю.</p>
-          </div>
-
-          {venues.filter((venue) => !venue.is_active).length === 0 ? (
-            <div className="rounded-2xl bg-tg-bg px-4 py-5">
-              <p className="text-sm font-medium text-tg-text">Архив точек пуст</p>
-              <p className="mt-1 text-sm text-tg-hint">Неактивные точки появятся здесь после перевода в архив.</p>
-            </div>
-          ) : (
-            <div className="owner-list-items">
-              {venues.filter((venue) => !venue.is_active).map((venue) => {
+            ) : (
+              <div className="owner-list-items">
+                {visibleVenues.map((venue) => {
                 const isEditing = editingVenueId === venue.id;
                 const isBusy = statusVenueId === venue.id;
                 const employeeCount = users.filter(
                   (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
                 ).length;
-                return (
-                <div key={venue.id} className="owner-employee-card owner-list-row" data-archived="true">
+                  return (
+                    <div key={venue.id} className="owner-employee-card owner-list-row" data-archived={showVenueArchive ? 'true' : 'false'}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (
@@ -1920,9 +1822,7 @@ function VenuesTab() {
                         ) : (
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium text-tg-text">{venue.name}</p>
-                          <span className="owner-status-badge" data-status="archived">
-                            В архиве
-                          </span>
+                          {showVenueArchive && <span className="owner-status-badge" data-status="archived">В архиве</span>}
                           <span className="text-xs text-tg-hint">
                             {employeeCount} сотрудников
                           </span>
@@ -1969,24 +1869,27 @@ function VenuesTab() {
                         <button
                           onClick={() => handleToggleVenue(venue)}
                           disabled={isBusy}
-                      className="owner-status-action"
-                      data-action="restore"
+                          className="owner-status-action"
+                          data-action={showVenueArchive ? 'restore' : 'archive'}
                         >
                           {isBusy ? (
                             <span className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
-                          ) : (
+                          ) : showVenueArchive ? (
                             <CheckCircle className="w-3.5 h-3.5" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5" />
                           )}
-                          Восстановить
+                          {showVenueArchive ? 'Восстановить' : 'В архив'}
                         </button>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -2136,6 +2039,7 @@ function TeamTab({ user }: { user: User }) {
 
   const activeUsers = users.filter((item) => item.is_active);
   const archivedUsers = users.filter((item) => !item.is_active);
+  const visibleUsers = showArchive ? archivedUsers : activeUsers;
   const activeVenueCount = venues.filter((venue) => venue?.is_active).length;
 
   return (
@@ -2292,69 +2196,39 @@ function TeamTab({ user }: { user: User }) {
         ) : null}
       </div>
 
-      <div className="owner-list-surface">
+      <div className="owner-segmented-control owner-list-tabs" role="tablist" aria-label="Статус сотрудников">
+        <button type="button" role="tab" aria-selected={!showArchive} data-active={!showArchive} onClick={() => setShowArchive(false)}>
+          Активные · {activeUsers.length}
+        </button>
+        <button type="button" role="tab" aria-selected={showArchive} data-active={showArchive} onClick={() => setShowArchive(true)}>
+          Архив · {archivedUsers.length}
+        </button>
+      </div>
+
+      <div className="owner-list-surface owner-disclosure-content">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-tg-text">Активные сотрудники</p>
-          </div>
-          <p className="text-xs text-tg-hint">Активных: {activeUsers.length}</p>
+          <p className="text-sm font-medium text-tg-text">{showArchive ? 'Архив сотрудников' : 'Активные сотрудники'}</p>
+          <p className="text-xs text-tg-hint">{visibleUsers.length}</p>
         </div>
 
-        {activeUsers.length === 0 ? (
-          <div className="rounded-2xl bg-tg-bg px-4 py-5">
-            <p className="text-sm font-medium text-tg-text">Активных сотрудников пока нет</p>
-            <p className="mt-1 text-sm text-tg-hint">Перенесите сотрудника из архива или добавьте нового через приглашение.</p>
+        {visibleUsers.length === 0 ? (
+          <div className="px-4 py-5">
+            <p className="text-sm font-medium text-tg-text">{showArchive ? 'Архив сотрудников пуст' : 'Активных сотрудников пока нет'}</p>
+            <p className="mt-1 text-sm text-tg-hint">{showArchive ? 'Деактивированные сотрудники появятся здесь и останутся с историей смен.' : 'Перенесите сотрудника из архива или добавьте нового через приглашение.'}</p>
           </div>
         ) : (
           <div className="owner-list-items">
-            {activeUsers.map((u) => (
+            {visibleUsers.map((u) => (
               <TeamEmployeeCard
                 key={u.id}
                 employee={u}
                 currentUser={user}
+                archived={showArchive}
                 onEdit={startEdit}
                 onToggleStatus={handleStatusChange}
                 busy={statusUserId === u.id}
               />
             ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setShowArchive((value) => !value)}
-          className="owner-archive-toggle"
-          aria-expanded={showArchive}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span>Архив сотрудников</span>
-            <span className="flex items-center gap-2 text-xs text-tg-hint">
-              {archivedUsers.length}
-              <ChevronDown className="disclosure-chevron h-4 w-4" data-open={showArchive} aria-hidden="true" />
-            </span>
-          </div>
-        </button>
-
-        {showArchive && (
-          <div className="owner-list-items owner-disclosure-content">
-            {archivedUsers.length === 0 ? (
-              <div className="rounded-2xl bg-tg-bg px-4 py-5">
-                <p className="text-sm font-medium text-tg-text">Архив сотрудников пуст</p>
-                <p className="mt-1 text-sm text-tg-hint">Деактивированные сотрудники появятся здесь и останутся с историей смен.</p>
-              </div>
-            ) : (
-              archivedUsers.map((u) => (
-                <TeamEmployeeCard
-                  key={u.id}
-                  employee={u}
-                  currentUser={user}
-                  archived
-                  onEdit={startEdit}
-                  onToggleStatus={handleStatusChange}
-                  busy={statusUserId === u.id}
-                />
-              ))
-            )}
           </div>
         )}
       </div>
