@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Clock, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ChevronRight } from 'lucide-react';
 import { getPayrollSummary, type PayrollSummary, type User as UserType } from '../utils/api';
 import { useStats } from '../hooks/useStats';
 import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
@@ -119,7 +119,6 @@ export default function Dashboard({ user, onNavigate }: Props) {
     <div className="dashboard-page mx-auto max-w-lg px-4 pb-6 pt-6">
       <header className="dashboard-profile-header">
         <div className="min-w-0">
-          <p className="dashboard-kicker">Главная</p>
           <h1 className="truncate text-2xl font-semibold text-tg-text">{user.name || 'Сотрудник'}</h1>
           <p className="mt-1 truncate text-sm text-tg-hint">
             {venueName} · {getPayModelSummary(user)}
@@ -140,42 +139,30 @@ export default function Dashboard({ user, onNavigate }: Props) {
         </button>
       </header>
 
-      {canApproveShifts && (
+      {canApproveShifts && (summaryLoading || summaryError || pendingCount > 0) && (
         <section aria-label="Смены на подтверждении">
           {summaryLoading ? (
             <div className="dashboard-compact-state">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
               <span>Проверяем сводку команды…</span>
             </div>
           ) : summaryError ? (
             <div className="dashboard-compact-state">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
               <span>Сводка команды недоступна</span>
             </div>
-          ) : pendingCount > 0 ? (
+          ) : (
             <div className="dashboard-attention">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+              <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-tg-text">Требует внимания</p>
-                <p className="mt-1 text-sm text-tg-hint">
-                  Смен ждут подтверждения: <strong className="font-semibold text-tg-text">{pendingCount}</strong>
-                </p>
+                <p className="text-sm font-semibold text-tg-text">Смены на подтверждении</p>
+                <p className="mt-0.5 text-sm text-tg-hint">Ожидают решения: {pendingCount}</p>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate('owner', { ownerTab: 'approve' })}
                 className="dashboard-attention-action"
               >
-                Проверить смены
+                Проверить
               </button>
-            </div>
-          ) : (
-            <div className="dashboard-compact-state">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-              <span>
-                Смен на подтверждении нет
-                {(summary?.approved_shifts_count ?? 0) > 0 ? ` · Утверждено за месяц: ${summary?.approved_shifts_count}` : ''}
-              </span>
             </div>
           )}
         </section>
@@ -203,11 +190,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
 
       <section className="dashboard-latest" aria-labelledby="dashboard-latest-title">
         <div className="dashboard-section-heading">
-          <div>
-            <p className="dashboard-kicker">Личные данные</p>
-            <h2 id="dashboard-latest-title" className="text-lg font-semibold text-tg-text">Последняя смена</h2>
-          </div>
-          <Clock className="h-5 w-5 text-tg-hint" aria-hidden="true" />
+          <h2 id="dashboard-latest-title" className="text-lg font-semibold text-tg-text">Последняя смена</h2>
         </div>
 
         {shiftsLoading ? (

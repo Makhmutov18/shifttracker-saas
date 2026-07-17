@@ -400,7 +400,7 @@ button:disabled {
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .dashboard-profile-header {
@@ -409,14 +409,6 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-
-.dashboard-kicker {
-  margin-bottom: 0.25rem;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.2;
 }
 
 .dashboard-avatar-button {
@@ -443,9 +435,9 @@ button:disabled {
 
 .dashboard-finance,
 .dashboard-latest {
-  border-radius: 1.125rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .dashboard-finance {
@@ -457,7 +449,7 @@ button:disabled {
   margin-top: 0.35rem;
   overflow-wrap: anywhere;
   color: var(--text-primary);
-  font-size: clamp(2rem, 10vw, 2.75rem);
+  font-size: clamp(2rem, 10vw, 2.5rem);
   font-weight: 650;
   line-height: 1.12;
 }
@@ -497,24 +489,25 @@ button:disabled {
 
 .dashboard-attention {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
-  align-items: start;
-  padding: 1rem;
-  border-left: 3px solid var(--tg-primary);
-  border-radius: 0.875rem;
-  background: color-mix(in srgb, var(--tg-primary) 8%, var(--surface));
-  color: var(--tg-primary);
+  align-items: center;
+  min-height: 3.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--warning);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--warning);
 }
 
 .dashboard-attention-action {
-  grid-column: 2;
-  justify-self: start;
+  justify-self: end;
   min-height: 2.75rem;
-  padding: 0.65rem 0.9rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 0.75rem;
-  background: var(--tg-primary);
-  color: var(--tg-button-text);
+  background: var(--surface-muted);
+  color: var(--text-primary);
   font-size: 0.8125rem;
   font-weight: 600;
   transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
@@ -572,9 +565,14 @@ button:disabled {
 }
 
 .dashboard-shift-status[data-status='approved'],
-.dashboard-shift-status[data-status='pending'] {
-  color: var(--tg-primary);
+.dashboard-shift-status[data-status='pending'],
+.dashboard-shift-status[data-status='rejected'] {
+  font-weight: 650;
 }
+
+.dashboard-shift-status[data-status='approved'] { background: var(--success-soft); color: var(--success); }
+.dashboard-shift-status[data-status='pending'] { background: var(--warning-soft); color: var(--warning); }
+.dashboard-shift-status[data-status='rejected'] { background: var(--danger-soft); color: var(--danger); }
 
 .dashboard-shift-footer {
   display: flex;
@@ -640,7 +638,8 @@ button:disabled {
   }
 
   .dashboard-attention-action {
-    width: 100%;
+    grid-column: 2;
+    justify-self: start;
   }
 }
 
