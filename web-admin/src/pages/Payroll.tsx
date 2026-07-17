@@ -21,6 +21,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const [selected, setSelected] = useState<PayrollRun | null>(null);
   const [paymentItem, setPaymentItem] = useState<PayrollRunItem | null>(null);
   const [payment, setPayment] = useState({ amount: '', payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' });
+  const [paymentError, setPaymentError] = useState('');
   const [confirm, setConfirm] = useState<ConfirmAction>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState<RunSort>('period');
@@ -41,7 +42,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   useEffect(() => { void loadRuns(); }, [venueId]);
   useEffect(() => { setPage(1); }, [venueId, statusFilter, sortKey, sortDirection]);
 
-  const openRun = async (id: string) => { setBusy(true); setError(''); try { setSelected(await api.payrollRun(id)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось открыть расчёт.'); } finally { setBusy(false); } };
+  const openRun = async (id: string) => { setBusy(true); setError(''); setPaymentItem(null); setPaymentError(''); try { setSelected(await api.payrollRun(id)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось открыть расчёт.'); } finally { setBusy(false); } };
   const doPreview = async () => {
     if (!periodStart || !periodEnd || periodStart > periodEnd) { setCreateError('Проверьте даты периода.'); return; }
     setCreateBusy(true); setCreateError(''); setSuccess('');
@@ -60,14 +61,15 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
     finally { setCreateBusy(false); }
   };
   const transition = async () => { if (!confirm) return; setBusy(true); setError(''); try { const updated = confirm.type === 'finalize' ? await api.finalizePayrollRun(confirm.run.id) : await api.cancelPayrollRun(confirm.run.id); setSelected(updated); setSuccess(confirm.type === 'finalize' ? 'Расчёт зафиксирован.' : 'Расчёт отменён.'); setConfirm(null); await loadRuns(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось изменить статус расчёта.'); } finally { setBusy(false); } };
-  const openPayment = (item: PayrollRunItem) => { setPaymentItem(item); setPayment({ amount: item.remaining_amount, payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' }); };
+  const openPayment = (item: PayrollRunItem) => { setPaymentError(''); setPaymentItem(item); setPayment({ amount: item.remaining_amount, payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' }); };
+  const closePayment = () => { if (busy) return; setPaymentItem(null); setPaymentError(''); };
   const recordPayment = async () => {
     if (!selected || !paymentItem || !canAct) return;
     const amount = Number(payment.amount); const remaining = Number(paymentItem.remaining_amount);
-    if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) { setError('Сумма должна быть больше нуля и не превышать остаток.'); return; }
-    setBusy(true); setError('');
-    try { await api.recordPayrollPayment(selected.id, { user_id: paymentItem.user_id, amount, payment_date: payment.payment_date, method: payment.method || undefined, comment: payment.comment || undefined }); setSelected(await api.payrollRun(selected.id)); setPaymentItem(null); setSuccess('Фактическая выплата записана.'); await loadRuns(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось записать выплату.'); }
+    if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) { setPaymentError('Сумма должна быть больше нуля и не превышать остаток.'); return; }
+    setBusy(true); setPaymentError('');
+    try { await api.recordPayrollPayment(selected.id, { user_id: paymentItem.user_id, amount, payment_date: payment.payment_date, method: payment.method || undefined, comment: payment.comment || undefined }); setSelected(await api.payrollRun(selected.id)); setPaymentItem(null); setPaymentError(''); setSuccess('Фактическая выплата записана.'); await loadRuns(); }
+    catch (reason) { setPaymentError(reason instanceof Error ? reason.message : 'Не удалось записать выплату.'); }
     finally { setBusy(false); }
   };
 
@@ -97,6 +99,13 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const updatePeriodStart = (value: string) => { setPeriodStart(value); setPreview(null); setCreateError(''); };
   const updatePeriodEnd = (value: string) => { setPeriodEnd(value); setPreview(null); setCreateError(''); };
   const selectedVenueName = venueId ? venues.find((venue) => venue.id === venueId)?.name || 'Точка не указана' : 'Все точки';
+  const selectedItems = selected?.items ?? [];
+  const selectedPayments = useMemo(() => [...(selected?.payments ?? [])].sort((left, right) => {
+    const dateDifference = new Date(right.payment_date).getTime() - new Date(left.payment_date).getTime();
+    return dateDifference || new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+  }), [selected]);
+  const selectedEmployees = useMemo(() => new Map(selectedItems.map((item) => [item.user_id, item.user_name || 'Сотрудник'])), [selectedItems]);
+  const closeDetails = () => { if (busy) return; setSelected(null); setPaymentItem(null); setPaymentError(''); };
   if (loading) return <LoadingState text="Загружаем расчёты выплат…" />;
   if (error && !runs.length && !preview) return <ErrorState message={error} retry={loadRuns} />;
 
@@ -139,15 +148,48 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       </div>
     </Drawer>
 
-    <Drawer title="Детали расчёта" open={Boolean(selected)} onClose={() => { setSelected(null); setPaymentItem(null); }} footer={selected && canAct ? <>{selected.status === 'draft' && <><button className="button secondary" onClick={() => setConfirm({ type: 'cancel', run: selected })}><X />Отменить</button><button className="button primary" onClick={() => setConfirm({ type: 'finalize', run: selected })}><Check />Зафиксировать</button></>}</> : undefined}>
-      {busy && !selected ? <LoadingState /> : selected && <div className="form-section"><div><StatusBadge status={selected.status} /><h3>{selected.title}</h3><p className="cell-sub">{formatDate(selected.period_start)} — {formatDate(selected.period_end)} · {selected.venue_name || 'Все точки'}</p></div><div className="metrics"><Metric label="Начислено" value={<MoneyValue value={selected.total_amount} />} /><Metric label="Выплачено" value={<MoneyValue value={selected.total_paid} />} /></div>{selected.items.map((item) => <div className="list-row" key={item.id}><div><strong>{item.user_name || 'Сотрудник'}</strong><p>{item.approved_shifts_count} смен · {formatNumber(item.approved_hours)} ч · удержания {formatMoneyLocal(item.deduction_amount)}</p></div><div><strong><MoneyValue value={item.remaining_amount} /></strong>{selected.status === 'finalized' && canAct && Number(item.remaining_amount) > 0 && <button className="button ghost" onClick={() => openPayment(item)}><CircleDollarSign />Записать выплату</button>}</div></div>)}</div>}
-    </Drawer>
-    <Drawer title="Записать фактическую выплату" open={Boolean(paymentItem)} onClose={() => setPaymentItem(null)} footer={<><button className="button secondary" onClick={() => setPaymentItem(null)}>Отмена</button><button className="button primary" disabled={busy} onClick={() => void recordPayment()}>Записать выплату</button></>}>
-      {paymentItem && <div className="form-section"><h3>{paymentItem.user_name || 'Сотрудник'}</h3><p className="cell-sub">Начислено {formatMoneyLocal(paymentItem.final_amount)} · осталось {formatMoneyLocal(paymentItem.remaining_amount)}</p><FormField label="Сумма"><input type="number" min="0.01" step="0.01" value={payment.amount} onChange={(event) => setPayment({ ...payment, amount: event.target.value })} /></FormField><FormField label="Дата выплаты"><input type="date" value={payment.payment_date} onChange={(event) => setPayment({ ...payment, payment_date: event.target.value })} /></FormField><FormField label="Способ" hint="Необязательно"><input value={payment.method} onChange={(event) => setPayment({ ...payment, method: event.target.value })} placeholder="Наличные или перевод" /></FormField><FormField label="Комментарий" hint="Необязательно"><textarea value={payment.comment} onChange={(event) => setPayment({ ...payment, comment: event.target.value })} /></FormField></div>}
+    <Drawer title="Детали расчёта" open={Boolean(selected)} onClose={closeDetails} size="wide" footer={selected && canAct ? paymentItem ? <><button className="button secondary" disabled={busy} onClick={closePayment}>Отмена</button><button className="button primary" disabled={busy} onClick={() => void recordPayment()}><CircleDollarSign />Записать выплату</button></> : selected.status === 'draft' ? <><button className="button secondary" disabled={busy} onClick={() => setConfirm({ type: 'cancel', run: selected })}><X />Отменить расчёт</button><button className="button primary" disabled={busy} onClick={() => setConfirm({ type: 'finalize', run: selected })}><Check />Зафиксировать</button></> : undefined : undefined}>
+      {busy && !selected ? <LoadingState /> : selected && <div className="payroll-details">
+        <section className="payroll-details-header">
+          <div className="payroll-details-title"><StatusBadge status={selected.status} /><h3>{selected.title || `${formatDate(selected.period_start)} — ${formatDate(selected.period_end)}`}</h3><p>{formatDate(selected.period_start)} — {formatDate(selected.period_end)} · {selected.venue_name || 'Все точки'}</p></div>
+          {(selected.created_by_name || selected.created_at) && <dl className="payroll-details-meta">{selected.created_by_name && <div><dt>Автор</dt><dd>{selected.created_by_name}</dd></div>}{selected.created_at && <div><dt>Создан</dt><dd>{formatDate(selected.created_at)}</dd></div>}</dl>}
+        </section>
+
+        <section className="payroll-details-summary" aria-label="Сводка расчёта">
+          <div><span>Сотрудников</span><strong>{selectedItems.length}</strong></div>
+          <div><span>Начислено</span><strong><MoneyValue value={selected.total_amount} /></strong></div>
+          <div><span>Выплачено</span><strong><MoneyValue value={selected.total_paid} /></strong></div>
+          <div><span>Осталось</span><strong><MoneyValue value={Math.max(0, Number(selected.total_amount || 0) - Number(selected.total_paid || 0))} /></strong></div>
+        </section>
+
+        {paymentItem && <section className="payroll-payment-form" aria-labelledby="payroll-payment-title">
+          <div className="payroll-payment-form-head"><div><span>Фактическая выплата</span><h3 id="payroll-payment-title">{paymentItem.user_name || 'Сотрудник'}</h3></div><button className="icon-button" type="button" disabled={busy} onClick={closePayment} aria-label="Закрыть форму выплаты"><X /></button></div>
+          <div className="payroll-payment-context"><span><small>Начислено</small><MoneyValue value={paymentItem.final_amount} /></span><span><small>Уже выплачено</small><MoneyValue value={paymentItem.paid_amount} /></span><span><small>Осталось</small><MoneyValue value={paymentItem.remaining_amount} /></span></div>
+          {paymentError && <div className="notice error">{paymentError}</div>}
+          <div className="payroll-payment-fields"><FormField label="Сумма"><input type="number" min="0.01" max={paymentItem.remaining_amount} step="0.01" value={payment.amount} onChange={(event) => { setPaymentError(''); setPayment({ ...payment, amount: event.target.value }); }} /></FormField><FormField label="Дата выплаты"><input type="date" value={payment.payment_date} onChange={(event) => setPayment({ ...payment, payment_date: event.target.value })} /></FormField><FormField label="Способ" hint="Необязательно"><input value={payment.method} onChange={(event) => setPayment({ ...payment, method: event.target.value })} placeholder="Наличные или перевод" /></FormField><FormField label="Комментарий" hint="Необязательно"><textarea value={payment.comment} onChange={(event) => setPayment({ ...payment, comment: event.target.value })} /></FormField></div>
+        </section>}
+
+        <section className="payroll-details-section">
+          <div className="payroll-details-section-head"><h3>Сотрудники</h3><span>{selectedItems.length}</span></div>
+          <DataTable label="Сотрудники в расчёте" headers={['Сотрудник', 'Смены', 'Часы', { label: 'База', align: 'right' }, { label: 'Бонусы', align: 'right' }, { label: 'Удержания', align: 'right' }, { label: 'Начислено', align: 'right' }, { label: 'Выплачено', align: 'right' }, { label: 'Осталось', align: 'right' }, 'Действие']} empty={!selectedItems.length}>
+            {selectedItems.map((item) => <tr key={item.id}><td className="cell-main">{item.user_name || 'Сотрудник'}</td><td>{item.approved_shifts_count}</td><td>{formatNumber(item.approved_hours)} ч</td><td className="align-right"><MoneyValue value={item.base_amount} /></td><td className="align-right"><MoneyValue value={item.bonus_amount} muted={!Number(item.bonus_amount)} /></td><td className="align-right"><DeductionValue value={item.deduction_amount} /></td><td className="align-right"><MoneyValue value={item.final_amount} /></td><td className="align-right"><MoneyValue value={item.paid_amount} muted={!Number(item.paid_amount)} /></td><td className="align-right payroll-detail-remaining"><MoneyValue value={item.remaining_amount} muted={!Number(item.remaining_amount)} /></td><td>{selected.status === 'finalized' && canAct && Number(item.remaining_amount) > 0 ? <button className="button ghost payroll-payment-action" type="button" onClick={() => openPayment(item)}><CircleDollarSign />Записать выплату</button> : <span className="payroll-action-unavailable">—</span>}</td></tr>)}
+          </DataTable>
+          <div className="mobile-cards payroll-detail-cards">{selectedItems.map((item) => <article className="mobile-card payroll-detail-card" key={item.id}><div className="payroll-detail-card-head"><strong>{item.user_name || 'Сотрудник'}</strong><span>{item.approved_shifts_count} смен · {formatNumber(item.approved_hours)} ч</span></div><div className="payroll-detail-card-values"><span><small>Начислено</small><MoneyValue value={item.final_amount} /></span><span><small>Выплачено</small><MoneyValue value={item.paid_amount} muted={!Number(item.paid_amount)} /></span><span><small>Осталось</small><MoneyValue value={item.remaining_amount} muted={!Number(item.remaining_amount)} /></span></div>{selected.status === 'finalized' && canAct && Number(item.remaining_amount) > 0 && <button className="button secondary" type="button" onClick={() => openPayment(item)}><CircleDollarSign />Записать выплату</button>}</article>)}</div>
+          {!selectedItems.length && <EmptyState title="В расчёте нет сотрудников" description="Сохранённые строки начислений отсутствуют." />}
+        </section>
+
+        <section className="payroll-details-section">
+          <div className="payroll-details-section-head"><h3>История выплат</h3><span>{selectedPayments.length}</span></div>
+          {selectedPayments.length ? <div className="payroll-payment-history" role="list">{selectedPayments.map((record) => <div className="payroll-payment-history-row" role="listitem" key={record.id}><span><small>Дата</small><strong>{formatDate(record.payment_date)}</strong></span><span><small>Сотрудник</small><strong>{selectedEmployees.get(record.user_id) || 'Сотрудник'}</strong></span><span className="align-right"><small>Сумма</small><MoneyValue value={record.amount} /></span><span><small>Способ</small><strong>{record.method || 'Не указан'}</strong></span><span><small>Комментарий</small><strong>{record.comment || 'Без комментария'}</strong></span></div>)}</div> : <EmptyState title="Выплат пока нет" description="Фактические выплаты появятся здесь после записи." />}
+        </section>
+      </div>}
     </Drawer>
     <ConfirmationDialog open={Boolean(confirm)} title={confirm?.type === 'finalize' ? 'Зафиксировать расчёт?' : 'Отменить расчёт?'} text={confirm?.type === 'finalize' ? 'Сохранённый snapshot больше не будет пересчитываться по сменам.' : 'Расчёт останется в истории, но не будет доступен для оплаты.'} confirmLabel={confirm?.type === 'finalize' ? 'Зафиксировать' : 'Отменить расчёт'} danger={confirm?.type === 'cancel'} onClose={() => setConfirm(null)} onConfirm={() => void transition()} />
     <Toast message={success} onClose={() => setSuccess('')} />
   </div>;
 }
 
-function formatMoneyLocal(value: string | number): string { return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(Number(value || 0)); }
+function DeductionValue({ value }: { value: string | number }) {
+  const amount = Math.abs(Number(value || 0));
+  return amount > 0 ? <span className="deduction-value">−<MoneyValue value={amount} /></span> : <MoneyValue value={0} muted />;
+}

@@ -434,6 +434,65 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .payroll-mobile-card-values > span { display: grid; gap: 3px; }
 .payroll-mobile-card-values > span:last-child { text-align: right; }
 .payroll-mobile-card-values small { color: var(--text-muted); font-size: 11px; }
+.payroll-details { display: grid; gap: 24px; min-width: 0; }
+.payroll-details-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.payroll-details-title { min-width: 0; }
+.payroll-details-title h3 { margin: 10px 0 4px; font-size: 20px; }
+.payroll-details-title p { margin: 0; color: var(--text-muted); }
+.payroll-details-meta { min-width: 190px; display: grid; gap: 10px; margin: 0; }
+.payroll-details-meta > div { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 12px; }
+.payroll-details-meta dt { color: var(--text-muted); }
+.payroll-details-meta dd { margin: 0; font-weight: 650; text-align: right; }
+.payroll-details-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); }
+.payroll-details-summary > div { min-width: 0; display: grid; gap: 5px; padding: 14px 16px; border-left: 1px solid var(--border); }
+.payroll-details-summary > div:first-child { border-left: 0; }
+.payroll-details-summary span { color: var(--text-muted); font-size: 12px; }
+.payroll-details-summary strong { overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-payment-form { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.payroll-payment-form-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.payroll-payment-form-head span { color: var(--text-muted); font-size: 12px; }
+.payroll-payment-form-head h3 { margin: 3px 0 0; font-size: 18px; }
+.payroll-payment-context { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.payroll-payment-context > span { min-width: 0; display: grid; gap: 4px; padding: 12px 14px; border-left: 1px solid var(--border); }
+.payroll-payment-context > span:first-child { border-left: 0; padding-left: 0; }
+.payroll-payment-context small { color: var(--text-muted); }
+.payroll-payment-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.payroll-payment-fields .field:last-child { grid-column: 1 / -1; }
+.payroll-payment-form .notice { margin-bottom: 0; }
+.payroll-details-section { min-width: 0; display: grid; gap: 12px; }
+.payroll-details-section-head { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.payroll-details-section-head h3 { margin: 0; font-size: 17px; }
+.payroll-details-section-head > span { min-width: 28px; min-height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--surface-muted); color: var(--text-muted); font-size: 11px; font-weight: 700; }
+.payroll-details-section .table-wrap { border: 1px solid var(--border); border-radius: var(--radius-control); }
+.payroll-details-section table { min-width: 0; table-layout: fixed; }
+.payroll-details-section th, .payroll-details-section td { padding-inline: 8px; font-size: 12px; }
+.payroll-details-section th:nth-child(1) { width: 12%; }
+.payroll-details-section th:nth-child(2), .payroll-details-section th:nth-child(3) { width: 6%; }
+.payroll-details-section th:nth-child(4), .payroll-details-section th:nth-child(5) { width: 9%; }
+.payroll-details-section th:nth-child(6) { width: 10%; }
+.payroll-details-section th:nth-child(7), .payroll-details-section th:nth-child(8), .payroll-details-section th:nth-child(9) { width: 11%; }
+.payroll-details-section th:nth-child(10) { width: 15%; }
+.payroll-details-section td { height: 52px; }
+.payroll-detail-remaining .money { font-weight: 750; }
+.deduction-value { display: inline-flex; align-items: baseline; color: var(--danger); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deduction-value .money { color: inherit; }
+.payroll-payment-action { width: 100%; min-height: 38px; padding-inline: 4px; font-size: 11px; white-space: nowrap; }
+.payroll-payment-action svg { width: 16px; height: 16px; }
+.payroll-action-unavailable { display: block; color: var(--text-muted); text-align: center; }
+.payroll-payment-history { border-top: 1px solid var(--border); }
+.payroll-payment-history-row { min-width: 0; display: grid; grid-template-columns: 110px minmax(150px, 1fr) minmax(110px, auto) minmax(130px, .7fr) minmax(160px, 1.2fr); align-items: center; gap: 16px; padding: 13px 4px; border-bottom: 1px solid var(--border); }
+.payroll-payment-history-row > span { min-width: 0; display: grid; gap: 3px; }
+.payroll-payment-history-row small { color: var(--text-muted); font-size: 10px; }
+.payroll-payment-history-row strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-detail-cards { display: none; }
+.payroll-detail-card { display: grid; gap: 12px; }
+.payroll-detail-card-head { min-width: 0; display: grid; gap: 3px; }
+.payroll-detail-card-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-detail-card-head span { color: var(--text-muted); font-size: 12px; }
+.payroll-detail-card-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.payroll-detail-card-values > span { min-width: 0; display: grid; gap: 3px; }
+.payroll-detail-card-values > span:last-child { text-align: right; }
+.payroll-detail-card-values small { color: var(--text-muted); font-size: 10px; }
 .chart-empty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 24px; color: var(--text-muted); text-align: center; }
 .chart-empty span { color: var(--text); font-weight: 650; }
 .sparkline { width: 96px; height: 30px; color: var(--accent); }
@@ -599,6 +658,26 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .payroll-create-drawer .date-range-separator { display: none; }
   .payroll-preview-card { grid-template-columns: minmax(0, 1fr) auto; }
   .payroll-preview-card > span:last-child { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .payroll-details { gap: 18px; }
+  .payroll-details-header { flex-direction: column; gap: 14px; }
+  .payroll-details-meta { width: 100%; min-width: 0; }
+  .payroll-details-meta > div { grid-template-columns: minmax(0, 1fr) auto; }
+  .payroll-details-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .payroll-details-summary > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
+  .payroll-details-summary > div:nth-child(4) { border-top: 1px solid var(--border); }
+  .payroll-payment-form { padding: 14px; }
+  .payroll-payment-context { grid-template-columns: 1fr; }
+  .payroll-payment-context > span { border-left: 0; border-top: 1px solid var(--border); padding-inline: 0; }
+  .payroll-payment-context > span:first-child { border-top: 0; }
+  .payroll-payment-fields { grid-template-columns: 1fr; }
+  .payroll-payment-fields .field:last-child { grid-column: auto; }
+  .payroll-details-section > .table-wrap { display: none; }
+  .payroll-detail-cards { display: grid; }
+  .payroll-detail-card .button { width: 100%; }
+  .payroll-payment-history-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 14px 0; }
+  .payroll-payment-history-row > span:nth-child(3) { text-align: right; }
+  .payroll-payment-history-row > span:last-child { grid-column: 1 / -1; }
+  .payroll-payment-history-row strong { white-space: normal; }
   .employee-profile-head { grid-template-columns: auto minmax(0, 1fr); }
   .employee-profile-head .badge { grid-column: 2; justify-self: start; }
   .shifts-page .mobile-cards { padding: 10px; }
