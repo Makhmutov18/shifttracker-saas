@@ -96,6 +96,7 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, unique=True)
+    telegram_photo_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     position: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[UserRole] = mapped_column(

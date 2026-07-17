@@ -19,6 +19,7 @@ export interface Venue {
 export interface User {
   id: string;
   telegram_id?: number | null;
+  telegram_photo_url?: string | null;
   name: string;
   position?: string | null;
   role: string;

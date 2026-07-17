@@ -25,6 +25,7 @@ from app.auth import (
     get_web_session_user,
     hash_secret,
     new_web_session_tokens,
+    normalize_telegram_photo_url,
     read_signed_state,
     safe_return_to,
     web_auth_is_configured,
@@ -276,6 +277,9 @@ async def telegram_login_callback(
         ensure_user_is_active(user)
         if not _has_web_admin_access(user):
             return _auth_error_redirect("no_access")
+        normalized_photo_url = normalize_telegram_photo_url(claims.get("picture"))
+        if normalized_photo_url and normalized_photo_url != user.telegram_photo_url:
+            user.telegram_photo_url = normalized_photo_url
         raw_token, csrf_token = new_web_session_tokens()
         session.add(
             WebSession(

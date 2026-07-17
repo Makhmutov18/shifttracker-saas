@@ -139,6 +139,7 @@ a { color: inherit; }
 .user-menu-trigger:hover, .user-menu.open .user-menu-trigger { background: var(--surface-muted); }
 .user-menu-trigger > svg { width: 16px; color: var(--text-muted); }
 .topbar-avatar { width: 34px; height: 34px; border: 1px solid var(--border-strong); background: var(--surface-muted); color: var(--text); font-size: 12px; }
+.topbar-avatar img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .user-menu-copy { min-width: 0; }
 .user-menu-copy strong { display: block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu-copy strong { font-size: 13px; }

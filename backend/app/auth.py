@@ -4,19 +4,54 @@ import json
 import base64
 import secrets
 from datetime import datetime, timedelta, timezone
-from urllib.parse import parse_qsl, unquote
+from urllib.parse import parse_qsl, unquote, urlparse
 
 from fastapi import HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.database import async_session_factory
 from app.models import User, WebSession
 
 WEB_SESSION_COOKIE = "shifttracker_web_session"
 WEB_CSRF_COOKIE = "shifttracker_web_csrf"
 WEB_SESSION_MAX_AGE = max(1, settings.WEB_SESSION_DAYS) * 24 * 60 * 60
+
+
+def normalize_telegram_photo_url(value: object) -> str | None:
+    """Return a safe absolute Telegram avatar URL without fetching it."""
+    if not isinstance(value, str) or not value or len(value) > 2048:
+        return None
+    normalized = value.strip()
+    if not normalized or any(character.isspace() for character in normalized):
+        return None
+    try:
+        parsed = urlparse(normalized)
+        if parsed.scheme.lower() != "https" or not parsed.netloc or not parsed.hostname:
+            return None
+    except ValueError:
+        return None
+    return normalized
+
+
+async def _sync_telegram_photo_url(user: User, value: object) -> None:
+    normalized = normalize_telegram_photo_url(value)
+    if not normalized or normalized == user.telegram_photo_url:
+        return
+    try:
+        async with async_session_factory() as avatar_session:
+            await avatar_session.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(telegram_photo_url=normalized)
+            )
+            await avatar_session.commit()
+        user.telegram_photo_url = normalized
+    except Exception:
+        # Avatar synchronization is optional and must not block authentication.
+        return
 
 
 def _web_session_secret() -> str:
@@ -128,6 +163,7 @@ async def authenticate_request(
         if not user:
             raise HTTPException(status_code=404, detail="User not found. Please start the bot first.")
         ensure_user_is_active(user)
+        await _sync_telegram_photo_url(user, user_data.get("photo_url"))
         return user
 
     web_session_result = await get_web_session_user(request, session)

@@ -4,6 +4,7 @@ import logging
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlparse
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -166,6 +167,42 @@ class WebAuthRegressionTests(unittest.TestCase):
         self.assertIn("if not user", callback_source)
         self.assertIn("ensure_user_is_active(user)", callback_source)
         self.assertNotIn("session.add(User", callback_source)
+
+    def test_telegram_photo_url_normalization(self) -> None:
+        module = ast.parse(self.auth_source)
+        normalizer = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "normalize_telegram_photo_url"
+        )
+        namespace = {"urlparse": urlparse}
+        exec(compile(ast.Module(body=[normalizer], type_ignores=[]), str(AUTH_PATH), "exec"), namespace)
+        normalize = namespace["normalize_telegram_photo_url"]
+
+        valid_url = "https://t.me/i/userpic/320/avatar.jpg"
+        self.assertEqual(normalize(valid_url), valid_url)
+        for invalid_value in (
+            None,
+            True,
+            "",
+            "   ",
+            "http://example.com/avatar.jpg",
+            "/avatar.jpg",
+            "https:///avatar.jpg",
+            "https://example.com/avatar image.jpg",
+            "https://example.com/" + "a" * 2030,
+        ):
+            with self.subTest(value=invalid_value):
+                self.assertIsNone(normalize(invalid_value))
+
+    def test_both_auth_flows_sync_only_valid_changed_photo_urls(self) -> None:
+        self.assertIn('user_data.get("photo_url")', self.auth_source)
+        self.assertIn("normalized == user.telegram_photo_url", self.auth_source)
+        self.assertIn("except Exception", self.auth_source)
+        self.assertIn('claims.get("picture")', self.router_source)
+        self.assertIn("normalized_photo_url != user.telegram_photo_url", self.router_source)
+        self.assertNotIn("user.telegram_photo_url = None", self.auth_source)
+        self.assertNotIn("user.telegram_photo_url = None", self.router_source)
 
     def test_session_stores_hashes_and_csrf_is_required(self) -> None:
         self.assertIn("token_hash=hash_secret(raw_token)", self.router_source)

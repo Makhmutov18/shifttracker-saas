@@ -98,8 +98,11 @@ export function TopBar({
   action?: ReactNode;
 }) {
   const roleLabel = userRoleLabel(user);
+  const photoUrl = user.telegram_photo_url?.trim() ?? '';
+  const [avatarFailed, setAvatarFailed] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => setAvatarFailed(false), [photoUrl]);
   React.useEffect(() => {
     if (!userMenuOpen) return;
     const closeOutside = (event: MouseEvent) => { if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false); };
@@ -120,7 +123,11 @@ export function TopBar({
       {action}
       <div className={`user-menu ${userMenuOpen ? 'open' : ''}`} ref={userMenuRef}>
         <button className="user-menu-trigger" aria-label="Меню пользователя" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((value) => !value)}>
-          <span className="avatar topbar-avatar">{(user.name || 'П').slice(0, 1).toUpperCase()}</span>
+          <span className="avatar topbar-avatar">
+            {photoUrl && !avatarFailed
+              ? <img src={photoUrl} alt={user.name || 'Пользователь'} onError={() => setAvatarFailed(true)} />
+              : (user.name || 'П').slice(0, 1).toUpperCase()}
+          </span>
           <span className="user-menu-copy"><strong>{user.name || 'Пользователь'}</strong></span>
           <ChevronDown />
         </button>

@@ -29,6 +29,7 @@ class VenueUpdate(BaseModel):
 class UserOut(BaseModel):
     id: uuid.UUID
     telegram_id: Optional[int] = None
+    telegram_photo_url: Optional[str] = None
     name: str
     position: Optional[str] = None
     role: str
