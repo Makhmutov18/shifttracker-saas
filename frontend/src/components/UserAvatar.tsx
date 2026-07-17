@@ -44,12 +44,12 @@ export default function UserAvatar({
 
   return (
     <div
-      className={`${sizeClassName} relative overflow-hidden rounded-full bg-tg-primary text-white flex items-center justify-center font-bold shrink-0`}
+      className={`${sizeClassName} user-avatar relative overflow-hidden rounded-full flex items-center justify-center font-semibold shrink-0`}
     >
       {showImage && (
         <img
           src={photoUrl ?? ''}
-          alt={`${name} avatar`}
+          alt={`Фото пользователя ${name || 'Сотрудник'}`}
           className="absolute inset-0 z-0 h-full w-full rounded-full object-cover"
           onError={() => setHasImageError(true)}
           referrerPolicy="no-referrer"

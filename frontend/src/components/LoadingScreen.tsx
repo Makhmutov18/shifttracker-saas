@@ -1,11 +1,10 @@
 import React from 'react';
-import { Clock } from 'lucide-react';
-
 export default function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-tg-bg">
-      <Clock className="w-12 h-12 text-tg-hint animate-pulse mb-4" />
-      <p className="text-tg-hint text-sm">Загрузка...</p>
+    <div className="screen-state" role="status" aria-live="polite">
+      <div className="screen-state-mark" aria-hidden="true">П</div>
+      <p className="screen-state-title">Загружаем приложение</p>
+      <p className="screen-state-copy">Подготавливаем ваши смены и начисления.</p>
     </div>
   );
 }

@@ -151,7 +151,7 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
       <header className="profile-identity">
         <UserAvatar
           name={user.name || 'Сотрудник'}
-          photoUrl={telegramUser?.photo_url}
+          photoUrl={user.telegram_photo_url || telegramUser?.photo_url}
           sizeClassName="h-16 w-16"
           textClassName="text-xl"
         />

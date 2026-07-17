@@ -126,6 +126,7 @@ function normalizeVenue(raw: unknown): Venue {
 export interface User {
   id: string;
   telegram_id: number | null;
+  telegram_photo_url?: string | null;
   name: string;
   position: string | null;
   role: 'owner' | 'admin' | 'senior' | 'barista' | 'cook' | 'senior_cook';
@@ -166,6 +167,7 @@ function normalizeUser(raw: unknown): User {
   return {
     id: typeof source.id === 'string' ? source.id : '',
     telegram_id: typeof source.telegram_id === 'number' ? source.telegram_id : null,
+    telegram_photo_url: typeof source.telegram_photo_url === 'string' ? source.telegram_photo_url : null,
     name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Сотрудник',
     position: typeof source.position === 'string' ? source.position : null,
     role: normalizeUserRole(source.role),

@@ -133,7 +133,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
         >
           <UserAvatar
             name={user.name || 'Сотрудник'}
-            photoUrl={telegramUser?.photo_url}
+            photoUrl={user.telegram_photo_url || telegramUser?.photo_url}
             sizeClassName="h-11 w-11"
             textClassName="text-sm"
           />
