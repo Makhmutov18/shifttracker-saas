@@ -130,7 +130,7 @@ export function SearchSelect({ value, options, placeholder, onChange }: { value:
   </div>;
 }
 
-export function Drawer({ title, open, onClose, children, footer }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+export function Drawer({ title, open, onClose, children, footer, size = 'default' }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; size?: 'default' | 'wide' }) {
   useEffect(() => {
     if (!open) return;
     const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -139,7 +139,7 @@ export function Drawer({ title, open, onClose, children, footer }: { title: stri
   }, [open, onClose]);
   if (!open) return null;
   return <div className="drawer-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <aside className="drawer" role="dialog" aria-modal="true" aria-label={title}>
+    <aside className={`drawer${size === 'wide' ? ' drawer-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
       <header><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Закрыть"><X /></button></header>
       <div className="drawer-body">{children}</div>{footer && <footer>{footer}</footer>}
     </aside>
