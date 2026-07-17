@@ -13,13 +13,13 @@ from openpyxl.utils import get_column_letter
 
 from app.database import get_session
 from app.models import (
-    User, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
+    User, Venue, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
     PayrollRun, PayrollRunItem, PayrollRunStatus, PayrollPayment,
     PayrollRunShiftSource, PayrollRunAdjustmentSource,
 )
 from app.permissions import has_permission
 from app.schemas import (
-    UserOut, ShiftCreate, ShiftOut, ShiftUpdate,
+    UserOut, VenueOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
@@ -104,11 +104,41 @@ async def get_current_user(
     return await authenticate_request(request, init_data, session)
 
 
+async def _get_active_venue(session: AsyncSession, venue_id: uuid.UUID) -> Venue:
+    result = await session.execute(
+        select(Venue).where(Venue.id == venue_id, Venue.is_active == True)
+    )
+    venue = result.scalar_one_or_none()
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Активная точка не найдена")
+    return venue
+
+
+async def _load_shift_response(session: AsyncSession, shift_id: uuid.UUID) -> Shift:
+    result = await session.execute(
+        select(Shift)
+        .options(selectinload(Shift.user), selectinload(Shift.venue))
+        .where(Shift.id == shift_id)
+    )
+    return result.scalar_one()
+
+
 # ─── User / Profile ──────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.get("/venues/active", response_model=list[VenueOut])
+async def list_active_venues(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(Venue).where(Venue.is_active == True).order_by(Venue.name)
+    )
+    return result.scalars().all()
 
 
 # ─── Shifts ──────────────────────────────────────────────────────────────────
@@ -143,6 +173,9 @@ async def create_shift(
             detail="Смена за этот день уже создана. Дождитесь подтверждения или обратитесь к администратору.",
         )
 
+    actual_venue_id = shift_data.venue_id or user.venue_id
+    await _get_active_venue(session, actual_venue_id)
+
     # Calculate hours and salary
     total_hours = calculate_hours(shift_data.start_time, shift_data.end_time)
     salary_earned = calculate_salary(
@@ -154,7 +187,7 @@ async def create_shift(
 
     shift = Shift(
         user_id=user.id,
-        venue_id=user.venue_id,
+        venue_id=actual_venue_id,
         date=shift_data.date,
         start_time=shift_data.start_time,
         end_time=shift_data.end_time,
@@ -166,13 +199,13 @@ async def create_shift(
     )
     session.add(shift)
     await session.commit()
-    await session.refresh(shift)
+    shift = await _load_shift_response(session, shift.id)
 
     # Audit logging should not break a successfully saved shift.
     try:
         log = AuditLog(
             user_id=user.id,
-            venue_id=user.venue_id,
+            venue_id=shift.venue_id,
             action="shift_created",
             entity_type="shift",
             entity_id=shift.id,
@@ -181,6 +214,7 @@ async def create_shift(
                 "start_time": str(shift.start_time),
                 "end_time": str(shift.end_time),
                 "salary": str(shift.salary_earned),
+                "venue_id": str(shift.venue_id),
             },
         )
         session.add(log)
@@ -246,18 +280,12 @@ async def list_pending_shifts(
 
     query = (
         select(Shift)
-        .outerjoin(User, Shift.user_id == User.id)
         .options(selectinload(Shift.user), selectinload(Shift.venue))
         .where(Shift.status == "pending")
     )
 
     if not _can_manage_all_venue_shifts(user):
-        query = query.where(
-            or_(
-                Shift.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        query = query.where(Shift.venue_id == user.venue_id)
 
     query = query.order_by(Shift.date.desc(), Shift.start_time.desc())
 
@@ -275,16 +303,11 @@ async def update_shift(
 ):
     query = (
         select(Shift)
-        .outerjoin(User, Shift.user_id == User.id)
+        .options(selectinload(Shift.user), selectinload(Shift.venue))
         .where(Shift.id == shift_id)
     )
     if not _can_manage_all_venue_shifts(user):
-        query = query.where(
-            or_(
-                Shift.venue_id == user.venue_id,
-                User.venue_id == user.venue_id,
-            )
-        )
+        query = query.where(Shift.venue_id == user.venue_id)
 
     result = await session.execute(query)
     shift = result.scalar_one_or_none()
@@ -296,6 +319,13 @@ async def update_shift(
         raise HTTPException(status_code=403, detail="Only users with shift edit rights can update shifts")
 
     old_status = shift.status
+    old_venue_id = shift.venue_id
+
+    if shift_data.venue_id is not None and shift_data.venue_id != shift.venue_id:
+        if shift.status != "pending":
+            raise HTTPException(status_code=409, detail="Точку можно изменить только у смены на подтверждении")
+        await _get_active_venue(session, shift_data.venue_id)
+        shift.venue_id = shift_data.venue_id
 
     if shift_data.start_time is not None:
         shift.start_time = shift_data.start_time
@@ -327,7 +357,7 @@ async def update_shift(
             )
 
     await session.commit()
-    await session.refresh(shift)
+    shift = await _load_shift_response(session, shift.id)
 
     # Audit log
     action = "shift_edited"
@@ -337,15 +367,21 @@ async def update_shift(
         action = "shift_rejected"
 
     try:
+        old_value = {"status": old_status} if shift_data.status else {}
+        new_value = {"status": shift.status, "salary": str(shift.salary_earned)}
+        if old_venue_id != shift.venue_id:
+            old_value["venue_id"] = str(old_venue_id)
+            new_value["venue_id"] = str(shift.venue_id)
+
         log = AuditLog(
             user_id=user.id,
             target_user_id=shift.user_id,
-            venue_id=user.venue_id,
+            venue_id=shift.venue_id,
             action=action,
             entity_type="shift",
             entity_id=shift.id,
-            old_value={"status": old_status} if shift_data.status else None,
-            new_value={"status": shift.status, "salary": str(shift.salary_earned)},
+            old_value=old_value or None,
+            new_value=new_value,
         )
         session.add(log)
         await session.commit()

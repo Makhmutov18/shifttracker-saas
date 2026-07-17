@@ -197,6 +197,10 @@ class Shift(Base):
         "PayrollRunShiftSource", back_populates="shift"
     )
 
+    @property
+    def venue_name(self) -> Optional[str]:
+        return self.venue.name if self.venue is not None else None
+
     def __repr__(self) -> str:
         return f"<Shift {self.date} {self.user_id}>"
 

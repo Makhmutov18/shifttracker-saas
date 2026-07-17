@@ -72,6 +72,7 @@ class ShiftCreate(BaseModel):
     cashier_hours: Optional[Decimal] = Field(None, ge=0)
     revenue: Optional[Decimal] = Field(None, ge=0)
     comment: Optional[str] = None
+    venue_id: Optional[uuid.UUID] = None
 
 
 class ShiftUpdate(BaseModel):
@@ -81,12 +82,14 @@ class ShiftUpdate(BaseModel):
     revenue: Optional[Decimal] = None
     comment: Optional[str] = None
     status: Optional[str] = None
+    venue_id: Optional[uuid.UUID] = None
 
 
 class ShiftOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     venue_id: uuid.UUID
+    venue_name: Optional[str] = None
     date: date
     start_time: time
     end_time: time
