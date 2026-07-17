@@ -733,8 +733,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   };
 
   return (
-    <div className="space-y-4 pb-6">
-      <section className="surface-card rounded-2xl p-4">
+    <div className="owner-payroll-page pb-6">
+      <section className="owner-payroll-create surface-card">
         <div className="flex items-start gap-3">
           <div className="surface-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-tg-primary">
             <Calculator className="h-5 w-5" />
@@ -744,7 +744,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             <p className="mt-1 text-sm text-tg-hint">Сформируйте расчёт начислений за выбранный период</p>
           </div>
         </div>
-        <form onSubmit={handlePreview} className="mt-4 space-y-3">
+        <form onSubmit={handlePreview} className="owner-payroll-form">
           <div className="owner-date-grid">
             <label className="text-xs text-tg-hint">
               Начало периода
@@ -793,7 +793,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
       {success && <div className="surface-card rounded-xl p-3 text-sm text-emerald-600 dark:text-emerald-200">{success}</div>}
 
       {preview && (
-        <section className="surface-card space-y-3 rounded-2xl p-4">
+        <section className="owner-payroll-preview surface-card">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-tg-text">Предварительный расчёт</h3>
@@ -810,31 +810,36 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Сотрудники</p><p className="mt-1 font-semibold text-tg-text">{preview.employees_count}</p></div>
-            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Смены</p><p className="mt-1 font-semibold text-tg-text">{preview.shifts_count}</p></div>
-            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Часы</p><p className="mt-1 font-semibold text-tg-text">{formatHours(preview.total_hours)}</p></div>
-            <div className="surface-muted rounded-xl p-3"><p className="text-xs text-tg-hint">Начислено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(preview.total_amount)}</p></div>
+          <div className="owner-payroll-preview-summary">
+            <div><p>Сотрудники</p><strong>{preview.employees_count}</strong></div>
+            <div><p>Смены</p><strong>{preview.shifts_count}</strong></div>
+            <div><p>Часы</p><strong>{formatHours(preview.total_hours)}</strong></div>
+            <div><p>Начислено</p><strong>{formatCurrency(preview.total_amount)}</strong></div>
           </div>
-          <div className="grid gap-2 text-sm text-tg-hint sm:grid-cols-3">
-            <span>База: <b className="text-tg-text">{formatCurrency(preview.total_base_amount)}</b></span>
-            <span>Бонусы: <b className="text-tg-text">{formatCurrency(preview.total_bonuses)}</b></span>
-            <span>Удержания: <b className="text-tg-text">{formatCurrency(preview.total_deductions)}</b></span>
+          <div className="owner-payroll-adjustments">
+            <span>База <b>{formatCurrency(preview.total_base_amount)}</b></span>
+            <span>Бонусы <b>{formatCurrency(preview.total_bonuses)}</b></span>
+            <span data-deduction={Number(preview.total_deductions || 0) > 0}>Удержания <b>{Number(preview.total_deductions || 0) > 0 ? '−' : ''}{formatCurrency(preview.total_deductions)}</b></span>
           </div>
           {preview.rows.length === 0 ? (
             <div className="surface-muted rounded-xl px-4 py-6 text-center text-sm text-tg-hint">За выбранный период начислений нет</div>
           ) : (
-            <div className="space-y-2">
+            <div className="owner-payroll-preview-list">
               {preview.rows.map((row) => (
-                <div key={row.user_id} className="surface-muted rounded-xl p-3">
+                <div key={row.user_id} className="owner-payroll-preview-row">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-tg-text">{row.user_name || 'Сотрудник'}</p>
                       <p className="mt-1 text-xs text-tg-hint">{row.venue_name || 'Основная точка'}</p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-tg-text">{formatCurrency(row.total_amount)}</p>
+                    <p className="owner-money-value shrink-0 text-sm font-semibold text-tg-text">{formatCurrency(row.total_amount)}</p>
                   </div>
-                  <p className="mt-2 text-xs text-tg-hint">{row.shifts_count} смен · {formatHours(row.total_hours)} · База {formatCurrency(row.base_amount)}</p>
+                  <div className="owner-payroll-row-breakdown">
+                    <span>{row.shifts_count} смен · {formatHours(row.total_hours)}</span>
+                    <span>База {formatCurrency(row.base_amount)}</span>
+                    <span>Бонусы {formatCurrency(row.bonuses)}</span>
+                    <span data-deduction={Number(row.deductions || 0) > 0}>Удержания {Number(row.deductions || 0) > 0 ? '−' : ''}{formatCurrency(row.deductions)}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -842,7 +847,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         </section>
       )}
 
-      <section className="space-y-3">
+      <section className="owner-payroll-runs-section">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-tg-text">Сохранённые расчёты</h3>
           <button type="button" onClick={loadRuns} className="text-xs font-medium text-tg-primary">Обновить</button>
@@ -852,40 +857,46 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         ) : runs.length === 0 ? (
           <div className="surface-card rounded-2xl px-4 py-8 text-center text-sm text-tg-hint">Расчётов пока нет</div>
         ) : (
-          runs.map((run) => (
+          <div className="owner-payroll-runs-list">
+          {runs.map((run) => {
+            const remaining = Math.max(0, Number(run.total_amount || 0) - Number(run.total_paid || 0));
+            return (
             <button
               key={run.id}
               type="button"
               onClick={() => handleOpenDetails(run.id)}
-              className="surface-card block w-full rounded-2xl p-4 text-left transition-transform active:scale-[0.99]"
+              className="owner-payroll-run surface-card"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(run)}</p>
                   <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Все точки'} · {formatPayrollPeriod(run.period_start, run.period_end)}</p>
                 </div>
-                <span className="shrink-0 rounded-full surface-muted px-2.5 py-1 text-[11px] font-medium text-tg-text">{getPayrollRunStatusLabel(run.status)}</span>
+                <span className="owner-status-badge shrink-0" data-status={run.status}>{getPayrollRunStatusLabel(run.status)}</span>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                <span className="text-tg-hint">Сотрудники <b className="block mt-0.5 text-tg-text">{run.employees_count}</b></span>
-                <span className="text-tg-hint">Начислено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_amount)}</b></span>
-                <span className="text-tg-hint">Выплачено <b className="block mt-0.5 text-tg-text">{formatCurrency(run.total_paid)}</b></span>
+              <div className="owner-payroll-run-facts">
+                <span>Сотрудники <b>{run.employees_count}</b></span>
+                <span>Начислено <b>{formatCurrency(run.total_amount)}</b></span>
+                <span>Выплачено <b>{formatCurrency(run.total_paid)}</b></span>
+                <span data-remaining={remaining > 0}>Осталось <b>{formatCurrency(remaining)}</b></span>
               </div>
               <p className="mt-3 text-[11px] text-tg-hint">
                 {formatCreatedAt(run.created_at) ? `Создано: ${formatCreatedAt(run.created_at)} · ${run.created_by_name || 'Пользователь'}` : 'Дата создания не указана'}
               </p>
             </button>
-          ))
+            );
+          })}
+          </div>
         )}
       </section>
 
       {detailsLoading && <div className="surface-card rounded-2xl p-4 text-sm text-tg-hint">Загружаем детали…</div>}
       {selectedRun && !detailsLoading && (
-        <section className="surface-card space-y-3 rounded-2xl p-4">
+        <section className="owner-payroll-details surface-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(selectedRun)}</h3>
-              <p className="mt-1 text-xs text-tg-hint">{getPayrollRunStatusLabel(selectedRun.status)} · {selectedRun.venue_name || 'Все точки'}</p>
+              <p className="mt-1 text-xs text-tg-hint">{formatPayrollPeriod(selectedRun.period_start, selectedRun.period_end)} · {selectedRun.venue_name || 'Все точки'}</p>
             </div>
             <button type="button" onClick={() => setSelectedRun(null)} className="text-xs text-tg-hint">Закрыть</button>
           </div>
@@ -909,23 +920,30 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               </button>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2 border-t border-tg-hint/10 pt-3 text-xs">
-            <div><p className="text-tg-hint">Начислено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(selectedRun.total_amount)}</p></div>
-            <div><p className="text-tg-hint">Выплачено</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency(selectedRun.total_paid)}</p></div>
-            <div><p className="text-tg-hint">Осталось</p><p className="mt-1 font-semibold text-tg-text">{formatCurrency((selectedRun.items || []).reduce((total, item) => total + Number(item.remaining_amount || 0), 0))}</p></div>
+          <div className="owner-payroll-detail-status">
+            <span className="owner-status-badge" data-status={selectedRun.status}>{getPayrollRunStatusLabel(selectedRun.status)}</span>
+            <span>{selectedRun.employees_count} сотрудников</span>
           </div>
-          <div className="space-y-2">
+          <div className="owner-payroll-totals">
+            <div><p>Начислено</p><strong>{formatCurrency(selectedRun.total_amount)}</strong></div>
+            <div><p>Выплачено</p><strong>{formatCurrency(selectedRun.total_paid)}</strong></div>
+            <div data-remaining={(selectedRun.items || []).some((item) => Number(item.remaining_amount || 0) > 0)}><p>Осталось</p><strong>{formatCurrency((selectedRun.items || []).reduce((total, item) => total + Number(item.remaining_amount || 0), 0))}</strong></div>
+          </div>
+          <div className="owner-payroll-items">
             {(selectedRun.items || []).map((item) => (
-              <div key={item.id} className="surface-muted rounded-xl p-3">
+              <div key={item.id} className="owner-payroll-item">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-tg-text">{item.user_name || 'Сотрудник'}</p>
-                  <p className="text-sm font-semibold text-tg-text">{formatCurrency(item.final_amount)}</p>
+                  <p className="owner-money-value text-sm font-semibold text-tg-text">{formatCurrency(item.final_amount)}</p>
                 </div>
                 <p className="mt-1 text-xs text-tg-hint">{item.approved_shifts_count} смен · {formatHours(item.approved_hours)}</p>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-                  <span className="text-tg-hint">Начислено <b className="block mt-0.5 text-tg-text">{formatCurrency(item.final_amount)}</b></span>
-                  <span className="text-tg-hint">Выплачено <b className="block mt-0.5 text-tg-text">{formatCurrency(item.paid_amount)}</b></span>
-                  <span className="text-tg-hint">Осталось <b className="block mt-0.5 text-tg-text">{formatCurrency(item.remaining_amount)}</b></span>
+                <div className="owner-payroll-item-breakdown">
+                  <span>База <b>{formatCurrency(item.base_amount)}</b></span>
+                  <span>Бонусы <b>{formatCurrency(item.bonus_amount)}</b></span>
+                  <span data-deduction={Number(item.deduction_amount || 0) > 0}>Удержания <b>{Number(item.deduction_amount || 0) > 0 ? '−' : ''}{formatCurrency(item.deduction_amount)}</b></span>
+                  <span>Начислено <b>{formatCurrency(item.final_amount)}</b></span>
+                  <span>Выплачено <b>{formatCurrency(item.paid_amount)}</b></span>
+                  <span data-remaining={Number(item.remaining_amount || 0) > 0}>Осталось <b>{formatCurrency(item.remaining_amount)}</b></span>
                 </div>
                 {canCreate && selectedRun.status === 'finalized' && Number(item.remaining_amount || 0) > 0 && (
                   <button
@@ -941,7 +959,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             ))}
           </div>
           {paymentItem && selectedRun.status === 'finalized' && canCreate && (
-            <form onSubmit={handlePayment} className="surface-muted space-y-3 rounded-xl p-3">
+            <form onSubmit={handlePayment} className="owner-payroll-payment-form">
               <div>
                 <h4 className="text-sm font-semibold text-tg-text">Записать выплату</h4>
                 <p className="mt-1 text-xs text-tg-hint">{paymentItem.user_name || 'Сотрудник'} · остаток {formatCurrency(paymentItem.remaining_amount)}</p>
