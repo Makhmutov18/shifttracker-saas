@@ -91,7 +91,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
 
   if (saved) {
     return (
-      <div className="shift-form-page shift-success-page mx-auto max-w-lg px-4 pt-6">
+      <div className="shift-form-page shift-success-page mx-auto max-w-lg px-4 pt-5">
         <div className="shift-success-icon" aria-hidden="true">
           <CheckCircle className="h-8 w-8" />
         </div>

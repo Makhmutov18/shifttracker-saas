@@ -147,7 +147,7 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
   const venueName = user.venue?.name?.trim() || 'Основная точка';
 
   return (
-    <div className="profile-page mx-auto max-w-lg px-4 pb-6 pt-6">
+    <div className="profile-page mx-auto max-w-lg px-4 pb-6 pt-5">
       <header className="profile-identity">
         <UserAvatar
           name={user.name || 'Сотрудник'}
