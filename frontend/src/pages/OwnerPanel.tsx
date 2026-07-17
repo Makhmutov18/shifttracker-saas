@@ -735,14 +735,9 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   return (
     <div className="owner-payroll-page pb-6">
       <section className="owner-payroll-create surface-card">
-        <div className="flex items-start gap-3">
-          <div className="surface-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-tg-primary">
-            <Calculator className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-tg-text">Расчёты выплат</h2>
-            <p className="mt-1 text-sm text-tg-hint">Сформируйте расчёт начислений за выбранный период</p>
-          </div>
+        <div>
+          <h2 className="text-base font-semibold text-tg-text">Расчёты выплат</h2>
+          <p className="mt-1 text-sm text-tg-hint">Сформируйте расчёт начислений за выбранный период</p>
         </div>
         <form onSubmit={handlePreview} className="owner-payroll-form">
           <div className="owner-date-grid">

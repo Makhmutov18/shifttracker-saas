@@ -139,7 +139,7 @@ export default function Payouts({ user }: Props) {
   const resetMonth = () => setDraftMonth(initialMonthValue);
 
   return (
-    <div className="payouts-page mx-auto max-w-lg px-4 pb-6 pt-6" aria-label={`Личные выплаты: ${user.name || 'Сотрудник'}`}>
+    <div className="payouts-page mx-auto max-w-lg px-4 pb-6 pt-5" aria-label={`Личные выплаты: ${user.name || 'Сотрудник'}`}>
       <header className="payouts-header">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-tg-text">Выплаты</h1>

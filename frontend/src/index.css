@@ -1490,7 +1490,7 @@ button:disabled {
 .payouts-page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .payouts-header {
@@ -1520,7 +1520,7 @@ button:disabled {
 }
 
 .payouts-current {
-  padding: 1.15rem 1.2rem;
+  padding: 1rem 1.1rem;
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
@@ -1530,20 +1530,20 @@ button:disabled {
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
   color: var(--text-primary);
-  font-size: clamp(1.85rem, 9vw, 2.45rem);
+  font-size: clamp(1.75rem, 8vw, 2.25rem);
   font-weight: 650;
   line-height: 1.15;
 }
 
 .payouts-current-facts {
   display: grid;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
 }
 
 .payouts-current-facts > div {
   display: flex;
-  min-height: 2.75rem;
+  min-height: 2.5rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -1594,7 +1594,7 @@ button:disabled {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 
 .payouts-section-heading h2 {
@@ -1625,11 +1625,11 @@ button:disabled {
 .payouts-run-main {
   display: flex;
   width: 100%;
-  min-height: 4.75rem;
+  min-height: 4.25rem;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.95rem 1rem 0.65rem;
+  padding: 0.75rem 1rem 0.55rem;
 }
 
 .payouts-run-status,
@@ -1661,7 +1661,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
-  padding: 0 1rem 0.95rem;
+  padding: 0 1rem 0.75rem;
 }
 
 .payouts-run-totals > div {
@@ -1688,7 +1688,7 @@ button:disabled {
 
 .payouts-payments {
   margin-inline: 1rem;
-  padding-block: 0.8rem 0.95rem;
+  padding-block: 0.65rem 0.75rem;
   border-top: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   font-size: 0.8125rem;
@@ -1696,7 +1696,7 @@ button:disabled {
 
 .payouts-payment-row {
   display: flex;
-  min-height: 3.25rem;
+  min-height: 3rem;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
@@ -1720,11 +1720,11 @@ button:disabled {
 
 .payouts-shift-row {
   display: flex;
-  min-height: 4.5rem;
+  min-height: 4rem;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
+  padding: 0.7rem 1rem;
 }
 
 .payouts-shift-row > strong {
@@ -2473,7 +2473,7 @@ button:disabled {
 .owner-payroll-create,
 .owner-payroll-preview,
 .owner-payroll-details {
-  padding: 1rem;
+  padding: 0.85rem;
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
 }
@@ -2483,10 +2483,18 @@ button:disabled {
 .owner-payroll-details,
 .owner-payroll-payment-form {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
 }
 
-.owner-payroll-form { margin-top: 1rem; }
+.owner-payroll-form { margin-top: 0.75rem; }
+
+.owner-payroll-form input,
+.owner-payroll-form select,
+.owner-payroll-payment-form input,
+.owner-payroll-payment-form textarea {
+  min-width: 0;
+  min-height: 3rem;
+}
 
 .owner-payroll-preview-summary,
 .owner-payroll-totals {
@@ -2498,7 +2506,7 @@ button:disabled {
 .owner-payroll-preview-summary > div,
 .owner-payroll-totals > div {
   min-width: 0;
-  padding: 0.75rem 0;
+  padding: 0.6rem 0;
 }
 
 .owner-payroll-preview-summary > div:nth-child(even),
@@ -2558,7 +2566,7 @@ button:disabled {
 
 .owner-payroll-preview-row,
 .owner-payroll-item {
-  padding: 0.8rem;
+  padding: 0.7rem;
 }
 
 .owner-payroll-preview-row + .owner-payroll-preview-row,
@@ -2566,7 +2574,7 @@ button:disabled {
   border-top: 1px solid var(--border-subtle);
 }
 
-.owner-payroll-row-breakdown { margin-top: 0.6rem; }
+.owner-payroll-row-breakdown { margin-top: 0.45rem; }
 
 .owner-money-value {
   max-width: 48%;
@@ -2577,7 +2585,7 @@ button:disabled {
 .owner-payroll-run {
   display: block;
   width: 100%;
-  padding: 0.9rem;
+  padding: 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: 0.9rem;
   text-align: left;
@@ -2589,9 +2597,9 @@ button:disabled {
 .owner-payroll-run-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem 0.75rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  gap: 0.45rem 0.7rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -2635,14 +2643,14 @@ button:disabled {
 .owner-payroll-item-breakdown {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
-  margin-top: 0.7rem;
-  padding-top: 0.7rem;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
   border-top: 1px solid var(--border-subtle);
 }
 
 .owner-payroll-payment-form {
-  padding: 0.85rem;
+  padding: 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: 0.85rem;
   background: var(--surface-elevated);
