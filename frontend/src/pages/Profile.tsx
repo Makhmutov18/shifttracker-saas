@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BriefcaseBusiness, Gift, MapPin, MinusCircle, Monitor, Moon, SunMedium, Wallet } from 'lucide-react';
+import { Gift, MinusCircle, Monitor, Moon, SunMedium } from 'lucide-react';
 import {
   User as UserType,
   Adjustment,
@@ -166,12 +166,12 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
         <div className="profile-section-heading">
           <h2 id="profile-work-title">Условия работы</h2>
         </div>
-        <div className="profile-detail-list">
-          <ProfileDetail icon={<MapPin />} label="Точка" value={venueName} />
-          <ProfileDetail icon={<BriefcaseBusiness />} label="Должность" value={positionLabel} />
-          <ProfileDetail icon={<Wallet />} label="Модель оплаты" value={PAY_MODEL_LABELS[user.pay_model] || 'Не указана'} />
-          <ProfileDetail icon={<Wallet />} label="Ставка" value={getRateLabel(user)} />
-        </div>
+        <dl className="profile-detail-list">
+          <ProfileDetail label="Точка" value={venueName} />
+          <ProfileDetail label="Должность" value={positionLabel} />
+          <ProfileDetail label="Модель оплаты" value={PAY_MODEL_LABELS[user.pay_model] || 'Не указана'} />
+          <ProfileDetail label="Ставка" value={getRateLabel(user)} />
+        </dl>
       </section>
 
       <section aria-labelledby="profile-theme-title">
@@ -232,7 +232,7 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
           <div className="profile-list">
             {adjustments.map((adjustment) => (
               <article key={adjustment.id} className="profile-adjustment-row">
-                <div className="profile-row-icon" aria-hidden="true">
+                <div className="profile-row-icon" data-type={adjustment.type} aria-hidden="true">
                   {adjustment.type === 'bonus' ? <Gift className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -293,12 +293,11 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
   );
 }
 
-function ProfileDetail({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ProfileDetail({ label, value }: { label: string; value: string }) {
   return (
     <div className="profile-detail-row">
-      <span className="profile-row-icon" aria-hidden="true">{icon}</span>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }

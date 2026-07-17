@@ -1816,7 +1816,7 @@ button:disabled {
 .profile-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .profile-identity {
@@ -1848,18 +1848,18 @@ button:disabled {
 .profile-detail-list,
 .profile-list {
   overflow: hidden;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .profile-detail-row {
   display: grid;
-  grid-template-columns: 2rem minmax(4.5rem, 0.7fr) minmax(0, 1.3fr);
-  min-height: 3.5rem;
+  grid-template-columns: minmax(5.5rem, 0.75fr) minmax(0, 1.25fr);
+  min-height: 3.25rem;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.75rem 1rem;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
 }
 
 .profile-detail-row + .profile-detail-row,
@@ -1868,12 +1868,13 @@ button:disabled {
   border-top: 1px solid var(--border-subtle);
 }
 
-.profile-detail-row > span:not(.profile-row-icon) {
+.profile-detail-row dt {
   color: var(--text-secondary);
   font-size: 0.8125rem;
 }
 
-.profile-detail-row strong {
+.profile-detail-row dd {
+  margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text-primary);
@@ -1897,6 +1898,9 @@ button:disabled {
   width: 1rem;
   height: 1rem;
 }
+
+.profile-row-icon[data-type='bonus'] { background: var(--success-soft); color: var(--success); }
+.profile-row-icon[data-type='penalty'] { background: var(--danger-soft); color: var(--danger); }
 
 .profile-theme-control {
   display: grid;
@@ -1922,8 +1926,8 @@ button:disabled {
 
 .profile-theme-control button[data-active='true'] {
   background: var(--surface-elevated);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-primary) 8%, transparent);
   color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--tg-primary);
 }
 
 .profile-theme-control button:focus-visible,
@@ -1934,9 +1938,9 @@ button:disabled {
 
 .profile-month-summary {
   padding: 1.05rem 1.15rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .profile-month-summary > div:first-child span,
@@ -2632,7 +2636,7 @@ button:disabled {
   }
 
   .profile-detail-row {
-    grid-template-columns: 2rem minmax(4rem, 0.65fr) minmax(0, 1.35fr);
+    grid-template-columns: minmax(4.5rem, 0.7fr) minmax(0, 1.3fr);
     padding-inline: 0.85rem;
   }
 }
