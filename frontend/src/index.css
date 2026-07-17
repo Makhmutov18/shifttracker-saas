@@ -1093,7 +1093,7 @@ button:disabled {
 .history-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .history-header {
@@ -1131,9 +1131,9 @@ button:disabled {
 
 .history-summary {
   padding: 1.15rem 1.2rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .history-summary-heading {
@@ -1280,8 +1280,8 @@ button:disabled {
 
 .history-tabs button[data-active='true'] {
   background: var(--surface-elevated);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-primary) 8%, transparent);
   color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--tg-primary);
 }
 
 .history-groups {
@@ -1303,9 +1303,9 @@ button:disabled {
 .history-date-list,
 .history-expenses-list {
   overflow: hidden;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .history-shift-row + .history-shift-row,
@@ -1338,10 +1338,9 @@ button:disabled {
   white-space: nowrap;
 }
 
-.history-status[data-status='approved'],
-.history-status[data-status='pending'] {
-  color: var(--tg-primary);
-}
+.history-status[data-status='approved'] { background: var(--success-soft); color: var(--success); }
+.history-status[data-status='pending'] { background: var(--warning-soft); color: var(--warning); }
+.history-status[data-status='rejected'] { background: var(--danger-soft); color: var(--danger); }
 
 .history-shift-amount {
   display: flex;
@@ -1483,7 +1482,7 @@ button:disabled {
 .payouts-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .payouts-header {
@@ -1514,9 +1513,9 @@ button:disabled {
 
 .payouts-current {
   padding: 1.15rem 1.2rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .payouts-current-amount {
@@ -1605,9 +1604,9 @@ button:disabled {
 .payouts-runs-list,
 .payouts-shifts-list {
   overflow: hidden;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .payouts-run-row + .payouts-run-row,
@@ -1645,10 +1644,10 @@ button:disabled {
 }
 
 .payouts-run-status[data-status='paid'],
-.payouts-status[data-status='approved'],
-.payouts-status[data-status='pending'] {
-  color: var(--tg-primary);
-}
+.payouts-status[data-status='approved'] { background: var(--success-soft); color: var(--success); }
+.payouts-run-status[data-status='finalized'],
+.payouts-status[data-status='pending'] { background: var(--warning-soft); color: var(--warning); }
+.payouts-status[data-status='rejected'] { background: var(--danger-soft); color: var(--danger); }
 
 .payouts-run-totals {
   display: grid;

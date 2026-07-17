@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronDown, CircleAlert, Clock3, ReceiptText } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, ChevronDown, CircleAlert, Clock3 } from 'lucide-react';
 import { PersonalPayrollRun, User, getErrorMessage, getMonthlyStats, getMyPayrollRuns } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import BottomSheet from '../components/BottomSheet';
@@ -41,6 +41,7 @@ function getShiftPresentation(status: ShiftStatus | string) {
 }
 
 export default function Payouts({ user }: Props) {
+  const periodButtonRef = useRef<HTMLButtonElement>(null);
   const initialMonthValue = `${getCurrentYear()}-${String(getCurrentMonth()).padStart(2, '0')}`;
   const [viewDate, setViewDate] = useState(() => ({ month: getCurrentMonth(), year: getCurrentYear() }));
   const [monthSheetOpen, setMonthSheetOpen] = useState(false);
@@ -144,7 +145,7 @@ export default function Payouts({ user }: Props) {
           <h1 className="text-2xl font-semibold text-tg-text">Выплаты</h1>
           <p className="mt-1 truncate text-sm text-tg-hint">{selectedMonthLabel}</p>
         </div>
-        <button type="button" className="payouts-period-button" onClick={() => setMonthSheetOpen(true)} aria-label="Выбрать месяц">
+        <button ref={periodButtonRef} type="button" className="payouts-period-button" onClick={() => setMonthSheetOpen(true)} aria-label="Выбрать месяц">
           <CalendarDays className="h-5 w-5" aria-hidden="true" />
         </button>
       </header>
@@ -177,7 +178,6 @@ export default function Payouts({ user }: Props) {
             <h2 id="payouts-history-title">История выплат</h2>
             <p>Зафиксированные работодателем расчёты</p>
           </div>
-          <ReceiptText className="h-5 w-5 text-tg-hint" aria-hidden="true" />
         </div>
 
         {payrollRunsLoading ? (
@@ -221,7 +221,7 @@ export default function Payouts({ user }: Props) {
         ) : monthShifts.length === 0 ? (
           <div className="payouts-state">
             <Clock3 className="h-6 w-6 text-tg-hint" aria-hidden="true" />
-            <p className="font-medium text-tg-text">За выбранный месяц выплат пока нет</p>
+            <p className="font-medium text-tg-text">За выбранный месяц смен пока нет</p>
             <p>Смены появятся здесь после сохранения.</p>
           </div>
         ) : (
@@ -245,7 +245,7 @@ export default function Payouts({ user }: Props) {
         )}
       </section>
 
-      <BottomSheet open={monthSheetOpen} title="Выберите месяц" onClose={() => setMonthSheetOpen(false)}>
+      <BottomSheet open={monthSheetOpen} title="Выберите месяц" onClose={() => setMonthSheetOpen(false)} returnFocusRef={periodButtonRef}>
         <div className="payouts-period-field">
           <label htmlFor="payouts-month">Месяц</label>
           <select id="payouts-month" value={draftMonth} onChange={(event) => setDraftMonth(event.target.value)}>
