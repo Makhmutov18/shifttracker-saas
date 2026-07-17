@@ -388,6 +388,30 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .archive-toolbar > div > svg { width: 20px; color: var(--text-muted); }
 .archive-toolbar span strong, .archive-toolbar span small { display: block; }
 .archive-toolbar span small { margin-top: 2px; color: var(--text-muted); }
+.employee-list-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.employee-list-tabs button { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); }
+.employee-list-tabs button:hover { color: var(--text); }
+.employee-list-tabs button.active { border-color: var(--accent); color: var(--text); font-weight: 700; }
+.employee-list-tabs button span { min-width: 24px; min-height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--surface-muted); color: var(--text-muted); font-size: 11px; }
+.employee-table-row { cursor: pointer; }
+.employee-table-row:hover { background: var(--surface-hover); }
+.employee-table-row:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
+.employee-pay-value { font-weight: 650; white-space: nowrap; }
+.employee-permissions > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; }
+.employee-permissions .checkbox-row { min-height: 40px; font-size: 12px; }
+.employee-mobile-card { position: relative; display: grid; gap: 12px; cursor: pointer; }
+.employee-mobile-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.employee-mobile-head { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.employee-mobile-head > span { min-width: 0; }
+.employee-mobile-head strong, .employee-mobile-head small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.employee-mobile-head small { margin-top: 2px; color: var(--text-muted); }
+.employee-mobile-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.employee-mobile-details > span { min-width: 0; }
+.employee-mobile-details > span:last-child { grid-column: 1 / -1; }
+.employee-mobile-details small, .employee-mobile-details strong { display: block; }
+.employee-mobile-details small { margin-bottom: 3px; color: var(--text-muted); font-size: 10px; }
+.employee-mobile-details strong { overflow-wrap: anywhere; font-size: 12px; }
+.employee-mobile-actions { display: flex; justify-content: flex-end; gap: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
 .table-link { min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--accent); font-weight: 700; text-align: left; }
 .table-link:hover { color: var(--accent-strong); text-decoration: underline; }
 .employee-profile { display: grid; gap: 22px; }
@@ -680,6 +704,7 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .payroll-payment-history-row strong { white-space: normal; }
   .employee-profile-head { grid-template-columns: auto minmax(0, 1fr); }
   .employee-profile-head .badge { grid-column: 2; justify-self: start; }
+  .employee-permissions > div { grid-template-columns: 1fr; }
   .shifts-page .mobile-cards { padding: 10px; }
   .shift-status-filter { min-height: 52px; align-items: flex-start; flex-direction: column; justify-content: center; gap: 5px; padding: 7px 10px; }
   .shift-status-filter-count { text-align: left; }
