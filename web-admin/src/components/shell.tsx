@@ -109,24 +109,28 @@ export function TopBar({
     return () => { document.removeEventListener('mousedown', closeOutside); document.removeEventListener('keydown', closeOnEscape); };
   }, [userMenuOpen]);
   return <header className="topbar">
-    <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
-    <div className="topbar-venue-filter">
-      <Building2 />
-      <SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} />
+    <div className="topbar-left">
+      <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
+      <div className="topbar-venue-filter">
+        <Building2 />
+        <div className="topbar-venue-copy"><span>Точка</span><SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} /></div>
+      </div>
     </div>
-    {action}
-    <div className={`user-menu ${userMenuOpen ? 'open' : ''}`} ref={userMenuRef}>
-      <button className="user-menu-trigger" aria-label="Меню пользователя" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((value) => !value)}>
-        <span className="avatar">{(user.name || 'П').slice(0, 1).toUpperCase()}</span>
-        <span className="user-menu-copy"><strong>{user.name || 'Пользователь'}</strong><small>{roleLabel}</small></span>
-        <ChevronDown />
-      </button>
-      {userMenuOpen && <div className="user-menu-popover">
-        <div className="user-menu-heading"><strong>{user.name || 'Пользователь'}</strong><span>{roleLabel}</span></div>
-        <button onClick={() => { onTheme(); setUserMenuOpen(false); }}>{theme === 'dark' ? <Moon /> : <Sun />}<span><strong>Тема интерфейса</strong><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span></button>
-        <div className="user-menu-divider" />
-        <button className="logout-button" onClick={onLogout}><LogOut /><span>Выйти</span></button>
-      </div>}
+    <div className="topbar-right">
+      {action}
+      <div className={`user-menu ${userMenuOpen ? 'open' : ''}`} ref={userMenuRef}>
+        <button className="user-menu-trigger" aria-label="Меню пользователя" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((value) => !value)}>
+          <span className="avatar topbar-avatar">{(user.name || 'П').slice(0, 1).toUpperCase()}</span>
+          <span className="user-menu-copy"><strong>{user.name || 'Пользователь'}</strong></span>
+          <ChevronDown />
+        </button>
+        {userMenuOpen && <div className="user-menu-popover">
+          <div className="user-menu-heading"><strong>{user.name || 'Пользователь'}</strong><span>{roleLabel}</span></div>
+          <button onClick={() => { onTheme(); setUserMenuOpen(false); }}>{theme === 'dark' ? <Moon /> : <Sun />}<span><strong>Тема интерфейса</strong><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span></button>
+          <div className="user-menu-divider" />
+          <button className="logout-button" onClick={onLogout}><LogOut /><span>Выйти</span></button>
+        </div>}
+      </div>
     </div>
   </header>;
 }
