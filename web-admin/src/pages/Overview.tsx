@@ -198,15 +198,6 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
     </section>
 
     <div className="overview-work-grid">
-      <section className="overview-panel attention-panel">
-        <div className="overview-section-header"><div><h2>Требует внимания</h2><span>{attention.length ? `${attention.length} активных задач` : 'Всё под контролем'}</span></div></div>
-        {attention.length ? <div className="attention-list">{attention.map(({ icon: Icon, tone, text, action, path }) => (
-          <button className="attention-row" key={text} onClick={() => navigate(path)}>
-            <IconBadge tone={tone} icon={<Icon />} label={text} value={action} /><ArrowRight className="row-arrow" />
-          </button>
-        ))}</div> : <div className="compact-empty"><span>Критичных действий нет</span><small>Все текущие задачи обработаны.</small></div>}
-      </section>
-
       <section className="overview-panel shifts-panel">
         <div className="overview-section-header"><div><h2>Последние смены</h2><span>До пяти последних записей за период</span></div><button className="section-link" onClick={() => navigate('/shifts')}>Все смены<ArrowRight /></button></div>
         {shifts.length ? <div className="overview-shift-list">{shifts.slice(0, 5).map((shift) => {
@@ -223,12 +214,21 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
       </section>
 
       <div className="overview-side-stack">
+        <section className="overview-panel attention-panel">
+          <div className="overview-section-header"><div><h2>Требует внимания</h2><span>{attention.length ? `${attention.length} активных задач` : 'Всё под контролем'}</span></div></div>
+          {attention.length ? <div className="attention-list">{attention.map(({ icon: Icon, tone, text, action, path }) => (
+            <button className="attention-row" key={text} onClick={() => navigate(path)}>
+              <IconBadge tone={tone} icon={<Icon />} label={text} value={action} /><ArrowRight className="row-arrow" />
+            </button>
+          ))}</div> : <div className="compact-empty"><span>Критичных действий нет</span><small>Все текущие задачи обработаны.</small></div>}
+        </section>
+
         <section className="overview-panel on-shift-panel">
           <div className="overview-section-header"><div><h2>Сейчас на смене</h2><span>Активные сотрудники</span></div></div>
           {activeNow.length ? <div className="on-shift-content"><AvatarStack items={activeNow.map((employee) => ({ name: employee.name || 'Сотрудник' }))} max={6} /><div><strong>{activeNow.length} {plural(activeNow.length, ['сотрудник', 'сотрудника', 'сотрудников'])}</strong><span>{activeNow.slice(0, 3).map((employee) => employee.name).join(', ')}</span></div></div> : <div className="compact-empty"><span>Сейчас активных смен нет</span><small>Сотрудники появятся здесь в рабочее время.</small></div>}
         </section>
 
-        <section className="overview-panel">
+        <section className="overview-panel recent-runs-panel">
           <div className="overview-section-header"><div><h2>Последние расчёты</h2><span>Зафиксированные начисления</span></div>{canViewPayroll ? <button className="section-link" onClick={() => navigate('/payroll')}>Все расчёты<ArrowRight /></button> : null}</div>
           {!canViewPayroll ? <div className="compact-empty"><span>Нет доступа к расчётам</span><small>Требуется право просмотра выплат.</small></div> : !runsAvailable ? <div className="compact-empty"><span>Не удалось загрузить расчёты</span><small>Обновите страницу или попробуйте позже.</small></div> : runs.length ? <div className="overview-run-list">{runs.slice(0, 3).map((run) => (
             <button className="overview-run-row" key={run.id} onClick={() => navigate('/payroll')}>

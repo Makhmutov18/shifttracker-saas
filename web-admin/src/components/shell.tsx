@@ -35,14 +35,12 @@ function userRoleLabel(user: User): string {
 export function Sidebar({
   route,
   user,
-  venueLabel,
   onNavigate,
   open,
   onClose,
 }: {
   route: RoutePath;
   user: User;
-  venueLabel: string;
   onNavigate: (path: RoutePath) => void;
   open: boolean;
   onClose: () => void;
@@ -68,10 +66,6 @@ export function Sidebar({
           </button>
         ))}
       </nav>
-      <div className="sidebar-footer">
-        <Building2 />
-        <div><span>Текущий контекст</span><strong title={venueLabel}>{venueLabel}</strong></div>
-      </div>
     </aside>
   </>;
 }
@@ -85,6 +79,7 @@ export function TopBar({
   onTheme,
   onLogout,
   onMenu,
+  title,
   action,
 }: {
   venues: Venue[];
@@ -95,6 +90,7 @@ export function TopBar({
   onTheme: () => void;
   onLogout: () => void;
   onMenu: () => void;
+  title: string;
   action?: ReactNode;
 }) {
   const roleLabel = userRoleLabel(user);
@@ -114,13 +110,14 @@ export function TopBar({
   return <header className="topbar">
     <div className="topbar-left">
       <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
+      <strong className="topbar-title">{title}</strong>
+    </div>
+    <div className="topbar-right">
+      {action}
       <div className="topbar-venue-filter">
         <Building2 />
         <div className="topbar-venue-copy"><span>Точка</span><SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} /></div>
       </div>
-    </div>
-    <div className="topbar-right">
-      {action}
       <div className={`user-menu ${userMenuOpen ? 'open' : ''}`} ref={userMenuRef}>
         <button className="user-menu-trigger" aria-label="Меню пользователя" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((value) => !value)}>
           <span className="avatar topbar-avatar">
@@ -153,6 +150,7 @@ export function AppShell({
   onNavigate,
   onLogout,
   children,
+  title,
   action,
 }: {
   route: RoutePath;
@@ -169,11 +167,10 @@ export function AppShell({
   action?: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const venueLabel = venueId ? venues.find((venue) => venue.id === venueId)?.name ?? 'Точка' : 'Все точки';
   return <div className="app-shell">
-    <Sidebar route={route} user={user} venueLabel={venueLabel} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} />
+    <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} />
     <main>
-      <TopBar venues={venues} venueId={venueId} onVenue={onVenue} user={user} theme={theme} onTheme={onTheme} onLogout={onLogout} onMenu={() => setMenuOpen(true)} action={action} />
+      <TopBar venues={venues} venueId={venueId} onVenue={onVenue} user={user} theme={theme} onTheme={onTheme} onLogout={onLogout} onMenu={() => setMenuOpen(true)} title={title} action={action} />
       <div className="content">{children}</div>
     </main>
   </div>;
