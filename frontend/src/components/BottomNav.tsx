@@ -59,19 +59,17 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
   return (
     <nav className="bottom-nav" aria-label="Основная навигация">
       <div className="bottom-nav-inner">
-        <div className="bottom-nav-composition">
-          <div className="dock-shell">
-            {items.map((item) => (
-              <NavButton
-                key={item.page}
-                page={item.page}
-                label={item.label}
-                icon={item.icon}
-                currentPage={currentPage}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </div>
+        <div className="dock-shell">
+          {items.slice(0, 2).map((item) => (
+            <NavButton
+              key={item.page}
+              page={item.page}
+              label={item.label}
+              icon={item.icon}
+              currentPage={currentPage}
+              onNavigate={onNavigate}
+            />
+          ))}
           <button
             type="button"
             className="dock-create-action"
@@ -81,8 +79,21 @@ export default function BottomNav({ currentPage, onNavigate, isAdmin }: Props) {
               onNavigate('shift');
             }}
           >
-            <Plus className="h-[1.375rem] w-[1.375rem]" aria-hidden="true" />
+            <span className="dock-create-icon">
+              <Plus className="h-[1.375rem] w-[1.375rem]" aria-hidden="true" />
+            </span>
+            <span className="dock-item-label">Смена</span>
           </button>
+          {items.slice(2).map((item) => (
+            <NavButton
+              key={item.page}
+              page={item.page}
+              label={item.label}
+              icon={item.icon}
+              currentPage={currentPage}
+              onNavigate={onNavigate}
+            />
+          ))}
         </div>
       </div>
     </nav>
