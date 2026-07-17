@@ -35,15 +35,18 @@ Additionally read:
 - Keep existing stable flows working.
 - Commit only relevant files.
 
-## 3. Timebox
+## 3. Fast execution mode
 
-- Do not turn a focused fix into a broad refactor or research task.
-- For simple local fixes, browser QA is limited to two focused verification cycles unless the task explicitly requires more.
-- Do not repeat already passed scenarios after every minor edit.
-- Once the main regression scenario passes, finish the required checks, commit and push.
-- If a task runs longer than 15 minutes, stop expanding scope and complete the smallest correct fix.
-- Read additional plugin skills only when they are genuinely needed for the task.
-- If blocked after two reasonable attempts, report the blocker instead of continuing indefinitely.
+Default mode for implementation tasks is code-only.
+
+- Do not open a browser.
+- Do not start dev servers or mock servers.
+- Do not create screenshots.
+- Do not run visual QA or manually test multiple resolutions.
+- Browser QA is allowed only when the task explicitly contains `VISUAL_QA_REQUIRED`.
+- When browser QA is not requested, state that it was not performed.
+- Do not expand a focused task into broad QA or research.
+- If blocked after two reasonable attempts, report the blocker and stop.
 
 ## 4. UI defaults
 
@@ -53,7 +56,6 @@ For UI tasks:
 - reuse existing CSS variables and surface classes;
 - support light and dark themes;
 - keep touch targets at least `44×44 px`;
-- check Mini App at `360 px` and `390 px`;
 - account for Telegram safe areas and dock overlap;
 - preserve loading, error, empty and permission states;
 - do not add gradients, glow, fake analytics, card-inside-card or generic AI-SaaS styling;
@@ -69,10 +71,18 @@ Always run:
 git diff --check
 ```
 
-For frontend changes:
+For Telegram Mini App changes:
 
 ```bash
 cd frontend
+npm run build
+cd ..
+```
+
+For web-admin changes:
+
+```bash
+cd web-admin
 npm run build
 cd ..
 ```
@@ -126,3 +136,5 @@ Do not change: <important exclusions, only when needed>.
 Check: <task-specific behaviour to verify>.
 Commit: <commit message>.
 ```
+
+`VISUAL_QA_REQUIRED` is optional and must be explicitly present to allow browser QA, screenshots, dev servers or mock servers.
