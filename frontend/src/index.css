@@ -686,8 +686,8 @@ button:disabled {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 1.5rem;
-  padding-block: 1.75rem 1.25rem;
+  gap: 1.25rem;
+  padding-block: 1.5rem 1.25rem;
 }
 
 .shift-form-section {
@@ -728,8 +728,8 @@ button:disabled {
 
 .shift-segmented button[data-active='true'] {
   background: var(--surface-elevated);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--tg-primary);
 }
 
 .shift-time-grid {
@@ -750,13 +750,30 @@ button:disabled {
   font-weight: 500;
 }
 
-.shift-time-grid input {
+.shift-time-control {
   width: 100%;
   min-width: 0;
   min-height: 3rem;
+  overflow: hidden;
   border: 1px solid var(--tg-control-border);
   border-radius: 0.8rem;
-  padding: 0.7rem 0.75rem;
+  background: var(--tg-control-bg);
+}
+
+.shift-time-control:focus-within {
+  border-color: var(--tg-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tg-primary) 22%, transparent);
+}
+
+.shift-time-control input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.875rem;
+  border: 0 !important;
+  border-radius: 0;
+  padding: 0.65rem 0.75rem;
+  background: transparent !important;
+  box-shadow: none !important;
   font-size: 1rem;
   font-weight: 600;
   appearance: none;
@@ -783,6 +800,7 @@ button:disabled {
   align-items: center;
   gap: 0.75rem;
   padding: 0.9rem 1rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 0.9rem;
   background: var(--surface-muted);
 }
@@ -822,9 +840,9 @@ button:disabled {
 
 .shift-summary {
   padding: 1.1rem 1.2rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
 }
 
 .shift-summary-amount {
@@ -906,14 +924,14 @@ button:disabled {
 
 .shift-success-icon {
   display: flex;
-  width: 4rem;
-  height: 4rem;
+  width: 3rem;
+  height: 3rem;
   margin-inline: auto;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--tg-primary) 12%, var(--surface));
-  color: var(--tg-primary);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .shift-success-actions {
@@ -929,6 +947,10 @@ button:disabled {
   .shift-time-grid input {
     padding-inline: 0.55rem;
   }
+}
+
+@media (max-width: 340px) {
+  .shift-time-grid { grid-template-columns: 1fr; }
 }
 
 .bottom-sheet-root {

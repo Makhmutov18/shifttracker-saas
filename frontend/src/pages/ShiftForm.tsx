@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle, ChevronDown, Clock, MapPin, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronDown, MapPin, MessageSquare, Send } from 'lucide-react';
 import { Shift, User, createShift, getErrorMessage } from '../utils/api';
 import { formatCurrency, formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
@@ -106,6 +106,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
           <p className="text-sm text-tg-hint">{saved.status === 'pending' ? 'Предварительно' : 'Начислено'}</p>
           <p className="shift-summary-amount">{formatCurrency(saved.salary)}</p>
           <div className="shift-summary-meta">
+            <span>{saved.status === 'pending' ? 'На подтверждении' : 'Утверждена'}</span>
             <span>{formatHours(saved.hours)}</span>
             <span>{isToday ? 'Сегодня' : 'Вчера'}, {startTime}–{endTime}</span>
           </div>
@@ -159,26 +160,27 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         </section>
 
         <section className="shift-form-section" aria-labelledby="shift-time-title">
-          <div className="shift-section-heading">
-            <h2 id="shift-time-title" className="shift-section-title">Рабочее время</h2>
-            <Clock className="h-5 w-5 text-tg-hint" aria-hidden="true" />
-          </div>
+          <h2 id="shift-time-title" className="shift-section-title">Рабочее время</h2>
           <div className="shift-time-grid">
             <label>
               <span>Начало смены</span>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-              />
+              <div className="shift-time-control">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => setStartTime(event.target.value)}
+                />
+              </div>
             </label>
             <label>
               <span>Конец смены</span>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-              />
+              <div className="shift-time-control">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(event) => setEndTime(event.target.value)}
+                />
+              </div>
             </label>
           </div>
           <div className="shift-time-total">
@@ -188,7 +190,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         </section>
 
         <section className="shift-context-row" aria-label="Точка и модель оплаты">
-          <MapPin className="h-5 w-5 shrink-0 text-tg-primary" aria-hidden="true" />
+          <MapPin className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
           <div className="min-w-0">
             <p className="truncate font-medium text-tg-text">{venueName}</p>
             <p className="mt-0.5 truncate text-sm text-tg-hint">{getPayModelLabel(user)}</p>
