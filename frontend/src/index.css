@@ -2922,6 +2922,8 @@ button:disabled {
 input:not([type='checkbox']):not([type='radio']),
 select,
 textarea {
+  min-width: 0;
+  max-width: 100%;
   color: var(--tg-text) !important;
   background-color: var(--tg-control-bg) !important;
   border-color: var(--tg-control-border) !important;

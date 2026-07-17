@@ -417,7 +417,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
   const activeTab = tab ? activeTabs.find((item) => item.id === tab) ?? null : null;
 
   return (
-    <div className="owner-panel-page mx-auto max-w-lg px-4 pb-4 pt-5">
+    <div className="owner-panel-page mx-auto max-w-lg px-4 pb-5 pt-5">
       <div key={activeTab?.id ?? 'hub'} className="owner-panel-view">
         {activeTab ? (
           <header className="owner-section-header">
