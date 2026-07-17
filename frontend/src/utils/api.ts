@@ -200,6 +200,7 @@ export interface Shift {
   id: string;
   user_id: string;
   venue_id: string;
+  venue_name?: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -225,6 +226,7 @@ function normalizeShift(raw: unknown): Shift {
     id: typeof source.id === 'string' ? source.id : '',
     user_id: typeof source.user_id === 'string' ? source.user_id : '',
     venue_id: typeof source.venue_id === 'string' ? source.venue_id : '',
+    venue_name: typeof source.venue_name === 'string' ? source.venue_name : null,
     date: typeof source.date === 'string' && source.date.trim() ? source.date : '',
     start_time: typeof source.start_time === 'string' ? source.start_time : '',
     end_time: typeof source.end_time === 'string' ? source.end_time : '',
@@ -239,6 +241,7 @@ function normalizeShift(raw: unknown): Shift {
 }
 
 export interface ShiftCreate {
+  venue_id?: string;
   date: string;
   start_time: string;
   end_time: string;
@@ -248,6 +251,7 @@ export interface ShiftCreate {
 }
 
 export interface ShiftUpdate {
+  venue_id?: string;
   start_time?: string;
   end_time?: string;
   cashier_hours?: number;
@@ -285,6 +289,11 @@ export async function updateShift(id: string, data: ShiftUpdate): Promise<Shift>
     body: JSON.stringify(data),
   });
   return normalizeShift(shift);
+}
+
+export async function getActiveVenues(): Promise<Venue[]> {
+  const venues = await request<Venue[]>('/venues/active');
+  return Array.isArray(venues) ? venues.map(normalizeVenue) : [];
 }
 
 // Expenses
@@ -658,6 +667,8 @@ export async function getMyAuditLogs(limit?: number): Promise<AuditLog[]> {
 export interface Adjustment {
   id: string;
   user_id: string;
+  venue_id: string;
+  venue_name: string | null;
   type: 'bonus' | 'penalty';
   amount: string;
   reason: string;
@@ -671,6 +682,7 @@ export interface Adjustment {
 
 export interface AdjustmentCreate {
   user_id: string;
+  venue_id?: string;
   type: 'bonus' | 'penalty';
   amount: number;
   reason: string;

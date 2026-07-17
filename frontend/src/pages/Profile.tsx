@@ -167,7 +167,7 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
           <h2 id="profile-work-title">Условия работы</h2>
         </div>
         <dl className="profile-detail-list">
-          <ProfileDetail label="Точка" value={venueName} />
+          <ProfileDetail label="Основная точка" value={venueName} />
           <ProfileDetail label="Должность" value={positionLabel} />
           <ProfileDetail label="Модель оплаты" value={PAY_MODEL_LABELS[user.pay_model] || 'Не указана'} />
           <ProfileDetail label="Ставка" value={getRateLabel(user)} />
@@ -238,7 +238,7 @@ export default function Profile({ user, themeMode, onThemeModeChange }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-medium text-tg-text">{adjustment.reason || (adjustment.type === 'bonus' ? 'Бонус' : 'Удержание')}</p>
                   <p className="mt-1 text-sm text-tg-hint">
-                    {formatAdjustmentDate(adjustment.created_at)}{adjustment.creator_name ? ` · ${adjustment.creator_name}` : ''}
+                    {formatAdjustmentDate(adjustment.created_at)}{adjustment.venue_name ? ` · ${adjustment.venue_name}` : ''}{adjustment.creator_name ? ` · ${adjustment.creator_name}` : ''}
                   </p>
                 </div>
                 <strong>{adjustment.type === 'bonus' ? '+' : '−'}{formatCurrency(adjustment.amount)}</strong>

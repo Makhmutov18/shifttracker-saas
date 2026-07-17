@@ -109,6 +109,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
     ? `Мои начисления за ${monthLabel}`
     : `Начислено за ${monthLabel}`;
   const pendingCount = summary?.pending_shifts_count ?? 0;
+  const latestVenueName = latestShift?.venue_name?.trim() || 'Точка не указана';
   const shiftTime = latestShift
     ? [latestShift.start_time && formatTime(latestShift.start_time), latestShift.end_time && formatTime(latestShift.end_time)]
         .filter(Boolean)
@@ -121,7 +122,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold text-tg-text">{user.name || 'Сотрудник'}</h1>
           <p className="mt-1 truncate text-sm text-tg-hint">
-            {venueName} · {getPayModelSummary(user)}
+            Основная точка: {venueName} · {getPayModelSummary(user)}
           </p>
         </div>
         <button
@@ -211,7 +212,7 @@ export default function Dashboard({ user, onNavigate }: Props) {
               <div className="min-w-0">
                 <p className="font-semibold text-tg-text">{formatDate(latestShift.date)}</p>
                 <p className="mt-1 text-sm text-tg-hint">
-                  {[shiftTime, formatHours(latestShift.total_hours)].filter(Boolean).join(' · ')}
+                  {[latestVenueName, shiftTime, formatHours(latestShift.total_hours)].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <span className="dashboard-shift-status" data-status={latestShift.status}>

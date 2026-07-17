@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle, ChevronDown, MapPin, MessageSquare, Send } from 'lucide-react';
-import { Shift, User, createShift, getErrorMessage } from '../utils/api';
+import { Shift, User, Venue, createShift, getActiveVenues, getErrorMessage } from '../utils/api';
 import { formatCurrency, formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers';
 import { hapticError, hapticSuccess } from '../utils/telegram';
 
@@ -24,12 +24,17 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const [revenue, setRevenue] = useState('');
   const [comment, setComment] = useState('');
   const [commentOpen, setCommentOpen] = useState(false);
+  const [venues, setVenues] = useState<Venue[]>(() => user.venue ? [user.venue] : []);
+  const [venueId, setVenueId] = useState(user.venue_id || user.venue?.id || '');
+  const [venuesLoading, setVenuesLoading] = useState(true);
+  const [venuesUnavailable, setVenuesUnavailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState<{ hours: string; salary: string; status: Shift['status'] } | null>(null);
+  const [saved, setSaved] = useState<{ hours: string; salary: string; status: Shift['status']; venueName: string } | null>(null);
 
   const needsRevenue = user.pay_model === 'revenue' || user.pay_model === 'hybrid';
-  const venueName = user.venue?.name?.trim() || 'Основная точка';
+  const homeVenueName = user.venue?.name?.trim() || 'Основная точка';
+  const venueName = venues.find((venue) => venue.id === venueId)?.name?.trim() || homeVenueName;
   const isToday = date === getTodayDate();
   const isOvernight = startTime >= endTime;
 
@@ -57,6 +62,44 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
     return (hourlyPart + revenuePart).toFixed(2);
   }, [totalHours, user.hourly_rate, revenue, user.revenue_percentage, user.pay_model, needsRevenue]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setVenuesLoading(true);
+    setVenuesUnavailable(false);
+
+    getActiveVenues()
+      .then((data) => {
+        if (cancelled) return;
+        const activeVenues = Array.isArray(data) ? data.filter((venue) => venue?.id && venue.is_active) : [];
+        if (activeVenues.length === 0) {
+          setVenues(user.venue ? [user.venue] : []);
+          setVenuesUnavailable(true);
+          return;
+        }
+        setVenues(activeVenues);
+        setVenueId((current) => (
+          activeVenues.some((venue) => venue.id === current)
+            ? current
+            : activeVenues.some((venue) => venue.id === user.venue_id)
+            ? user.venue_id
+            : activeVenues[0].id
+        ));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVenues(user.venue ? [user.venue] : []);
+          setVenuesUnavailable(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setVenuesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user.venue, user.venue_id]);
+
   const handleSubmit = async () => {
     if (submitting) return;
 
@@ -70,6 +113,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
 
     try {
       const createdShift = await createShift({
+        venue_id: venueId || undefined,
         date,
         start_time: `${startTime}:00`,
         end_time: `${endTime}:00`,
@@ -78,7 +122,12 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
       });
 
       hapticSuccess();
-      setSaved({ hours: totalHours, salary, status: createdShift.status });
+      setSaved({
+        hours: totalHours,
+        salary,
+        status: createdShift.status,
+        venueName: createdShift.venue_name?.trim() || venueName,
+      });
     } catch (err) {
       hapticError();
       setError(getErrorMessage(err, 'Не удалось сохранить смену. Попробуйте ещё раз.'));
@@ -107,6 +156,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
           <p className="shift-summary-amount">{formatCurrency(saved.salary)}</p>
           <div className="shift-summary-meta">
             <span>{saved.status === 'pending' ? 'На подтверждении' : 'Утверждена'}</span>
+            <span>{saved.venueName}</span>
             <span>{formatHours(saved.hours)}</span>
             <span>{isToday ? 'Сегодня' : 'Вчера'}, {startTime}–{endTime}</span>
           </div>
@@ -132,7 +182,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         </button>
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold text-tg-text">Новая смена</h1>
-          <p className="mt-1 truncate text-sm text-tg-hint">{venueName}</p>
+          <p className="mt-1 truncate text-sm text-tg-hint">Точка смены: {venueName}</p>
         </div>
       </header>
 
@@ -189,12 +239,31 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
           </div>
         </section>
 
-        <section className="shift-context-row" aria-label="Точка и модель оплаты">
-          <MapPin className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="truncate font-medium text-tg-text">{venueName}</p>
-            <p className="mt-0.5 truncate text-sm text-tg-hint">{getPayModelLabel(user)}</p>
+        <section className="shift-form-section" aria-labelledby="shift-venue-title">
+          <label id="shift-venue-title" htmlFor="shift-venue" className="shift-section-title">Точка смены</label>
+          <div className="shift-venue-control">
+            <MapPin className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
+            <select
+              id="shift-venue"
+              value={venueId}
+              onChange={(event) => setVenueId(event.target.value)}
+              disabled={venuesLoading || venues.length === 0}
+            >
+              {venues.length === 0 ? (
+                <option value={venueId}>{homeVenueName}</option>
+              ) : (
+                venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)
+              )}
+            </select>
+            <ChevronDown className="h-5 w-5 shrink-0 text-tg-hint" aria-hidden="true" />
           </div>
+          <p className="shift-venue-help">
+            {venuesUnavailable
+              ? `Список точек недоступен. Используется основная точка: ${homeVenueName}`
+              : venueId === user.venue_id
+              ? `Основная точка · ${getPayModelLabel(user)}`
+              : `Основная точка: ${homeVenueName} · ${getPayModelLabel(user)}`}
+          </p>
         </section>
 
         {needsRevenue && (

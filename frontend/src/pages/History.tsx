@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, CreditCard, Download, SlidersHorizontal, TrendingDown } from 'lucide-react';
-import { User, Venue, PayrollSummary, downloadPayrollExport, getPayrollSummary, getVenues } from '../utils/api';
+import { Shift, User, Venue, PayrollSummary, downloadPayrollExport, getActiveVenues, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import BottomSheet from '../components/BottomSheet';
@@ -77,9 +77,8 @@ export default function History({ user }: Props) {
 
   const venueNames = useMemo(() => {
     const map = new Map(venues.map((venue) => [venue.id, getVenueLabel(venue)]));
-    if (user.venue?.id) map.set(user.venue.id, user.venue.name || 'Основная точка');
     return map;
-  }, [user.venue, venues]);
+  }, [venues]);
 
   const shiftGroups = useMemo(() => {
     const groups = new Map<string, typeof shifts>();
@@ -96,14 +95,13 @@ export default function History({ user }: Props) {
 
   useEffect(() => {
     if (!canScopeByVenue) {
-      setVenues([]);
       setVenueFilter('all');
       setDraftVenue('all');
-      return;
     }
 
     let cancelled = false;
-    getVenues(true)
+    const venuesRequest = canScopeByVenue ? getVenues(true) : getActiveVenues();
+    venuesRequest
       .then((data) => {
         if (!cancelled) setVenues(Array.isArray(data) ? data : []);
       })
@@ -187,9 +185,10 @@ export default function History({ user }: Props) {
     setDraftVenue('all');
   };
 
-  const getShiftVenueName = (shiftVenueId: string) => {
-    if (shiftVenueId && venueNames.has(shiftVenueId)) return venueNames.get(shiftVenueId) ?? 'Точка не указана';
-    if (!shiftVenueId) return user.venue?.name?.trim() || 'Основная точка';
+  const getShiftVenueName = (shift: Shift) => {
+    const responseName = shift.venue_name?.trim();
+    if (responseName) return responseName;
+    if (shift.venue_id && venueNames.has(shift.venue_id)) return venueNames.get(shift.venue_id) ?? 'Точка не указана';
     return 'Точка не указана';
   };
 
@@ -306,7 +305,7 @@ export default function History({ user }: Props) {
                   <h2>{groupDate === 'unknown' ? 'Дата не указана' : formatDate(groupDate)}</h2>
                   <div className="history-date-list">
                     {groupShifts.map((shift) => (
-                      <ShiftCard key={shift.id} shift={shift} venueName={getShiftVenueName(shift.venue_id)} />
+                      <ShiftCard key={shift.id} shift={shift} venueName={getShiftVenueName(shift)} />
                     ))}
                   </div>
                 </section>

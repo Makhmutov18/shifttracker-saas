@@ -39,6 +39,7 @@ import {
   deactivateVenue,
   deleteUser,
   getAuditLogs,
+  getActiveVenues,
   getPendingShifts,
   getPayrollRun,
   getPayrollRunPreview,
@@ -71,6 +72,7 @@ interface Props {
 type Tab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues' | 'payroll';
 
 type ShiftDraft = {
+  venue_id: string;
   start_time: string;
   end_time: string;
   cashier_hours: string;
@@ -329,7 +331,7 @@ function TeamEmployeeCard({
       </div>
 
       <div className="owner-employee-details">
-        <p><span>Точка</span><strong>{getShortVenueLabel(employee.venue)}</strong></p>
+        <p><span>Основная точка</span><strong>{getShortVenueLabel(employee.venue)}</strong></p>
         <p>
           <span>Оплата</span>
           <strong>
@@ -459,7 +461,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
           <OwnerPanelBoundary>
             {tab === 'invite' && canManageTeam && <InviteTab />}
             {tab === 'approve' && canApprove && <ApproveTab />}
-            {tab === 'adjust' && canManageAdjustments && <AdjustTab venueId={user.venue_id} />}
+            {tab === 'adjust' && canManageAdjustments && <AdjustTab user={user} />}
             {tab === 'audit' && canViewAudit && <AuditTab />}
             {tab === 'team' && canManageTeam && <TeamTab user={user} />}
             {tab === 'venues' && canManageTeam && <VenuesTab />}
@@ -1104,7 +1106,7 @@ function InviteTab() {
           </div>
 
           <div>
-            <label className="block text-sm text-tg-hint mb-1.5">Точка</label>
+            <label className="block text-sm text-tg-hint mb-1.5">Основная точка</label>
             <select
               value={venueId}
               onChange={(e) => setVenueId(e.target.value)}
@@ -1220,17 +1222,21 @@ function InviteTab() {
 
 function ApproveTab() {
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const [userVenues, setUserVenues] = useState<Record<string, string>>({});
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ShiftDraft | null>(null);
   const [savingShiftId, setSavingShiftId] = useState<string | null>(null);
 
   const safeShifts = Array.isArray(shifts) ? shifts : [];
   const safeUserNames = userNames ?? {};
-  const safeUserVenues = userVenues ?? {};
+  const safeVenues = Array.isArray(venues) ? venues : [];
+  const venueNames = safeVenues.reduce<Record<string, string>>((acc, venue) => {
+    if (venue?.id) acc[venue.id] = venue.name || 'Точка не указана';
+    return acc;
+  }, {});
   const pendingEmployeesCount = new Set(
     safeShifts.map((shift) => shift?.user_id).filter((userId): userId is string => Boolean(userId))
   ).size;
@@ -1279,6 +1285,7 @@ function ApproveTab() {
   };
 
   const buildDraft = (shift: Shift): ShiftDraft => ({
+    venue_id: shift.venue_id || '',
     start_time: typeof shift.start_time === 'string' ? shift.start_time.slice(0, 5) : '',
     end_time: typeof shift.end_time === 'string' ? shift.end_time.slice(0, 5) : '',
     cashier_hours: shift.cashier_hours ? String(shift.cashier_hours) : '',
@@ -1290,7 +1297,11 @@ function ApproveTab() {
     try {
       setLoading(true);
       setError(null);
-      const [shiftsResult, usersResult] = await Promise.allSettled([getPendingShifts(), getUsers(true)]);
+      const [shiftsResult, usersResult, venuesResult] = await Promise.allSettled([
+        getPendingShifts(),
+        getUsers(true),
+        getActiveVenues(),
+      ]);
 
       if (shiftsResult.status === 'rejected') {
         throw shiftsResult.reason;
@@ -1308,22 +1319,14 @@ function ApproveTab() {
             return acc;
           }, {})
         );
-        setUserVenues(
-          usersResult.value.reduce<Record<string, string>>((acc, current) => {
-            if (current?.id) {
-              acc[current.id] = current.venue?.name || 'Основная точка';
-            }
-            return acc;
-          }, {})
-        );
       } else {
         setUserNames({});
-        setUserVenues({});
       }
+      setVenues(venuesResult.status === 'fulfilled' && Array.isArray(venuesResult.value) ? venuesResult.value : []);
     } catch (err: any) {
       setShifts([]);
       setUserNames({});
-      setUserVenues({});
+      setVenues([]);
       setError(err instanceof Error ? err.message : 'Не удалось загрузить смены на подтверждение');
     } finally {
       setLoading(false);
@@ -1354,6 +1357,7 @@ function ApproveTab() {
       setSavingShiftId(shiftId);
       setError(null);
       const updated = await updateShift(shiftId, {
+        venue_id: draft.venue_id || undefined,
         start_time: draft.start_time || undefined,
         end_time: draft.end_time || undefined,
         cashier_hours: draft.cashier_hours === '' ? undefined : parseFloat(draft.cashier_hours),
@@ -1480,7 +1484,8 @@ function ApproveTab() {
           (shift?.user_id && safeUserNames[shift.user_id]) ||
           'Сотрудник не указан';
         const venueName =
-          (shift?.user_id && safeUserVenues[shift.user_id]) ||
+          shift?.venue_name?.trim() ||
+          (shift?.venue_id && venueNames[shift.venue_id]) ||
           'Точка не указана';
         const revenueLabel = getShiftRevenue(shift?.revenue);
         const commentText = typeof shift?.comment === 'string' && shift.comment.trim() ? shift.comment.trim() : 'Комментария нет';
@@ -1535,6 +1540,21 @@ function ApproveTab() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-tg-hint">Точка смены</label>
+                    <select
+                      value={draft?.venue_id ?? ''}
+                      onChange={(e) => setDraft((prev) => (prev ? { ...prev, venue_id: e.target.value } : prev))}
+                      className="owner-field-control"
+                    >
+                      {safeVenues.length === 0 && (
+                        <option value={draft?.venue_id ?? ''}>{venueName}</option>
+                      )}
+                      {safeVenues.map((venue) => (
+                        <option key={venue.id} value={venue.id}>{venue.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className="mb-1 block text-xs text-tg-hint">Выручка</label>
                     <input
@@ -2101,7 +2121,7 @@ function TeamTab({ user }: { user: User }) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-sm text-tg-hint">Точка</label>
+                <label className="block text-sm text-tg-hint">Основная точка</label>
                 <select
                   value={editVenueId}
                   onChange={(e) => setEditVenueId(e.target.value)}
@@ -2299,8 +2319,9 @@ function getVenueLabel(venue: Venue) {
   return venue.is_active ? name : `${name} (неактивна)`;
 }
 
-function AdjustTab({ venueId }: { venueId: string }) {
+function AdjustTab({ user }: { user: User }) {
   const [userId, setUserId] = useState('');
+  const [venueId, setVenueId] = useState(user.venue_id || '');
   const [type, setType] = useState<'bonus' | 'penalty'>('bonus');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -2308,18 +2329,22 @@ function AdjustTab({ venueId }: { venueId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [venues, setVenues] = useState<Venue[]>(() => user.venue ? [user.venue] : []);
+  const canChooseVenue = user.role === 'owner' || user.role === 'admin';
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const data = await getUsers();
-        setUsers(Array.isArray(data) ? data : []);
-      } catch {
-        setUsers([]);
-      }
+    const fetchOptions = async () => {
+      const [usersResult, venuesResult] = await Promise.allSettled([
+        getUsers(),
+        canChooseVenue ? getActiveVenues() : Promise.resolve(user.venue ? [user.venue] : []),
+      ]);
+      setUsers(usersResult.status === 'fulfilled' && Array.isArray(usersResult.value) ? usersResult.value : []);
+      const nextVenues = venuesResult.status === 'fulfilled' && Array.isArray(venuesResult.value) ? venuesResult.value : [];
+      setVenues(nextVenues);
+      setVenueId((current) => current || user.venue_id || nextVenues[0]?.id || '');
     };
-    fetchUsers();
-  }, []);
+    fetchOptions();
+  }, [canChooseVenue, user.venue, user.venue_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2344,6 +2369,7 @@ function AdjustTab({ venueId }: { venueId: string }) {
       setLoading(true);
       await createAdjustment({
         user_id: userId,
+        venue_id: venueId || undefined,
         type,
         amount: amt,
         reason: reason.trim(),
@@ -2376,6 +2402,26 @@ function AdjustTab({ venueId }: { venueId: string }) {
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm text-tg-hint mb-1.5">Отнести к точке</label>
+          {canChooseVenue ? (
+            <select
+              value={venueId}
+              onChange={(e) => setVenueId(e.target.value)}
+              className="owner-field-control"
+            >
+              {venues.length === 0 ? (
+                <option value={venueId}>{user.venue?.name || 'Основная точка'}</option>
+              ) : (
+                venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)
+              )}
+            </select>
+          ) : (
+            <div className="owner-field-readonly">{user.venue?.name || 'Основная точка'}</div>
+          )}
+          <p className="mt-1.5 text-xs text-tg-hint">Корректировка войдёт в начисления выбранной точки.</p>
         </div>
 
         <div>

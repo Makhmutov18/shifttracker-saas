@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, CircleAlert, Clock3 } from 'lucide-react';
-import { PersonalPayrollRun, User, getErrorMessage, getMonthlyStats, getMyPayrollRuns } from '../utils/api';
+import { PersonalPayrollRun, User, Venue, getActiveVenues, getErrorMessage, getMonthlyStats, getMyPayrollRuns } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import BottomSheet from '../components/BottomSheet';
 import { formatCurrency, formatDate, formatHours, getCurrentMonth, getCurrentYear } from '../utils/helpers';
@@ -52,9 +52,11 @@ export default function Payouts({ user }: Props) {
   const [payrollRuns, setPayrollRuns] = useState<PersonalPayrollRun[]>([]);
   const [payrollRunsLoading, setPayrollRunsLoading] = useState(true);
   const [payrollRunsError, setPayrollRunsError] = useState<string | null>(null);
+  const [venues, setVenues] = useState<Venue[]>([]);
 
   const { month, year } = viewDate;
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts(month, year);
+  const venueNames = useMemo(() => new Map(venues.map((venue) => [venue.id, venue.name])), [venues]);
 
   const monthOptions = useMemo<MonthOption[]>(() => {
     const current = new Date(getCurrentYear(), getCurrentMonth() - 1, 1);
@@ -71,6 +73,20 @@ export default function Payouts({ user }: Props) {
   const selectedMonthLabel =
     monthOptions.find((option) => option.value === currentMonthValue)?.label
     ?? formatMonthLabel(new Date(year, month - 1, 1));
+
+  useEffect(() => {
+    let cancelled = false;
+    getActiveVenues()
+      .then((data) => {
+        if (!cancelled) setVenues(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setVenues([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -235,7 +251,9 @@ export default function Payouts({ user }: Props) {
                       <p className="truncate font-medium text-tg-text">{shift.date ? formatDate(shift.date) : 'Дата не указана'}</p>
                       <span className="payouts-status" data-status={shift.status}>{presentation.status}</span>
                     </div>
-                    <p className="mt-1 text-sm text-tg-hint">{formatHours(shift.total_hours || 0)} · {presentation.amount}</p>
+                    <p className="mt-1 text-sm text-tg-hint">
+                      {shift.venue_name?.trim() || venueNames.get(shift.venue_id) || 'Точка не указана'} · {formatHours(shift.total_hours || 0)} · {presentation.amount}
+                    </p>
                   </div>
                   <strong>{formatCurrency(shift.salary_earned || 0)}</strong>
                 </article>
