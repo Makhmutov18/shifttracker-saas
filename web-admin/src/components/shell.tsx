@@ -80,6 +80,7 @@ export function TopBar({
   onLogout,
   onMenu,
   title,
+  secondaryContext,
   action,
 }: {
   venues: Venue[];
@@ -91,6 +92,7 @@ export function TopBar({
   onLogout: () => void;
   onMenu: () => void;
   title: string;
+  secondaryContext?: string;
   action?: ReactNode;
 }) {
   const roleLabel = userRoleLabel(user);
@@ -110,7 +112,10 @@ export function TopBar({
   return <header className="topbar">
     <div className="topbar-left">
       <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
-      <strong className="topbar-title">{title}</strong>
+      <div className="topbar-heading">
+        <strong className="topbar-title">{title}</strong>
+        {secondaryContext && <span className="topbar-secondary">{secondaryContext}</span>}
+      </div>
     </div>
     <div className="topbar-right">
       {action}
@@ -151,6 +156,7 @@ export function AppShell({
   onLogout,
   children,
   title,
+  secondaryContext,
   action,
 }: {
   route: RoutePath;
@@ -164,13 +170,14 @@ export function AppShell({
   onLogout: () => void;
   children: ReactNode;
   title: string;
+  secondaryContext?: string;
   action?: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   return <div className="app-shell">
     <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} />
     <main>
-      <TopBar venues={venues} venueId={venueId} onVenue={onVenue} user={user} theme={theme} onTheme={onTheme} onLogout={onLogout} onMenu={() => setMenuOpen(true)} title={title} action={action} />
+      <TopBar venues={venues} venueId={venueId} onVenue={onVenue} user={user} theme={theme} onTheme={onTheme} onLogout={onLogout} onMenu={() => setMenuOpen(true)} title={title} secondaryContext={secondaryContext} action={action} />
       <div className="content">{children}</div>
     </main>
   </div>;

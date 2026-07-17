@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight, Ban, Building2, Clock3, FileClock, Store, UserRoundX } from 'lucide-react';
+import { AlertCircle, ArrowRight, Ban, Clock3, FileClock, Store, UserRoundX } from 'lucide-react';
 import { api } from '../api';
 import { AvatarStack, ErrorState, IconBadge, LoadingState, MoneyValue, StatusBadge, type BadgeVariant } from '../components/ui';
 import type { PayrollRunListItem, PayrollSummary, Shift, User, Venue } from '../types';
-import { currentMonthValue, formatDate, formatTime, hasPermission, monthBounds, monthParts } from '../utils';
+import { formatDate, formatTime, hasPermission, monthBounds, monthParts } from '../utils';
 import type { RoutePath } from '../components/shell';
 
 type WeeklyAccrual = {
@@ -20,12 +20,6 @@ type VenueOverview = {
   revenue: number;
   pending: number;
 };
-
-function monthLabel(value: string): string {
-  const [year, month] = value.split('-').map(Number);
-  const monthName = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date(year, month - 1, 1));
-  return `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`;
-}
 
 function plural(value: number, forms: [string, string, string]): string {
   const mod100 = value % 100;
@@ -65,7 +59,7 @@ function WeeklyAccrualChart({ allowed, series }: { allowed: boolean; series: Wee
   </div>;
 }
 
-export function Overview({ user, venues, venueId, navigate }: { user: User; venues: Venue[]; venueId: string; navigate: (path: RoutePath) => void }) {
+export function Overview({ user, venues, venueId, periodValue, navigate }: { user: User; venues: Venue[]; venueId: string; periodValue: string; navigate: (path: RoutePath) => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -73,7 +67,6 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [runs, setRuns] = useState<PayrollRunListItem[]>([]);
   const [runsAvailable, setRunsAvailable] = useState(true);
-  const periodValue = currentMonthValue();
   const { month, year } = monthParts(periodValue);
   const { start: periodStart, end: periodEnd } = monthBounds(periodValue);
   const canViewPayroll = hasPermission(user, 'can_view_team_payroll');
@@ -119,7 +112,6 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
   const inactiveVenues = (venues ?? []).filter((venue) => !venue.is_active);
   const userMap = useMemo(() => new Map(users.map((employee) => [employee.id, employee])), [users]);
   const venueMap = useMemo(() => new Map((venues ?? []).map((venue) => [venue.id, venue])), [venues]);
-  const selectedVenue = venueId ? venueMap.get(venueId)?.name ?? 'Точка не указана' : 'Сводка по всем точкам';
   const attention = [
     pending.length ? { icon: Clock3, tone: 'warning' as BadgeVariant, text: `${pending.length} ${plural(pending.length, ['смена ждёт', 'смены ждут', 'смен ждут'])} подтверждения`, action: 'Открыть смены', path: '/shifts' as RoutePath } : null,
     missingPay.length ? { icon: UserRoundX, tone: 'danger' as BadgeVariant, text: `${missingPay.length} ${plural(missingPay.length, ['сотрудник без', 'сотрудника без', 'сотрудников без'])} настроенной оплаты`, action: 'Открыть команду', path: '/employees' as RoutePath } : null,
@@ -171,10 +163,6 @@ export function Overview({ user, venues, venueId, navigate }: { user: User; venu
   if (error && !shifts.length) return <ErrorState message={error} retry={load} />;
 
   return <div className="overview-page">
-    <header className="overview-header">
-      <div className="overview-context"><strong>{monthLabel(periodValue)}</strong><span><Building2 />{selectedVenue}</span></div>
-    </header>
-
     <section className="overview-metrics" aria-label="Финансовая сводка за месяц">
       <article className="overview-metric">
         <span>Предварительно начислено</span>
