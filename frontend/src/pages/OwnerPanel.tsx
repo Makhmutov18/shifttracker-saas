@@ -1754,19 +1754,19 @@ function VenuesTab() {
   const visibleVenues = showVenueArchive ? archivedVenues : activeVenues;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="owner-compact-summary">
         <div className="owner-inline-stats">
           <EmployeeStat label="Активных" value={venues.filter((venue) => venue.is_active).length} />
           <EmployeeStat label="В архиве" value={venues.filter((venue) => !venue.is_active).length} />
           <EmployeeStat
-            label="С точкой"
+            label="Сотрудников"
             value={users.filter((userItem) => Boolean(userItem.venue_id || userItem.venue?.id)).length}
           />
         </div>
       </div>
 
-      <form onSubmit={handleCreateVenue} className="owner-form-surface space-y-3">
+      <form onSubmit={handleCreateVenue} className="owner-form-surface space-y-2">
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-tg-primary" />
           <p className="text-sm font-medium text-tg-text">Новая точка</p>
@@ -1792,8 +1792,8 @@ function VenuesTab() {
       {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
 
       {venues.length === 0 ? (
-        <div className="surface-card rounded-2xl px-4 py-5 text-center">
-          <Building2 className="mx-auto mb-3 h-12 w-12 text-tg-hint opacity-50" />
+        <div className="owner-empty-state">
+          <Building2 className="mx-auto mb-2 h-8 w-8 text-tg-hint opacity-50" />
           <p className="text-sm font-medium text-tg-text">Точек пока нет</p>
           <p className="mt-1 text-sm text-tg-hint">Добавьте первую точку, чтобы привязывать к ней сотрудников и смены.</p>
         </div>
@@ -1861,7 +1861,7 @@ function VenuesTab() {
                       )}
                     </div>
 
-                    <div className="mt-3 flex gap-2">
+                    <div className="owner-venue-row-actions">
                       {isEditing ? (
                         <>
                           <button
@@ -2061,7 +2061,7 @@ function TeamTab({ user }: { user: User }) {
   const activeVenueCount = venues.filter((venue) => venue?.is_active).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="owner-compact-summary">
         <div className="owner-inline-stats">
           <EmployeeStat label="Активных" value={activeUsers.length} />
@@ -2073,7 +2073,7 @@ function TeamTab({ user }: { user: User }) {
       {teamError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{teamError}</p>}
       {teamSuccess && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{teamSuccess}</p>}
 
-      <div className={editingUser ? 'surface-card rounded-xl p-4 space-y-4' : 'hidden'}>
+      <div className={editingUser ? 'owner-form-surface space-y-3' : 'hidden'}>
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-tg-text">Редактирование сотрудника</p>
@@ -2192,7 +2192,7 @@ function TeamTab({ user }: { user: User }) {
               <button
                 onClick={saveEdit}
                 disabled={saving}
-                className="flex-1 bg-tg-primary text-tg-button-text py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
+                className="owner-primary-action flex-1"
               >
                 {saving ? (
                   <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
@@ -2205,7 +2205,7 @@ function TeamTab({ user }: { user: User }) {
               </button>
               <button
                 onClick={() => setEditingUser(null)}
-                className="flex-1 surface-muted text-tg-text py-2.5 rounded-xl text-sm font-medium"
+                className="owner-secondary-action flex-1"
               >
                 Отмена
               </button>
