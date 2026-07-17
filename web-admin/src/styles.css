@@ -381,8 +381,22 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .venue-name-cell svg { width: 17px; }
 .venue-name-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .venue-team-cell { display: flex; align-items: center; gap: 8px; }
-.venue-revenue-cell { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
-.mobile-venue-stat { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.venue-table-row { cursor: pointer; }
+.venue-table-row:hover { background: var(--surface-hover); }
+.venue-table-row:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
+.venue-mobile-card { position: relative; display: grid; gap: 12px; cursor: pointer; }
+.venue-mobile-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.venue-mobile-head { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.venue-mobile-head > span { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.venue-mobile-head svg { width: 17px; }
+.venue-mobile-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.venue-mobile-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.venue-mobile-details > span { min-width: 0; }
+.venue-mobile-details > span:last-child { grid-column: 1 / -1; }
+.venue-mobile-details small, .venue-mobile-details strong { display: block; }
+.venue-mobile-details small { margin-bottom: 3px; color: var(--text-muted); font-size: 10px; }
+.venue-mobile-details strong { overflow-wrap: anywhere; font-size: 12px; }
+.venue-mobile-actions { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--border); }
 .archive-toolbar { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--surface-muted); }
 .archive-toolbar > div { min-width: 0; display: flex; align-items: center; gap: 11px; }
 .archive-toolbar > div > svg { width: 20px; color: var(--text-muted); }
