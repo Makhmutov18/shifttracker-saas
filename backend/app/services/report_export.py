@@ -143,12 +143,12 @@ def assemble_report_data(
 
         if status in status_counts:
             status_counts[status] += 1
-        if is_cross_venue:
-            cross_venue_count += 1
         if status == "approved":
             approved_hours += hours
             approved_amount += salary
             approved_revenue += revenue
+            if is_cross_venue:
+                cross_venue_count += 1
 
             if user_id is not None:
                 totals = employee_totals.setdefault(
@@ -298,9 +298,10 @@ def assemble_report_data(
         ("На подтверждении", status_counts["pending"], "integer"),
         ("Отклонённые смены", status_counts["rejected"], "integer"),
         ("Утверждённые часы", approved_hours, "hours"),
-        ("Начислено", total_accrued, "money"),
+        ("Начислено за смены", approved_amount, "money"),
         ("Бонусы", bonus_total, "money"),
         ("Удержания", deduction_total, "money"),
+        ("Итого к выплате", total_accrued, "money"),
         ("Зафиксировано", fixed_total, "money"),
         ("Выплачено", paid_total, "money"),
         ("Осталось", remaining_total, "money"),
@@ -469,7 +470,7 @@ def _write_shifts(workbook: Workbook, report: ReportData) -> None:
     sheet = workbook.create_sheet("Смены")
     headers = [
         "Дата", "Сотрудник", "Должность", "Основная точка", "Точка смены",
-        "Начало", "Конец", "Часы", "Статус", "Модель оплаты", "Ставка",
+        "Начало", "Конец", "Часы", "Статус", "Модель оплаты", "Текущая ставка",
         "Выручка смены", "Начислено",
     ]
     _prepare_sheet(sheet, report, headers)

@@ -101,7 +101,7 @@ def _sample_report():
 
     shifts = [
         make_shift("approved", "1500", other, 2),
-        make_shift("pending", "9000", home, 3),
+        make_shift("pending", "9000", other, 3),
         make_shift("rejected", "8000", home, 4),
     ]
 
@@ -206,6 +206,16 @@ class ReportExportTests(unittest.TestCase):
         self.assertEqual(approved["home_venue"], "Главная")
         self.assertEqual(approved["work_venue"], "Выездная")
         self.assertEqual(report.employees[0]["cross_venue"], 1)
+        overview = {label: value for label, value, _ in report.overview}
+        self.assertEqual(overview["Cross-venue смены"], 1)
+
+    def test_overview_separates_shift_accruals_and_adjustments(self) -> None:
+        report = _sample_report()
+        overview = {label: value for label, value, _ in report.overview}
+        self.assertEqual(overview["Начислено за смены"], Decimal("1500"))
+        self.assertEqual(overview["Бонусы"], Decimal("200"))
+        self.assertEqual(overview["Удержания"], Decimal("50"))
+        self.assertEqual(overview["Итого к выплате"], Decimal("1650"))
 
     def test_payroll_totals_use_item_snapshots(self) -> None:
         report = _sample_report()
@@ -229,6 +239,7 @@ class ReportExportTests(unittest.TestCase):
             self.assertFalse(sheet.sheet_view.showGridLines)
             self.assertTrue(sheet.auto_filter.ref)
         self.assertIn("ShiftsTable", workbook["Смены"].tables)
+        self.assertEqual(workbook["Смены"]["K4"].value, "Текущая ставка")
         self.assertEqual(workbook["Смены"]["M5"].number_format, MONEY_FORMAT)
         self.assertEqual(workbook["Расчёты и выплаты"]["J5"].number_format, "0.00%")
 
