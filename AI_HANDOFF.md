@@ -58,6 +58,14 @@
 - Never broaden a venue filter with `Shift.venue_id == venue OR User.venue_id == venue`.
 - UI labels: `Основная точка` for employee assignment, `Точка смены` for actual work.
 
+## Revenue Invariant
+
+- `Shift.revenue` belongs to one shift and remains an input to revenue/hybrid salary calculations.
+- Never treat the sum of `Shift.revenue` as the actual venue revenue for a period.
+- Actual period revenue is stored only in `PayrollRun.revenue_total` for a payroll run with a concrete `venue_id`.
+- Payroll share is derived from the saved snapshots: `PayrollRun.total_amount / PayrollRun.revenue_total * 100`.
+- Period revenue never changes employee accruals, is editable only while the run is `draft` and is not exposed to employees.
+
 ## Standard Finish
 
 - run `git status --short`

@@ -44,6 +44,16 @@ Owner always has full access.
 - Never filter venue work with `Shift.venue_id == venue OR User.venue_id == venue`.
 - In Russian UI, use `Основная точка` for an employee and `Точка смены` for work.
 
+## Revenue invariant
+
+- `Shift.revenue` is the revenue of one shift and is used only by revenue/hybrid salary formulas and shift details.
+- `Shift.revenue` is not the complete venue revenue for a reporting period and must not be summed to calculate the venue payroll share.
+- `PayrollRun.revenue_total` is the actual revenue entered for one concrete venue and the same saved payroll period.
+- A payroll run with `revenue_total` must have a concrete `venue_id`; all-points runs cannot store one combined revenue value.
+- Payroll share is calculated as `PayrollRun.total_amount / PayrollRun.revenue_total * 100` and is unavailable when revenue is missing or not positive.
+- `revenue_total` is management-only data, does not change employee accruals and is immutable after the payroll run leaves `draft`.
+- Employee-facing API and UI must not expose `revenue_total` or payroll share.
+
 ## UI
 The app supports light/dark/system theme.
 Use CSS variables for colors.
