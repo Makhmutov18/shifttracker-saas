@@ -2909,9 +2909,18 @@ button:disabled {
 .owner-payroll-form input,
 .owner-payroll-form select,
 .owner-payroll-payment-form input,
-.owner-payroll-payment-form textarea {
+.owner-payroll-payment-form textarea,
+.owner-payroll-revenue-editor input {
   min-width: 0;
   min-height: 3rem;
+}
+
+.owner-payroll-field-help {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.45;
 }
 
 .owner-payroll-preview-summary,
@@ -2968,6 +2977,105 @@ button:disabled {
   margin-left: 0.2rem;
   color: var(--text-primary);
 }
+
+.owner-payroll-economics {
+  padding: 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.85rem;
+  background: var(--surface-muted);
+}
+
+.owner-payroll-economics > p,
+.owner-payroll-economics-heading > p {
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.owner-payroll-economics dl {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.owner-payroll-economics dl div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.owner-payroll-economics dt {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.owner-payroll-economics dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.owner-payroll-economics-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.owner-payroll-economics-heading button,
+.owner-payroll-revenue-actions > button:not(.owner-payroll-primary) {
+  min-height: 2.75rem;
+  color: var(--tg-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.owner-payroll-revenue-editor {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+}
+
+.owner-payroll-revenue-editor input {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  background: var(--tg-control-bg);
+  outline: none;
+}
+
+.owner-payroll-revenue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.owner-payroll-revenue-actions .owner-payroll-primary {
+  width: auto;
+  min-width: 7rem;
+  min-height: 2.75rem;
+  padding-inline: 0.85rem;
+}
+
+.owner-payroll-inline-error {
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
+.owner-payroll-economics-empty,
+.owner-payroll-run-share {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.owner-payroll-economics-empty { margin-top: 0.55rem; }
+.owner-payroll-run-share { margin-top: 0.55rem; }
 
 .owner-payroll-adjustments [data-deduction='true'],
 .owner-payroll-row-breakdown [data-deduction='true'],

@@ -438,6 +438,8 @@ export interface PayrollRunListItem {
   employees_count: number;
   total_amount: string;
   total_paid: string;
+  revenue_total: string | null;
+  payroll_share_percent: string | null;
   created_by_id: string;
   created_by_name: string | null;
   created_at: string;
@@ -511,6 +513,7 @@ export interface CreatePayrollRunRequest {
   period_end: string;
   venue_id?: string;
   notes?: string;
+  revenue_total?: number;
 }
 
 export async function createPayrollRun(data: CreatePayrollRunRequest): Promise<PayrollRunDetail> {
@@ -527,6 +530,16 @@ export async function getPayrollRuns(venueId?: string): Promise<PayrollRunListIt
 
 export async function getPayrollRun(payrollRunId: string): Promise<PayrollRunDetail> {
   return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}`);
+}
+
+export async function updatePayrollRunRevenue(
+  payrollRunId: string,
+  revenueTotal: number | null,
+): Promise<PayrollRunDetail> {
+  return request<PayrollRunDetail>(`/payroll-runs/${payrollRunId}/revenue`, {
+    method: 'PATCH',
+    body: JSON.stringify({ revenue_total: revenueTotal }),
+  });
 }
 
 export async function getMyPayrollRuns(): Promise<PersonalPayrollRun[]> {

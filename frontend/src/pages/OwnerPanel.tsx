@@ -50,6 +50,7 @@ import {
   getVenues,
   getVenueStats,
   updateShift,
+  updatePayrollRunRevenue,
   updateUser,
   updateVenue,
 } from '../utils/api';
@@ -537,6 +538,19 @@ function formatCreatedAt(value?: string | null) {
   });
 }
 
+function parsePayrollRevenue(value: string): number | null | undefined {
+  const normalized = value.replace(/\s/g, '').replace(',', '.').trim();
+  if (!normalized) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? amount : undefined;
+}
+
+function formatPayrollShare(value?: string | number | null) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '—';
+  return `${amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
 function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate: boolean; userVenueId: string; restrictToVenue: boolean }) {
   const now = new Date();
   const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -544,6 +558,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [periodStart, setPeriodStart] = useState(defaultStart);
   const [periodEnd, setPeriodEnd] = useState(defaultEnd);
   const [venueId, setVenueId] = useState('');
+  const [revenueInput, setRevenueInput] = useState('');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [preview, setPreview] = useState<PayrollPreview | null>(null);
   const [runs, setRuns] = useState<PayrollRunListItem[]>([]);
@@ -553,6 +568,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [revenueSaving, setRevenueSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [paymentItem, setPaymentItem] = useState<PayrollRunItem | null>(null);
@@ -560,9 +576,16 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentComment, setPaymentComment] = useState('');
+  const [revenueEditOpen, setRevenueEditOpen] = useState(false);
+  const [revenueDraft, setRevenueDraft] = useState('');
+  const [revenueError, setRevenueError] = useState<string | null>(null);
   const selectedPreviewVenueName = venueId
     ? venues.find((venue) => venue.id === venueId)?.name || 'Точка не указана'
     : 'Несколько точек';
+  const previewRevenue = venueId ? parsePayrollRevenue(revenueInput) : null;
+  const previewPayrollShare = preview && previewRevenue != null && previewRevenue > 0
+    ? Number(preview.total_amount || 0) / previewRevenue * 100
+    : null;
 
   const loadRuns = async () => {
     try {
@@ -598,6 +621,10 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
     };
   }, [restrictToVenue, userVenueId]);
 
+  useEffect(() => {
+    if (!venueId) setRevenueInput('');
+  }, [venueId]);
+
   const handlePreview = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -605,6 +632,10 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
     setPreview(null);
     if (!periodStart || !periodEnd || periodStart > periodEnd) {
       setError('Проверьте даты периода.');
+      return;
+    }
+    if (venueId && parsePayrollRevenue(revenueInput) === undefined) {
+      setError('Введите выручку числом не меньше нуля или оставьте поле пустым.');
       return;
     }
     try {
@@ -620,6 +651,10 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
 
   const handleCreate = async () => {
     if (!preview || !canCreate) return;
+    if (venueId && previewRevenue === undefined) {
+      setError('Введите выручку числом не меньше нуля или оставьте поле пустым.');
+      return;
+    }
     setError(null);
     setSuccess(null);
     try {
@@ -628,6 +663,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         period_start: periodStart,
         period_end: periodEnd,
         venue_id: venueId || undefined,
+        ...(venueId && previewRevenue != null ? { revenue_total: previewRevenue } : {}),
       });
       setSuccess('Черновик расчёта сформирован.');
       await loadRuns();
@@ -640,6 +676,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
 
   const handleOpenDetails = async (runId: string) => {
     setError(null);
+    setRevenueEditOpen(false);
+    setRevenueError(null);
     try {
       setDetailsLoading(true);
       setSelectedRun(await getPayrollRun(runId));
@@ -655,6 +693,41 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
     setSelectedRun(updated);
     await loadRuns();
     return updated;
+  };
+
+  const openRevenueEditor = () => {
+    if (!selectedRun || selectedRun.status !== 'draft' || !selectedRun.venue_id) return;
+    setRevenueDraft(selectedRun.revenue_total == null ? '' : String(selectedRun.revenue_total));
+    setRevenueError(null);
+    setRevenueEditOpen(true);
+  };
+
+  const saveRevenue = async (clear = false) => {
+    if (!selectedRun || !canCreate || selectedRun.status !== 'draft' || !selectedRun.venue_id) return;
+    const nextRevenue = clear ? null : parsePayrollRevenue(revenueDraft);
+    if (nextRevenue === undefined) {
+      setRevenueError('Введите выручку числом не меньше нуля.');
+      hapticError();
+      return;
+    }
+    setRevenueError(null);
+    setError(null);
+    setSuccess(null);
+    try {
+      setRevenueSaving(true);
+      const updated = await updatePayrollRunRevenue(selectedRun.id, nextRevenue);
+      setSelectedRun(updated);
+      setRevenueEditOpen(false);
+      setRevenueDraft('');
+      await loadRuns();
+      setSuccess(nextRevenue == null ? 'Выручка удалена из черновика.' : 'Выручка за период сохранена.');
+      hapticSuccess();
+    } catch (err) {
+      setRevenueError(getPayrollRunError(err));
+      hapticError();
+    } finally {
+      setRevenueSaving(false);
+    }
   };
 
   const handleFinalize = async () => {
@@ -771,7 +844,10 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             Точка
             <select
               value={venueId}
-              onChange={(event) => setVenueId(event.target.value)}
+              onChange={(event) => {
+                setVenueId(event.target.value);
+                setPreview(null);
+              }}
               className="mt-1.5 w-full appearance-none rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
             >
               <option value="">Все точки</option>
@@ -780,6 +856,22 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               ))}
             </select>
           </label>
+          {venueId ? (
+            <label className="block text-xs text-tg-hint">
+              Выручка точки за период <span>(необязательно)</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={revenueInput}
+                onChange={(event) => setRevenueInput(event.target.value)}
+                placeholder="Например: 850 000"
+                className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint"
+              />
+              <span className="owner-payroll-field-help">Используется только для расчёта доли ФОТ и не влияет на начисления сотрудникам.</span>
+            </label>
+          ) : (
+            <p className="owner-payroll-field-help">Выручка указывается в расчёте по конкретной точке.</p>
+          )}
           <button
             type="submit"
             disabled={previewLoading}
@@ -818,6 +910,16 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             <div><p>Часы</p><strong>{formatHours(preview.total_hours)}</strong></div>
             <div><p>Начислено</p><strong>{formatCurrency(preview.total_amount)}</strong></div>
           </div>
+          {previewRevenue !== null && previewRevenue !== undefined && (
+            <div className="owner-payroll-economics">
+              <p>Экономика периода</p>
+              <dl>
+                <div><dt>ФОТ</dt><dd>{formatCurrency(preview.total_amount)}</dd></div>
+                <div><dt>Выручка</dt><dd>{formatCurrency(previewRevenue)}</dd></div>
+                <div><dt>Доля ФОТ</dt><dd>{previewPayrollShare == null ? '—' : formatPayrollShare(previewPayrollShare)}</dd></div>
+              </dl>
+            </div>
+          )}
           <div className="owner-payroll-adjustments">
             <span>База <b>{formatCurrency(preview.total_base_amount)}</b></span>
             <span>Бонусы <b>{formatCurrency(preview.total_bonuses)}</b></span>
@@ -882,6 +984,9 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                 <span>Выплачено <b>{formatCurrency(run.total_paid)}</b></span>
                 <span data-remaining={remaining > 0}>Осталось <b>{formatCurrency(remaining)}</b></span>
               </div>
+              {run.payroll_share_percent != null && (
+                <p className="owner-payroll-run-share">ФОТ {formatPayrollShare(run.payroll_share_percent)}</p>
+              )}
               <p className="mt-3 text-[11px] text-tg-hint">
                 {formatCreatedAt(run.created_at) ? `Создано: ${formatCreatedAt(run.created_at)} · ${run.created_by_name || 'Пользователь'}` : 'Дата создания не указана'}
               </p>
@@ -931,6 +1036,53 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             <div><p>Выплачено</p><strong>{formatCurrency(selectedRun.total_paid)}</strong></div>
             <div data-remaining={(selectedRun.items || []).some((item) => Number(item.remaining_amount || 0) > 0)}><p>Осталось</p><strong>{formatCurrency((selectedRun.items || []).reduce((total, item) => total + Number(item.remaining_amount || 0), 0))}</strong></div>
           </div>
+          {selectedRun.venue_id && (
+            <div className="owner-payroll-economics owner-payroll-saved-economics">
+              <div className="owner-payroll-economics-heading">
+                <p>Экономика периода</p>
+                {canCreate && selectedRun.status === 'draft' && !revenueEditOpen && (
+                  <button type="button" onClick={openRevenueEditor}>
+                    {selectedRun.revenue_total == null ? 'Указать выручку' : 'Изменить'}
+                  </button>
+                )}
+              </div>
+              {revenueEditOpen && canCreate && selectedRun.status === 'draft' ? (
+                <div className="owner-payroll-revenue-editor">
+                  <label className="text-xs text-tg-hint">
+                    Выручка точки за период
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={revenueDraft}
+                      onChange={(event) => setRevenueDraft(event.target.value)}
+                      placeholder="Например: 850 000"
+                      disabled={revenueSaving}
+                    />
+                  </label>
+                  {revenueError && <p className="owner-payroll-inline-error">{revenueError}</p>}
+                  <div className="owner-payroll-revenue-actions">
+                    <button type="button" className="owner-payroll-primary" onClick={() => void saveRevenue(false)} disabled={revenueSaving}>
+                      {revenueSaving ? 'Сохраняем…' : 'Сохранить'}
+                    </button>
+                    {selectedRun.revenue_total != null && (
+                      <button type="button" onClick={() => void saveRevenue(true)} disabled={revenueSaving}>Удалить</button>
+                    )}
+                    <button type="button" onClick={() => { setRevenueEditOpen(false); setRevenueError(null); }} disabled={revenueSaving}>Отмена</button>
+                  </div>
+                </div>
+              ) : selectedRun.revenue_total != null ? (
+                <dl>
+                  <div><dt>ФОТ</dt><dd>{formatCurrency(selectedRun.total_amount)}</dd></div>
+                  <div><dt>Выручка</dt><dd>{formatCurrency(selectedRun.revenue_total)}</dd></div>
+                  <div><dt>Доля ФОТ</dt><dd>{formatPayrollShare(selectedRun.payroll_share_percent)}</dd></div>
+                </dl>
+              ) : (
+                <p className="owner-payroll-economics-empty">
+                  {selectedRun.status === 'draft' ? 'Выручка за период ещё не указана' : 'Выручка не была зафиксирована'}
+                </p>
+              )}
+            </div>
+          )}
           <div className="owner-payroll-items">
             {(selectedRun.items || []).map((item) => (
               <div key={item.id} className="owner-payroll-item">
