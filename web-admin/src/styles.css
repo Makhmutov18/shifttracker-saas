@@ -474,6 +474,30 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .payroll-table-row.has-remaining .payroll-remaining .money { color: var(--warning); font-weight: 700; }
 .payroll-create-drawer { display: grid; gap: 20px; }
 .payroll-export-drawer { display: grid; gap: 20px; }
+.report-month-picker { position: relative; display: grid; gap: 7px; }
+.report-month-picker-label { color: var(--text-muted); font-size: 12px; font-weight: 650; }
+.report-month-control { min-width: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--control-surface); }
+.report-month-control > button { min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--text); }
+.report-month-control > button:first-child { border-right: 1px solid var(--border); }
+.report-month-control > button:last-child { border-left: 1px solid var(--border); }
+.report-month-control > button:hover:not(:disabled) { background: var(--surface-hover); }
+.report-month-control > button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
+.report-month-control > button:disabled { color: var(--text-muted); opacity: .45; cursor: not-allowed; }
+.report-month-control svg { width: 18px; height: 18px; }
+.report-month-value { overflow: hidden; padding: 0 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.report-month-popover { position: absolute; z-index: 5; top: calc(100% + 8px); left: 0; right: 0; display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-elevated); box-shadow: var(--shadow); }
+.report-month-year { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; text-align: center; }
+.report-month-year button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-muted); }
+.report-month-year button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.report-month-year button:disabled { opacity: .35; cursor: not-allowed; }
+.report-month-year svg { width: 18px; height: 18px; }
+.report-month-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.report-month-grid button { min-width: 0; min-height: 44px; padding: 5px 7px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); font-size: 12px; }
+.report-month-grid button:hover { background: var(--surface-hover); color: var(--text); }
+.report-month-grid button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.report-month-current { min-height: 44px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--accent); font-weight: 700; }
+.report-month-current:hover { background: var(--surface-hover); }
+.report-month-popover button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .payroll-export-context { display: grid; gap: 4px; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .payroll-export-context span, .payroll-export-context small { color: var(--text-muted); }
 .payroll-export-context span { font-size: 12px; font-weight: 650; }

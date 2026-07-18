@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { Calculator, Check, CircleDollarSign, Download, FileSpreadsheet, FileText, LoaderCircle, Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Calculator, Check, ChevronLeft, ChevronRight, CircleDollarSign, Download, FileSpreadsheet, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import { api, type ExportFormat } from '../api';
 import { ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, Metric, MoneyValue, PageHeader, Pagination, StatusBadge, Toast, type SortDirection } from '../components/ui';
 import type { PayrollPreview, PayrollRun, PayrollRunItem, PayrollRunListItem, User, Venue } from '../types';
@@ -8,6 +8,9 @@ import { currentMonthValue, formatDate, formatNumber, hasPermission, isOwnerOrAd
 type ConfirmAction = { type: 'finalize' | 'cancel'; run: PayrollRun } | null;
 type RunSort = 'period' | 'status' | 'amount' | 'remaining';
 const PAGE_SIZE = 12;
+const REPORT_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MIN_REPORT_YEAR = 2000;
+const MAX_REPORT_YEAR = 2100;
 
 function parseRevenue(value: string): number | null | undefined {
   const normalized = value.replace(/\s/g, '').replace(',', '.').trim();
@@ -29,6 +32,89 @@ function formatReportMonth(value: string): string {
     .format(new Date(year, month - 1, 1))
     .replace(/\s*г\.$/, '');
   return `${label.charAt(0).toLocaleUpperCase('ru-RU')}${label.slice(1)}`;
+}
+
+function reportMonthValue(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function VisualMonthPicker({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const parts = monthParts(value);
+  const selectedYear = Number.isInteger(parts.year) && parts.year >= MIN_REPORT_YEAR && parts.year <= MAX_REPORT_YEAR ? parts.year : new Date().getFullYear();
+  const selectedMonth = Number.isInteger(parts.month) && parts.month >= 1 && parts.month <= 12 ? parts.month : new Date().getMonth() + 1;
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(selectedYear);
+  const canGoBack = selectedYear > MIN_REPORT_YEAR || selectedMonth > 1;
+  const canGoForward = selectedYear < MAX_REPORT_YEAR || selectedMonth < 12;
+
+  useEffect(() => {
+    if (!open) setViewYear(selectedYear);
+  }, [open, selectedYear]);
+
+  useEffect(() => {
+    if (!disabled) return;
+    setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener('mousedown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [open]);
+
+  const stepMonth = (direction: -1 | 1) => {
+    const date = new Date(selectedYear, selectedMonth - 1 + direction, 1);
+    onChange(reportMonthValue(date.getFullYear(), date.getMonth() + 1));
+    setOpen(false);
+  };
+  const selectMonth = (month: number) => {
+    onChange(reportMonthValue(viewYear, month));
+    setOpen(false);
+  };
+  const selectCurrentMonth = () => {
+    onChange(currentMonthValue());
+    setOpen(false);
+  };
+
+  return <div className="report-month-picker" ref={rootRef}>
+    <span className="report-month-picker-label">Месяц отчёта</span>
+    <div className="report-month-control">
+      <button type="button" disabled={disabled || !canGoBack} onClick={() => stepMonth(-1)} aria-label="Предыдущий месяц"><ChevronLeft /></button>
+      <button ref={triggerRef} className="report-month-value" type="button" disabled={disabled} aria-expanded={open} aria-haspopup="dialog" onClick={() => { setViewYear(selectedYear); setOpen((current) => !current); }}>{formatReportMonth(value)}</button>
+      <button type="button" disabled={disabled || !canGoForward} onClick={() => stepMonth(1)} aria-label="Следующий месяц"><ChevronRight /></button>
+    </div>
+    {open && <div className="report-month-popover" role="dialog" aria-label="Выбор месяца">
+      <div className="report-month-year">
+        <button type="button" disabled={viewYear <= MIN_REPORT_YEAR} onClick={() => setViewYear((year) => Math.max(MIN_REPORT_YEAR, year - 1))} aria-label="Предыдущий год"><ChevronLeft /></button>
+        <strong>{viewYear}</strong>
+        <button type="button" disabled={viewYear >= MAX_REPORT_YEAR} onClick={() => setViewYear((year) => Math.min(MAX_REPORT_YEAR, year + 1))} aria-label="Следующий год"><ChevronRight /></button>
+      </div>
+      <div className="report-month-grid">
+        {REPORT_MONTHS.map((monthName, index) => {
+          const month = index + 1;
+          const active = selectedYear === viewYear && selectedMonth === month;
+          return <button className={active ? 'active' : undefined} type="button" aria-pressed={active} key={monthName} onClick={() => selectMonth(month)}>{monthName}</button>;
+        })}
+      </div>
+      <button className="report-month-current" type="button" onClick={selectCurrentMonth}>Текущий месяц</button>
+    </div>}
+  </div>;
 }
 
 export function PayrollPage({ user, venues, venueId }: { user: User; venues: Venue[]; venueId: string }) {
@@ -216,7 +302,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
 
     {canExport && <Drawer title="Экспорт отчёта" open={exportOpen} onClose={closeExport}>
       <div className="payroll-export-drawer">
-        <FormField label="Месяц отчёта"><input type="month" value={exportMonth} onChange={(event) => { setExportMonth(event.target.value); setExportError(''); }} disabled={Boolean(exportLoading)} /></FormField>
+        <VisualMonthPicker value={exportMonth} disabled={Boolean(exportLoading)} onChange={(value) => { setExportMonth(value); setExportError(''); }} />
         <div className="payroll-export-context"><span>Область отчёта</span><strong>{selectedVenueName}</strong><small>Отчёт: {formatReportMonth(exportMonth)} · {selectedVenueName}</small></div>
         {exportError && <div className="notice error" role="alert">{exportError}</div>}
         <div className="payroll-export-options" aria-label="Формат отчёта">
