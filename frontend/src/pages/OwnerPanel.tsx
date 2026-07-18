@@ -305,11 +305,11 @@ function TeamEmployeeCard({
   return (
     <article className="owner-employee-card" data-archived={archived ? 'true' : 'false'}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <UserAvatar
             name={employee.name || 'Сотрудник'}
             photoUrl={employee.telegram_photo_url}
-            sizeClassName="h-10 w-10"
+            sizeClassName="h-9 w-9"
             textClassName="text-xs"
           />
           <div className="min-w-0 flex-1">
@@ -318,12 +318,14 @@ function TeamEmployeeCard({
               {archived && <span className="owner-status-badge" data-status="archived">В архиве</span>}
             </div>
             <p className="owner-employee-position">{getPositionLabel(employee)}</p>
-            <div className="owner-employee-badges" aria-label="Роль и доступ">
-              <span className="owner-employee-badge">{getManagementRoleLabel(employee)}</span>
-              <span className="owner-employee-badge" data-access={hasManagementAccess ? 'management' : 'employee'}>
-                {hasManagementAccess ? 'Управление' : 'Без управления'}
-              </span>
-            </div>
+            {hasManagementAccess && (
+              <div className="owner-employee-badges" aria-label="Роль и доступ">
+                <span className="owner-employee-badge">{getManagementRoleLabel(employee)}</span>
+                <span className="owner-employee-badge" data-access="management">
+                  Управление
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <button
@@ -2282,7 +2284,7 @@ function TeamTab({ user }: { user: User }) {
   const activeVenueCount = venues.filter((venue) => venue?.is_active).length;
 
   return (
-    <div className="space-y-3">
+    <div className="owner-team-tab space-y-3">
       <div className="owner-compact-summary">
         <div className="owner-inline-stats">
           <EmployeeStat label="Активных" value={activeUsers.length} />
@@ -2444,7 +2446,7 @@ function TeamTab({ user }: { user: User }) {
         </button>
       </div>
 
-      <div className="owner-list-surface owner-disclosure-content">
+      <div className="owner-list-surface owner-team-surface owner-disclosure-content">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium text-tg-text">{showArchive ? 'Архив сотрудников' : 'Активные сотрудники'}</p>
           <p className="text-xs text-tg-hint">{visibleUsers.length}</p>
