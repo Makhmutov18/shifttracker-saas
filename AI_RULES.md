@@ -54,6 +54,29 @@ Owner always has full access.
 - `revenue_total` is management-only data, does not change employee accruals and is immutable after the payroll run leaves `draft`.
 - Employee-facing API and UI must not expose `revenue_total` or payroll share.
 
+## AI invariant
+
+- AI is read-only.
+- Backend computes every financial and operational metric.
+- AI may explain aggregates but may not calculate payroll.
+- AI output never changes shifts, adjustments, payroll runs or payments.
+- No Telegram IDs, contacts, employee names, comments or secrets are sent to the provider.
+- Provider keys exist only in backend environment variables.
+- AI requests are user initiated.
+- Employee-facing screens do not expose management AI summaries.
+- AI text is rendered as plain text, never HTML.
+- Provider failure must not affect non-AI application flows.
+- AI recommendations are advisory and must not be presented as verified facts.
+- The provider is configurable through `AI_PROVIDER` and `AI_MODEL`.
+- Never hardcode the production API key.
+
+AI deployment variables:
+
+- required to enable the feature: `AI_FEATURE_ENABLED`, `AI_PROVIDER`, `AI_MODEL`, `DEEPSEEK_API_KEY`;
+- optional tuning: `DEEPSEEK_BASE_URL`, `AI_REQUEST_TIMEOUT_SECONDS`, `AI_MAX_OUTPUT_TOKENS`.
+
+Do not add production values to the repository. Missing AI configuration must disable only the AI endpoint and must not block application startup.
+
 ## UI
 The app supports light/dark/system theme.
 Use CSS variables for colors.

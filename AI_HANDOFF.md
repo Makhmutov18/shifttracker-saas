@@ -35,7 +35,7 @@
 
 - XLSX export does not block the pilot
 - web admin is planned later
-- AI / DeepSeek is later-stage work
+- the first AI / DeepSeek MVP is a manual, read-only weekly management summary and remains disabled until backend environment variables are configured
 - automatic payments are later; first sales can be manual
 
 ## Hard Rules
@@ -65,6 +65,31 @@
 - Actual period revenue is stored only in `PayrollRun.revenue_total` for a payroll run with a concrete `venue_id`.
 - Payroll share is derived from the saved snapshots: `PayrollRun.total_amount / PayrollRun.revenue_total * 100`.
 - Period revenue never changes employee accruals, is editable only while the run is `draft` and is not exposed to employees.
+
+## AI Invariant
+
+- AI is read-only; it explains backend-calculated aggregates and never calculates payroll.
+- AI output cannot change shifts, adjustments, payroll runs or payments.
+- Weekly summaries are started manually and are visible only to `owner` and `admin`.
+- Telegram IDs, contacts, employee names, comments and secrets are never sent to the provider.
+- Provider text is advisory, rendered as plain text and must not be presented as verified fact.
+- Provider failures affect only the summary request, not the rest of the product.
+- Provider keys stay in backend environment variables and must never be hardcoded.
+
+Deployment variables required to enable the summary:
+
+- `AI_FEATURE_ENABLED`
+- `AI_PROVIDER`
+- `AI_MODEL`
+- `DEEPSEEK_API_KEY`
+
+Optional tuning variables:
+
+- `DEEPSEEK_BASE_URL`
+- `AI_REQUEST_TIMEOUT_SECONDS`
+- `AI_MAX_OUTPUT_TOKENS`
+
+Do not record production environment values in documentation, code, tests or logs.
 
 ## Standard Finish
 
