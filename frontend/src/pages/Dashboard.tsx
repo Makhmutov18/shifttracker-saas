@@ -296,6 +296,16 @@ export default function Dashboard({ user, onNavigate }: Props) {
         </span>
       </button>
 
+      {canApproveShifts && !summaryLoading && !summaryError && pendingCount > 0 && (
+        <section aria-label="Смены на подтверждении">
+          <div className="dashboard-attention">
+            <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-tg-text">Требуют подтверждения</p><p className="mt-0.5 text-sm text-tg-hint">{pendingCount} {pendingCount === 1 ? 'смена ожидает' : pendingCount < 5 ? 'смены ожидают' : 'смен ожидают'} решения</p></div>
+            <button type="button" onClick={() => onNavigate('owner', { ownerTab: 'approve' })} className="dashboard-attention-action">Проверить</button>
+          </div>
+        </section>
+      )}
+
       {canUseAiSummary && (
         <section className="dashboard-ai-summary" aria-labelledby="dashboard-ai-summary-title" aria-busy={aiSummaryLoading}>
           <div className="dashboard-ai-summary-heading">
@@ -376,17 +386,6 @@ export default function Dashboard({ user, onNavigate }: Props) {
         )}
       </section>
 
-      {canApproveShifts && (summaryLoading || summaryError || pendingCount > 0) && (
-        <section aria-label="Смены на подтверждении">
-          {summaryLoading ? <div className="dashboard-compact-state"><span>Проверяем сводку команды…</span></div> : summaryError ? <div className="dashboard-compact-state"><span>Сводка команды недоступна</span></div> : (
-            <div className="dashboard-attention">
-              <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-tg-text">Требуют подтверждения</p><p className="mt-0.5 text-sm text-tg-hint">{pendingCount} {pendingCount === 1 ? 'смена ожидает' : pendingCount < 5 ? 'смены ожидают' : 'смен ожидают'} решения</p></div>
-              <button type="button" onClick={() => onNavigate('owner', { ownerTab: 'approve' })} className="dashboard-attention-action">Проверить</button>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }

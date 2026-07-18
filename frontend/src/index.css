@@ -2977,19 +2977,23 @@ button:disabled {
 .owner-employee-profile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0;
   margin-top: 0.75rem;
 }
 
 .owner-employee-profile-block {
   min-width: 0;
-  min-height: 4.15rem;
+  min-height: 3.65rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0.65rem 0.7rem;
-  border-radius: 0.7rem;
-  background: var(--surface-muted);
+  padding: 0.35rem 0.75rem 0.35rem 0;
+}
+
+.owner-employee-profile-block + .owner-employee-profile-block {
+  padding-right: 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--border-subtle);
 }
 
 .owner-employee-profile-label,
@@ -3046,7 +3050,7 @@ button:disabled {
 .owner-danger-zone {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.6rem;
+  margin-top: 0.45rem;
 }
 
 .owner-venue-row-actions {
@@ -3720,6 +3724,18 @@ button:disabled {
 
   .owner-employee-profile-grid {
     grid-template-columns: 1fr;
+  }
+
+  .owner-employee-profile-block {
+    padding: 0.4rem 0;
+  }
+
+  .owner-employee-profile-block + .owner-employee-profile-block {
+    margin-top: 0.25rem;
+    padding-top: 0.65rem;
+    padding-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
   }
 
   .owner-approval-actions {
