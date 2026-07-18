@@ -125,6 +125,8 @@ export interface PayrollRunListItem {
   employees_count: number;
   total_amount: string;
   total_paid: string;
+  revenue_total?: string | null;
+  payroll_share_percent?: string | null;
   created_by_id: string;
   created_by_name?: string | null;
   created_at: string;

@@ -477,6 +477,8 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .payroll-create-venue span, .payroll-create-venue small { color: var(--text-muted); }
 .payroll-create-venue span { font-size: 12px; font-weight: 650; }
 .payroll-create-venue strong { font-size: 14px; }
+.payroll-revenue-help { display: block; margin-top: 6px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+.payroll-revenue-note { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--text-muted); background: var(--surface-muted); font-size: 12px; }
 .payroll-preview { display: grid; gap: 18px; min-width: 0; }
 .payroll-preview .metrics { margin-bottom: 0; }
 .payroll-preview-card { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
@@ -506,6 +508,18 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .payroll-details-summary > div:first-child { border-left: 0; }
 .payroll-details-summary span { color: var(--text-muted); font-size: 12px; }
 .payroll-details-summary strong { overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-economics { min-width: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); }
+.payroll-economics h3 { margin: 0; font-size: 15px; }
+.payroll-economics dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 14px 0 0; }
+.payroll-economics dl > div { min-width: 0; display: grid; gap: 5px; padding: 0 16px; border-left: 1px solid var(--border); }
+.payroll-economics dl > div:first-child { padding-left: 0; border-left: 0; }
+.payroll-economics dt { color: var(--text-muted); font-size: 12px; }
+.payroll-economics dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 16px; font-weight: 700; }
+.payroll-economics-head { min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.payroll-revenue-editor { display: grid; gap: 12px; margin-top: 12px; }
+.payroll-revenue-editor input { min-width: 0; width: 100%; }
+.payroll-revenue-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.payroll-revenue-empty { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; }
 .payroll-payment-form { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-muted); }
 .payroll-payment-form-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .payroll-payment-form-head span { color: var(--text-muted); font-size: 12px; }
@@ -707,6 +721,10 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .payroll-details-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .payroll-details-summary > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
   .payroll-details-summary > div:nth-child(4) { border-top: 1px solid var(--border); }
+  .payroll-economics dl { grid-template-columns: 1fr; gap: 10px; }
+  .payroll-economics dl > div { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; padding: 10px 0 0; border-top: 1px solid var(--border); border-left: 0; }
+  .payroll-economics dl > div:first-child { padding-top: 0; border-top: 0; }
+  .payroll-economics dd { text-align: right; }
   .payroll-payment-form { padding: 14px; }
   .payroll-payment-context { grid-template-columns: 1fr; }
   .payroll-payment-context > span { border-left: 0; border-top: 1px solid var(--border); padding-inline: 0; }
