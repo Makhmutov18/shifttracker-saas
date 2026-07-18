@@ -63,6 +63,16 @@ export function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+export class ApiRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const initData = getInitData();
 
@@ -86,7 +96,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const body = await readResponseBody(response);
 
   if (!response.ok) {
-    throw new Error(extractErrorMessage(body, 'Не удалось выполнить действие. Попробуйте ещё раз.', response.status));
+    throw new ApiRequestError(
+      extractErrorMessage(body, 'Не удалось выполнить действие. Попробуйте ещё раз.', response.status),
+      response.status,
+    );
   }
 
   if (!body) {
@@ -207,6 +220,35 @@ function normalizeUser(raw: unknown): User {
 export async function getMe(): Promise<User> {
   const user = await request<User>('/me');
   return normalizeUser(user);
+}
+
+export interface AiWeeklySummaryMetrics {
+  approved_shifts_count: number;
+  pending_shifts_count: number;
+  approved_hours: string;
+  approved_accruals: string;
+  unique_worked_employees_count: number;
+  cross_venue_shifts_count: number;
+  draft_payroll_runs_count: number;
+  finalized_unpaid_payroll_runs_count: number;
+}
+
+export interface AiWeeklySummary {
+  period_start: string;
+  period_end: string;
+  generated_at: string;
+  metrics: AiWeeklySummaryMetrics;
+  headline: string;
+  summary: string;
+  attention: string[];
+  actions: string[];
+}
+
+export async function generateAiWeeklySummary(periodStart: string, periodEnd: string): Promise<AiWeeklySummary> {
+  return request<AiWeeklySummary>('/ai/weekly-summary', {
+    method: 'POST',
+    body: JSON.stringify({ period_start: periodStart, period_end: periodEnd }),
+  });
 }
 
 // Shifts

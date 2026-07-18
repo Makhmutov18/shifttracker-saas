@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ChevronRight } from 'lucide-react';
-import { getPayrollSummary, getShifts, type PayrollSummary, type Shift, type User as UserType } from '../utils/api';
+import { AlertCircle, ChevronRight, LoaderCircle, Sparkles } from 'lucide-react';
+import {
+  ApiRequestError,
+  generateAiWeeklySummary,
+  getPayrollSummary,
+  getShifts,
+  type AiWeeklySummary,
+  type PayrollSummary,
+  type Shift,
+  type User as UserType,
+} from '../utils/api';
 import { useStats } from '../hooks/useStats';
 import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/helpers';
 import { useShifts } from '../hooks/useShifts';
@@ -75,17 +84,51 @@ function deduplicateShifts(items: Shift[]) {
   return Array.from(unique.values());
 }
 
+function getAiSummaryError(error: unknown) {
+  if (error instanceof ApiRequestError && error.status === 503) return 'Умная сводка временно недоступна';
+  if (error instanceof ApiRequestError && error.status === 504) return 'Подготовка заняла слишком много времени';
+  return 'Не удалось сформировать сводку';
+}
+
+function formatGeneratedTime(value: string) {
+  const generatedAt = new Date(value);
+  if (Number.isNaN(generatedAt.getTime())) return 'Сформировано недавно';
+  return `Сформировано в ${generatedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function formatEmployeeCount(count: number) {
+  const remainder100 = count % 100;
+  const remainder10 = count % 10;
+  if (remainder100 >= 11 && remainder100 <= 14) return `${count} сотрудников`;
+  if (remainder10 === 1) return `${count} сотрудник`;
+  if (remainder10 >= 2 && remainder10 <= 4) return `${count} сотрудника`;
+  return `${count} сотрудников`;
+}
+
+function formatShiftCount(count: number) {
+  const remainder100 = count % 100;
+  const remainder10 = count % 10;
+  if (remainder100 >= 11 && remainder100 <= 14) return `${count} смен`;
+  if (remainder10 === 1) return `${count} смена`;
+  if (remainder10 >= 2 && remainder10 <= 4) return `${count} смены`;
+  return `${count} смен`;
+}
+
 export default function Dashboard({ user, onNavigate }: Props) {
   const { stats, loading: statsLoading, error: statsError } = useStats();
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts();
   const telegramUser = getTelegramUser();
   const canApproveShifts = canAccessOwnerPanel(user) || hasPermission(user, 'can_approve_shifts');
+  const canUseAiSummary = user.role === 'owner' || user.role === 'admin';
   const [summary, setSummary] = useState<Pick<PayrollSummary, 'pending_shifts_count' | 'approved_shifts_count'> | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
   const [extraWeekShifts, setExtraWeekShifts] = useState<Shift[]>([]);
   const [extraWeekLoading, setExtraWeekLoading] = useState(false);
   const [extraWeekError, setExtraWeekError] = useState(false);
+  const [aiSummary, setAiSummary] = useState<AiWeeklySummary | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
   const week = useMemo(getCurrentWeek, []);
 
   const personalShifts = useMemo(
@@ -186,6 +229,20 @@ export default function Dashboard({ user, onNavigate }: Props) {
     ? 'Есть смена на подтверждении'
     : 'Все утверждённые смены учтены';
 
+  const handleGenerateAiSummary = async () => {
+    if (aiSummaryLoading) return;
+    setAiSummaryLoading(true);
+    setAiSummaryError(null);
+    try {
+      const generated = await generateAiWeeklySummary(week.startKey, week.endKey);
+      setAiSummary(generated);
+    } catch (error) {
+      setAiSummaryError(getAiSummaryError(error));
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
   return (
     <div className="dashboard-page mx-auto max-w-lg px-4 pb-6 pt-5">
       <header className="dashboard-profile-header">
@@ -238,6 +295,66 @@ export default function Dashboard({ user, onNavigate }: Props) {
           </> : weekHasError ? <strong>Данные недели временно недоступны</strong> : <strong>На этой неделе смен пока нет</strong>}
         </span>
       </button>
+
+      {canUseAiSummary && (
+        <section className="dashboard-ai-summary" aria-labelledby="dashboard-ai-summary-title" aria-busy={aiSummaryLoading}>
+          <div className="dashboard-ai-summary-heading">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            <div className="min-w-0">
+              <h2 id="dashboard-ai-summary-title">Умная сводка</h2>
+              {aiSummary && <p>{formatGeneratedTime(aiSummary.generated_at)}</p>}
+            </div>
+          </div>
+
+          {aiSummary ? (
+            <div className="dashboard-ai-summary-result" aria-live="polite">
+              <h3>{aiSummary.headline || 'Сводка готова'}</h3>
+              <p className="dashboard-ai-summary-text">{aiSummary.summary || 'Данные недели собраны.'}</p>
+              <p className="dashboard-ai-summary-metrics">
+                {formatShiftCount(aiSummary.metrics.approved_shifts_count)} · {formatHours(aiSummary.metrics.approved_hours)} · {formatCurrency(aiSummary.metrics.approved_accruals)} · {formatEmployeeCount(aiSummary.metrics.unique_worked_employees_count)}
+              </p>
+              {(aiSummary.metrics.pending_shifts_count > 0 || aiSummary.metrics.cross_venue_shifts_count > 0) && (
+                <div className="dashboard-ai-summary-signals">
+                  {aiSummary.metrics.pending_shifts_count > 0 && <span>На подтверждении: {aiSummary.metrics.pending_shifts_count}</span>}
+                  {aiSummary.metrics.cross_venue_shifts_count > 0 && <span>На других точках: {formatShiftCount(aiSummary.metrics.cross_venue_shifts_count)}</span>}
+                </div>
+              )}
+              {aiSummary.attention.length > 0 && (
+                <div className="dashboard-ai-summary-list">
+                  <h4>Обратить внимание</h4>
+                  <ul>{aiSummary.attention.slice(0, 3).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                </div>
+              )}
+              {aiSummary.actions.length > 0 && (
+                <div className="dashboard-ai-summary-list">
+                  <h4>Что проверить</h4>
+                  <ul>{aiSummary.actions.slice(0, 3).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                </div>
+              )}
+              <p className="dashboard-ai-summary-disclaimer">Сводка создана ИИ на основе агрегированных данных приложения. Важные решения стоит перепроверять.</p>
+            </div>
+          ) : (
+            <div className="dashboard-ai-summary-intro">
+              <p>ИИ кратко разберёт смены и управленческие задачи этой недели.</p>
+              <small>Используются агрегированные данные приложения без персональных данных сотрудников.</small>
+            </div>
+          )}
+
+          {aiSummaryLoading && !aiSummary && (
+            <div className="dashboard-ai-summary-loading" aria-live="polite">
+              <span /><span /><span />
+            </div>
+          )}
+
+          <div className="dashboard-ai-summary-footer">
+            {aiSummaryError && <p role="alert">{aiSummaryError}</p>}
+            <button type="button" onClick={handleGenerateAiSummary} disabled={aiSummaryLoading}>
+              {aiSummaryLoading && <LoaderCircle className="dashboard-ai-summary-spinner h-4 w-4" aria-hidden="true" />}
+              {aiSummaryLoading ? 'Анализируем неделю…' : aiSummary ? 'Обновить сводку' : aiSummaryError ? 'Попробовать снова' : 'Сформировать сводку'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="dashboard-latest" aria-labelledby="dashboard-latest-title">
         <div className="dashboard-section-heading"><h2 id="dashboard-latest-title">Последняя смена</h2></div>
