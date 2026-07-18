@@ -166,6 +166,17 @@ class AiWeeklySummaryAggregationTests(unittest.TestCase):
         self.assertEqual(payload["max_tokens"], 777)
         self.assertIn("JSON", SYSTEM_PROMPT)
         self.assertIn("Пример JSON", SYSTEM_PROMPT)
+        self.assertIn("pending shifts", SYSTEM_PROMPT)
+        self.assertIn("finalized", SYSTEM_PROMPT)
+        self.assertIn("cross-venue", SYSTEM_PROMPT)
+        self.assertIn("разница нагрузки", SYSTEM_PROMPT)
+        self.assertIn("Не повторяй один", SYSTEM_PROMPT)
+        self.assertIn("1–2", SYSTEM_PROMPT)
+        self.assertIn("пробелы между тысячами", SYSTEM_PROMPT)
+        self.assertLess(SYSTEM_PROMPT.index("1) pending"), SYSTEM_PROMPT.index("2) finalized"))
+        self.assertLess(SYSTEM_PROMPT.index("2) finalized"), SYSTEM_PROMPT.index("3) cross-venue"))
+        self.assertLess(SYSTEM_PROMPT.index("3) cross-venue"), SYSTEM_PROMPT.index("4) заметная"))
+        self.assertIn("Не перечисляй проверенные метрики", payload["messages"][1]["content"])
         self.assertIn("<business_data>", payload["messages"][1]["content"])
 
 
@@ -179,7 +190,11 @@ class AiWeeklySummaryProviderTests(unittest.IsolatedAsyncioTestCase):
             AI_MAX_OUTPUT_TOKENS=900,
         )
         self.configuration.__enter__()
-        self.context = {"totals": {}, "venues": [], "payroll": {}}
+        self.context = {
+            "totals": {"pending_estimated_accruals": "1800.00"},
+            "venues": [],
+            "payroll": {"remaining_to_pay": "53831.25"},
+        }
 
     async def asyncTearDown(self) -> None:
         self.configuration.__exit__(None, None, None)
@@ -188,12 +203,12 @@ class AiWeeklySummaryProviderTests(unittest.IsolatedAsyncioTestCase):
         async def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.headers["Authorization"], "Bearer not-a-real-key")
             return provider_response(
-                '{"headline":"Спокойная неделя","summary":"Данные проверены.","attention":[],"actions":[]}',
+                '{"headline":"Неделя под контролем","summary":"Критичных отклонений не видно.","attention":[],"actions":["Проверить очередь утверждения"]}',
                 usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
             )
 
         result = await generate_weekly_summary(self.context, httpx.MockTransport(handler))
-        self.assertEqual(result.headline, "Спокойная неделя")
+        self.assertEqual(result.headline, "Неделя под контролем")
 
     async def test_empty_and_invalid_json_each_retry_once(self) -> None:
         for first_content in ("", "not-json"):
@@ -201,15 +216,101 @@ class AiWeeklySummaryProviderTests(unittest.IsolatedAsyncioTestCase):
 
             async def handler(request: httpx.Request) -> httpx.Response:
                 calls.append(json.loads(request.content))
-                content = first_content if len(calls) == 1 else '{"headline":"Готово","summary":"Сводка готова.","attention":[],"actions":[]}'
+                content = first_content if len(calls) == 1 else '{"headline":"Очередь требует проверки","summary":"Сначала разберите ожидающие смены.","attention":[],"actions":["Открыть раздел утверждения"]}'
                 return provider_response(content)
 
             result = await generate_weekly_summary(self.context, httpx.MockTransport(handler))
-            self.assertEqual(result.headline, "Готово")
+            self.assertEqual(result.headline, "Очередь требует проверки")
             self.assertEqual(len(calls), 2)
             self.assertIn("Предыдущий ответ был невалидным", calls[1]["messages"][1]["content"])
             if first_content:
                 self.assertNotIn(first_content, calls[1]["messages"][1]["content"])
+
+    async def test_generic_headline_retries_with_conclusion(self) -> None:
+        calls = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            content = (
+                '{"headline":"Сводка за период: текущая неделя","summary":"Есть задачи.","attention":[],"actions":["Открыть смены"]}'
+                if calls == 1
+                else '{"headline":"Ожидающие смены требуют решения","summary":"Сначала закройте очередь подтверждения.","attention":[],"actions":["Открыть раздел утверждения"]}'
+            )
+            return provider_response(content)
+
+        result = await generate_weekly_summary(self.context, httpx.MockTransport(handler))
+        self.assertEqual(result.headline, "Ожидающие смены требуют решения")
+        self.assertEqual(calls, 2)
+
+    async def test_repeated_signal_between_summary_and_attention_is_rejected(self) -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            return provider_response(
+                '{"headline":"Нужна проверка","summary":"Ожидающие смены требуют решения.",'
+                '"attention":["Проверьте смены на подтверждении"],"actions":["Открыть раздел утверждения"]}'
+            )
+
+        with self.assertRaises(AiSummaryProviderError) as error:
+            await generate_weekly_summary(self.context, httpx.MockTransport(handler))
+        self.assertEqual(error.exception.status_code, 502)
+
+    async def test_actions_are_limited_to_one_or_two(self) -> None:
+        for actions in ([], ["Первое", "Второе", "Третье"]):
+            async def handler(request: httpx.Request, value=actions) -> httpx.Response:
+                return provider_response(json.dumps({
+                    "headline": "Есть рабочие задачи",
+                    "summary": "Приоритет определён.",
+                    "attention": [],
+                    "actions": value,
+                }, ensure_ascii=False))
+
+            with self.subTest(actions=actions), self.assertRaises(AiSummaryProviderError):
+                await generate_weekly_summary(self.context, httpx.MockTransport(handler))
+
+    async def test_money_requires_russian_format_or_omission(self) -> None:
+        invalid_summaries = ("Осталось 53831.25.", "Осталось 53 831,25 рублей.")
+        for invalid_summary in invalid_summaries:
+            responses = iter((
+                json.dumps({
+                    "headline": "Есть остаток",
+                    "summary": invalid_summary,
+                    "attention": [],
+                    "actions": ["Открыть расчёты"],
+                }, ensure_ascii=False),
+                '{"headline":"Есть остаток","summary":"Осталось 53 831,25 ₽.","attention":[],"actions":["Открыть расчёты"]}',
+            ))
+
+            async def handler(request: httpx.Request) -> httpx.Response:
+                return provider_response(next(responses))
+
+            with self.subTest(invalid_summary=invalid_summary):
+                result = await generate_weekly_summary(self.context, httpx.MockTransport(handler))
+                self.assertEqual(result.summary, "Осталось 53 831,25 ₽.")
+
+    async def test_verified_metrics_are_not_repeated_in_ai_text(self) -> None:
+        context = {
+            "totals": {
+                "approved_shifts_count": 37,
+                "approved_hours": "285.00",
+                "approved_accruals": "90155.50",
+                "unique_worked_employees_count": 11,
+                "pending_estimated_accruals": "0.00",
+            },
+            "venues": [],
+            "payroll": {"remaining_to_pay": "0.00"},
+        }
+        responses = iter((
+            '{"headline":"Работа идёт стабильно","summary":"Утверждено 37 смен, отработано 285 часов и задействовано 11 сотрудников.","attention":[],"actions":["Проверить очередь"]}',
+            '{"headline":"Работа идёт стабильно","summary":"Критичных отклонений по утверждённой работе не видно.","attention":[],"actions":["Проверить очередь"]}',
+        ))
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            return provider_response(next(responses))
+
+        result = await generate_weekly_summary(context, httpx.MockTransport(handler))
+        self.assertNotIn("37", result.summary)
+        self.assertNotIn("285", result.summary)
+        self.assertNotIn("11", result.summary)
 
     async def test_second_invalid_json_returns_502(self) -> None:
         calls = 0
