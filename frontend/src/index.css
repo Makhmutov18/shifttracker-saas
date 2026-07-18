@@ -24,10 +24,12 @@
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
   --text-primary: #171717;
   --text-secondary: #666a73;
-  --dock-surface: rgba(255, 255, 255, 0.78);
+  --dock-surface: rgba(255, 255, 255, 0.68);
   --dock-surface-fallback: var(--surface-elevated);
   --dock-border: rgba(255, 255, 255, 0.72);
-  --dock-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --dock-shadow: 0 10px 28px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  --dock-action-border: rgba(255, 255, 255, 0.32);
+  --dock-action-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
   --dock-active-bg: var(--surface-muted);
   --dock-action-bg: var(--tg-primary);
   --dock-action-text: var(--tg-button-text);
@@ -73,11 +75,13 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
   --text-primary: #f5f5f5;
   --text-secondary: #a3a3a3;
-  --dock-surface: rgba(21, 21, 21, 0.78);
+  --dock-surface: rgba(12, 12, 12, 0.66);
   --dock-surface-fallback: var(--surface-elevated);
-  --dock-border: rgba(255, 255, 255, 0.12);
-  --dock-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --dock-active-bg: rgba(255, 255, 255, 0.08);
+  --dock-border: rgba(255, 255, 255, 0.16);
+  --dock-shadow: 0 12px 30px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --dock-active-bg: rgba(255, 255, 255, 0.1);
+  --dock-action-border: rgba(255, 255, 255, 0.24);
+  --dock-action-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
   --success: #4fd18b;
   --success-soft: rgba(34, 197, 94, 0.14);
   --warning: #f2b84b;
@@ -307,8 +311,8 @@ button:disabled {
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dock-shell {
     background: var(--dock-surface);
-    -webkit-backdrop-filter: blur(14px) saturate(115%);
-    backdrop-filter: blur(14px) saturate(115%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+    backdrop-filter: blur(18px) saturate(130%);
   }
 }
 
@@ -367,9 +371,11 @@ button:disabled {
   justify-content: center;
   justify-self: end;
   padding: 0;
+  border: 1px solid var(--dock-action-border);
   border-radius: 50%;
   background: var(--dock-action-bg);
   color: var(--dock-action-text);
+  box-shadow: var(--dock-action-shadow);
   transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
 }
 
@@ -2968,15 +2974,52 @@ button:disabled {
 .owner-status-badge[data-status='cancelled'] { background: var(--danger-soft); color: var(--danger); }
 .owner-status-badge[data-status='paid'] { color: var(--success); }
 
-.owner-employee-details {
+.owner-employee-profile-grid {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
   margin-top: 0.75rem;
-  padding-block: 0.25rem;
-  border-block: 1px solid var(--border-subtle);
 }
 
-.owner-employee-details p,
+.owner-employee-profile-block {
+  min-width: 0;
+  min-height: 4.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.7rem;
+  background: var(--surface-muted);
+}
+
+.owner-employee-profile-label,
+.owner-employee-profile-value,
+.owner-employee-profile-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.owner-employee-profile-label {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+}
+
+.owner-employee-profile-value {
+  margin-top: 0.25rem;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.owner-employee-profile-meta {
+  margin-top: 0.15rem;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  line-height: 1.3;
+}
+
 .owner-approval-facts p {
   display: flex;
   min-width: 0;
@@ -2985,24 +3028,12 @@ button:disabled {
   gap: 0.75rem;
 }
 
-.owner-employee-details p {
-  min-height: 2.25rem;
-  padding-block: 0.4rem;
-}
-
-.owner-employee-details p + p {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.owner-employee-details span,
 .owner-approval-facts span {
   flex: 0 0 auto;
   color: var(--text-secondary);
   font-size: 0.75rem;
 }
 
-.owner-employee-details strong,
-.owner-employee-value,
 .owner-approval-facts strong {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -3010,21 +3041,6 @@ button:disabled {
   font-size: 0.8125rem;
   font-weight: 500;
   text-align: right;
-}
-
-.owner-employee-pay {
-  display: grid;
-  justify-items: end;
-  gap: 0.1rem;
-}
-
-.owner-employee-pay small {
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-}
-
-.owner-employee-pay b {
-  font-weight: 650;
 }
 
 .owner-danger-zone {
@@ -3700,6 +3716,10 @@ button:disabled {
 
   .owner-inline-stat strong {
     font-size: 0.8125rem;
+  }
+
+  .owner-employee-profile-grid {
+    grid-template-columns: 1fr;
   }
 
   .owner-approval-actions {

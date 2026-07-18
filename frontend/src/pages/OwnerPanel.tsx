@@ -305,6 +305,9 @@ function TeamEmployeeCard({
     || managementRoleLabel === 'Владелец';
   const hasRevenueShare = (employee.pay_model === 'revenue' || employee.pay_model === 'hybrid')
     && Number(employee.revenue_percentage) > 0;
+  const payValue = employee.pay_model === 'revenue'
+    ? hasRevenueShare ? `${employee.revenue_percentage}%` : 'Не настроено'
+    : `${getPayRateLabel(employee)}${hasRevenueShare ? ` + ${employee.revenue_percentage}%` : ''}`;
 
   return (
     <article className="owner-employee-card" data-archived={archived ? 'true' : 'false'}>
@@ -344,15 +347,16 @@ function TeamEmployeeCard({
         </button>
       </div>
 
-      <div className="owner-employee-details">
-        <p><span>Основная точка</span><span className="owner-employee-value">{getShortVenueLabel(employee.venue)}</span></p>
-        <p>
-          <span>Оплата</span>
-          <span className="owner-employee-value owner-employee-pay">
-            <small>{getPayModelLabel(employee.pay_model)}</small>
-            <b>{getPayRateLabel(employee)}{hasRevenueShare ? ` + ${employee.revenue_percentage}%` : ''}</b>
-          </span>
-        </p>
+      <div className="owner-employee-profile-grid">
+        <div className="owner-employee-profile-block">
+          <span className="owner-employee-profile-label">Основная точка</span>
+          <strong className="owner-employee-profile-value">{getShortVenueLabel(employee.venue)}</strong>
+        </div>
+        <div className="owner-employee-profile-block">
+          <span className="owner-employee-profile-label">Оплата</span>
+          <strong className="owner-employee-profile-value">{payValue}</strong>
+          <small className="owner-employee-profile-meta">{getPayModelLabel(employee.pay_model)}</small>
+        </div>
       </div>
 
       <div className="owner-danger-zone">
