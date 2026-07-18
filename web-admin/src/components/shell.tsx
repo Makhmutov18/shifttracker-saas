@@ -2,13 +2,14 @@ import React, { type ReactNode } from 'react';
 import {
   Building2,
   CalendarClock,
-  ChevronDown,
   ClipboardCheck,
   History,
   LayoutDashboard,
   LogOut,
   Menu,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sun,
   Users,
   X,
@@ -19,13 +20,23 @@ import { SearchSelect } from './ui';
 
 export type RoutePath = '/overview' | '/shifts' | '/payroll' | '/employees' | '/venues' | '/audit';
 
-const navigation: Array<{ path: RoutePath; label: string; icon: typeof LayoutDashboard }> = [
-  { path: '/overview', label: 'Обзор', icon: LayoutDashboard },
-  { path: '/shifts', label: 'Смены', icon: CalendarClock },
-  { path: '/payroll', label: 'Расчёты выплат', icon: ClipboardCheck },
-  { path: '/employees', label: 'Команда', icon: Users },
-  { path: '/venues', label: 'Точки', icon: Building2 },
-  { path: '/audit', label: 'История действий', icon: History },
+const navigationGroups: Array<{ label: string; items: Array<{ path: RoutePath; label: string; icon: typeof LayoutDashboard }> }> = [
+  {
+    label: 'Работа',
+    items: [
+      { path: '/overview', label: 'Обзор', icon: LayoutDashboard },
+      { path: '/shifts', label: 'Смены', icon: CalendarClock },
+      { path: '/payroll', label: 'Расчёты выплат', icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: 'Управление',
+    items: [
+      { path: '/employees', label: 'Команда', icon: Users },
+      { path: '/venues', label: 'Точки', icon: Building2 },
+      { path: '/audit', label: 'История действий', icon: History },
+    ],
+  },
 ];
 
 function userRoleLabel(user: User): string {
@@ -38,34 +49,69 @@ export function Sidebar({
   onNavigate,
   open,
   onClose,
+  collapsed,
+  onToggleCollapsed,
+  theme,
+  onTheme,
+  onLogout,
 }: {
   route: RoutePath;
   user: User;
   onNavigate: (path: RoutePath) => void;
   open: boolean;
   onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  theme: 'light' | 'dark';
+  onTheme: () => void;
+  onLogout: () => void;
 }) {
+  const roleLabel = userRoleLabel(user);
+  const photoUrl = user.telegram_photo_url?.trim() ?? '';
+  const [avatarFailed, setAvatarFailed] = React.useState(false);
+  React.useEffect(() => setAvatarFailed(false), [photoUrl]);
   return <>
     <div className={`sidebar-backdrop ${open ? 'visible' : ''}`} onClick={onClose} />
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
+    <aside className={`sidebar${open ? ' open' : ''}${collapsed ? ' collapsed' : ''}`} aria-label="Навигация и профиль">
       <div className="brand">
         <div className="brand-mark">П</div>
         <div className="brand-copy"><strong>Порядок.Смены</strong><span>Управление</span></div>
+        <button className="icon-button sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button>
         <button className="icon-button sidebar-close" onClick={onClose} aria-label="Закрыть меню"><X /></button>
       </div>
-      <nav aria-label="Основная навигация">
-        <span className="nav-caption">Рабочее пространство</span>
-        {navigation.filter(({ path }) => canOpen(path, user)).map(({ path, label, icon: Icon }) => (
-          <button
-            key={path}
-            className={route === path ? 'active' : ''}
-            aria-current={route === path ? 'page' : undefined}
-            onClick={() => { onNavigate(path); onClose(); }}
-          >
-            <Icon /><span>{label}</span>
-          </button>
-        ))}
+      <nav className="sidebar-navigation" aria-label="Основная навигация">
+        {navigationGroups.map((group) => {
+          const items = group.items.filter(({ path }) => canOpen(path, user));
+          if (!items.length) return null;
+          return <div className="nav-group" key={group.label}>
+            <span className="nav-caption">{group.label}</span>
+            {items.map(({ path, label, icon: Icon }) => <button
+              key={path}
+              className={route === path ? 'active' : ''}
+              aria-current={route === path ? 'page' : undefined}
+              aria-label={collapsed ? label : undefined}
+              title={collapsed ? label : undefined}
+              onClick={() => { onNavigate(path); onClose(); }}
+            >
+              <Icon /><span>{label}</span>
+            </button>)}
+          </div>;
+        })}
       </nav>
+      <div className="sidebar-account">
+        <div className="sidebar-user" title={collapsed ? `${user.name || 'Пользователь'} · ${roleLabel}` : undefined}>
+          <span className="avatar sidebar-avatar">
+            {photoUrl && !avatarFailed
+              ? <img src={photoUrl} alt={user.name || 'Пользователь'} onError={() => setAvatarFailed(true)} />
+              : (user.name || 'П').slice(0, 1).toUpperCase()}
+          </span>
+          <span className="sidebar-user-copy"><strong>{user.name || 'Пользователь'}</strong><small>{roleLabel}</small></span>
+        </div>
+        <div className="sidebar-account-actions">
+          <button type="button" onClick={onTheme} aria-label={`Тема интерфейса: ${theme === 'dark' ? 'тёмная' : 'светлая'}`} title={collapsed ? 'Тема интерфейса' : undefined}>{theme === 'dark' ? <Moon /> : <Sun />}<span><strong>Тема интерфейса</strong><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span></button>
+          <button className="sidebar-logout" type="button" onClick={onLogout} aria-label="Выйти" title={collapsed ? 'Выйти' : undefined}><LogOut /><span>Выйти</span></button>
+        </div>
+      </div>
     </aside>
   </>;
 }
@@ -74,10 +120,6 @@ export function TopBar({
   venues,
   venueId,
   onVenue,
-  user,
-  theme,
-  onTheme,
-  onLogout,
   onMenu,
   title,
   secondaryContext,
@@ -86,29 +128,11 @@ export function TopBar({
   venues: Venue[];
   venueId: string;
   onVenue: (value: string) => void;
-  user: User;
-  theme: 'light' | 'dark';
-  onTheme: () => void;
-  onLogout: () => void;
   onMenu: () => void;
   title: string;
   secondaryContext?: string;
   action?: ReactNode;
 }) {
-  const roleLabel = userRoleLabel(user);
-  const photoUrl = user.telegram_photo_url?.trim() ?? '';
-  const [avatarFailed, setAvatarFailed] = React.useState(false);
-  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
-  const userMenuRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => setAvatarFailed(false), [photoUrl]);
-  React.useEffect(() => {
-    if (!userMenuOpen) return;
-    const closeOutside = (event: MouseEvent) => { if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false); };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setUserMenuOpen(false); };
-    document.addEventListener('mousedown', closeOutside);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => { document.removeEventListener('mousedown', closeOutside); document.removeEventListener('keydown', closeOnEscape); };
-  }, [userMenuOpen]);
   return <header className="topbar">
     <div className="topbar-left">
       <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
@@ -118,28 +142,11 @@ export function TopBar({
       </div>
     </div>
     <div className="topbar-right">
-      {action}
       <div className="topbar-venue-filter">
         <Building2 />
         <div className="topbar-venue-copy"><span>Точка</span><SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} /></div>
       </div>
-      <div className={`user-menu ${userMenuOpen ? 'open' : ''}`} ref={userMenuRef}>
-        <button className="user-menu-trigger" aria-label="Меню пользователя" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((value) => !value)}>
-          <span className="avatar topbar-avatar">
-            {photoUrl && !avatarFailed
-              ? <img src={photoUrl} alt={user.name || 'Пользователь'} onError={() => setAvatarFailed(true)} />
-              : (user.name || 'П').slice(0, 1).toUpperCase()}
-          </span>
-          <span className="user-menu-copy"><strong>{user.name || 'Пользователь'}</strong></span>
-          <ChevronDown />
-        </button>
-        {userMenuOpen && <div className="user-menu-popover">
-          <div className="user-menu-heading"><strong>{user.name || 'Пользователь'}</strong><span>{roleLabel}</span></div>
-          <button onClick={() => { onTheme(); setUserMenuOpen(false); }}>{theme === 'dark' ? <Moon /> : <Sun />}<span><strong>Тема интерфейса</strong><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span></button>
-          <div className="user-menu-divider" />
-          <button className="logout-button" onClick={onLogout}><LogOut /><span>Выйти</span></button>
-        </div>}
-      </div>
+      {action}
     </div>
   </header>;
 }
@@ -174,11 +181,14 @@ export function AppShell({
   action?: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
-  return <div className="app-shell">
-    <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} />
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  return <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+    <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} theme={theme} onTheme={onTheme} onLogout={onLogout} />
     <main>
-      <TopBar venues={venues} venueId={venueId} onVenue={onVenue} user={user} theme={theme} onTheme={onTheme} onLogout={onLogout} onMenu={() => setMenuOpen(true)} title={title} secondaryContext={secondaryContext} action={action} />
-      <div className="content">{children}</div>
+      <div className="workspace">
+        <TopBar venues={venues} venueId={venueId} onVenue={onVenue} onMenu={() => setMenuOpen(true)} title={title} secondaryContext={secondaryContext} action={action} />
+        <div className="content">{children}</div>
+      </div>
     </main>
   </div>;
 }
