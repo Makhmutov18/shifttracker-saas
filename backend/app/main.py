@@ -12,6 +12,7 @@ from app.database import init_db
 from app.routers.api import router as api_router
 from app.routers.admin import router as admin_router
 from app.routers.web_auth import install_oidc_access_log_filter, router as web_auth_router
+from app.routers.ai import router as ai_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -135,6 +136,7 @@ app.add_middleware(
 app.include_router(api_router)
 app.include_router(admin_router)
 app.include_router(web_auth_router)
+app.include_router(ai_router)
 
 
 # ─── Telegram webhook endpoint ──────────────────────────────────────────────

@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -17,6 +18,15 @@ class Settings(BaseSettings):
     WEB_ADMIN_PUBLIC_URL: str = ""
     WEB_SESSION_SECRET: str = ""
     WEB_SESSION_DAYS: int = 14
+
+    # Optional read-only AI summary. Missing configuration must not block startup.
+    AI_FEATURE_ENABLED: bool = False
+    AI_PROVIDER: str = "deepseek"
+    AI_MODEL: str = "deepseek-v4-flash"
+    DEEPSEEK_API_KEY: str = Field(default="", repr=False)
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    AI_REQUEST_TIMEOUT_SECONDS: float = 25.0
+    AI_MAX_OUTPUT_TOKENS: int = 900
 
     # Railway auto-provided public domain (e.g. shifttracker-saas-production.up.railway.app)
     RAILWAY_PUBLIC_DOMAIN: Optional[str] = None

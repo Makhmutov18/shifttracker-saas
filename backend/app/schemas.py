@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
+from typing import Annotated, Optional
 from datetime import date, time, datetime
 from decimal import Decimal
 import uuid
+
+
+AiSummaryLine = Annotated[str, StringConstraints(min_length=1, max_length=180)]
 
 
 # ─── Venue ───────────────────────────────────────────────────────────────────
@@ -392,3 +395,68 @@ class PersonalPayrollRunRead(BaseModel):
     paid_amount: Decimal = Decimal("0.00")
     remaining_amount: Decimal = Decimal("0.00")
     payments: list[PersonalPayrollPaymentRead] = Field(default_factory=list)
+
+
+# ─── Read-only AI summary ───────────────────────────────────────────────────
+
+class AiWeeklySummaryRequest(BaseModel):
+    period_start: date
+    period_end: date
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_start > self.period_end:
+            raise ValueError("Дата начала периода должна быть не позже даты окончания")
+        if (self.period_end - self.period_start).days + 1 > 31:
+            raise ValueError("Период умной сводки не может превышать 31 календарный день")
+        return self
+
+
+class AiWeeklySummaryMetrics(BaseModel):
+    approved_shifts_count: int = 0
+    pending_shifts_count: int = 0
+    approved_hours: Decimal = Decimal("0.00")
+    approved_accruals: Decimal = Decimal("0.00")
+    unique_worked_employees_count: int = 0
+    cross_venue_shifts_count: int = 0
+    draft_payroll_runs_count: int = 0
+    finalized_unpaid_payroll_runs_count: int = 0
+
+
+class AiWeeklySummaryContent(BaseModel):
+    headline: str = Field(..., min_length=1, max_length=100)
+    summary: str = Field(..., min_length=1, max_length=600)
+    attention: list[AiSummaryLine] = Field(default_factory=list, max_length=3)
+    actions: list[AiSummaryLine] = Field(default_factory=list, max_length=3)
+
+    @field_validator("headline", "summary", mode="before")
+    @classmethod
+    def normalize_text(cls, value):
+        if not isinstance(value, str):
+            return value
+        return " ".join(value.split())
+
+    @field_validator("attention", "actions", mode="before")
+    @classmethod
+    def normalize_lines(cls, value):
+        if not isinstance(value, list):
+            return value
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            if not isinstance(item, str):
+                normalized.append(item)
+                continue
+            line = " ".join(item.split())
+            if not line or line in seen:
+                continue
+            seen.add(line)
+            normalized.append(line)
+        return normalized
+
+
+class AiWeeklySummaryResponse(AiWeeklySummaryContent):
+    period_start: date
+    period_end: date
+    generated_at: datetime
+    metrics: AiWeeklySummaryMetrics
