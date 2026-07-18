@@ -15,6 +15,7 @@ from app.schemas import AdjustmentCreate, AdjustmentOut, VenueStatsRow  # noqa: 
 
 
 API_PATH = BACKEND_DIR / "app" / "routers" / "api.py"
+REPORT_EXPORT_PATH = BACKEND_DIR / "app" / "services" / "report_export.py"
 API_SOURCE = API_PATH.read_text(encoding="utf-8")
 API_MODULE = ast.parse(API_SOURCE)
 
@@ -47,13 +48,14 @@ class VenueReportingTests(unittest.TestCase):
         self.assertNotIn("User.venue_id == payroll_data.venue_id", create_source)
 
     def test_export_uses_actual_shift_and_adjustment_venues(self) -> None:
-        source = _endpoint_source("export_csv")
+        source = REPORT_EXPORT_PATH.read_text(encoding="utf-8")
         self.assertIn("Shift.venue_id == venue_id", source)
         self.assertIn("Adjustment.venue_id == venue_id", source)
         self.assertNotIn("User.venue_id == venue_id", source)
-        self.assertIn('venue_name = "Точка не указана"', source)
-        self.assertIn('getattr(shift, "venue", None)', source)
-        self.assertNotIn('getattr(shift_user, "venue", None)', source)
+        self.assertIn('work_venue = getattr(shift, "venue", None)', source)
+        self.assertIn('home_venue = getattr(employee, "venue", None)', source)
+        self.assertIn('"work_venue"', source)
+        self.assertIn('"home_venue"', source)
 
     def test_adjustment_contract_and_scope_use_adjustment_venue(self) -> None:
         venue_id = uuid.uuid4()

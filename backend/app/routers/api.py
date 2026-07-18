@@ -1,15 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from sqlalchemy import select, func, and_, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
-import io
-import openpyxl
 from urllib.parse import quote
-from openpyxl.styles import Font, Alignment, PatternFill
-from openpyxl.utils import get_column_letter
 
 from app.database import get_session
 from app.models import (
@@ -40,6 +36,7 @@ from app.utils import (
     shift_status_label,
 )
 from app.notifications import notify_shift_approved, notify_shift_rejected, notify_bonus_added, notify_penalty_added
+from app.services.report_export import build_csv, build_xlsx, load_report_data
 
 import uuid
 import logging
@@ -1688,9 +1685,81 @@ async def list_adjustments(
     ]
 
 
-# ─── CSV Export ──────────────────────────────────────────────────────────────
+# ─── Report export ──────────────────────────────────────────────────────────
+
+
+def _export_scope_venue_id(user: User, requested_venue_id: uuid.UUID | None) -> uuid.UUID | None:
+    if _can_manage_all_venue_shifts(user):
+        return requested_venue_id
+    return user.venue_id
+
+
+def _export_content_disposition(month: int, year: int, extension: str) -> str:
+    ascii_filename = f"shift-report-{year}-{month:02d}.{extension}"
+    russian_filename = f"Порядок.Смены — отчёт {year}-{month:02d}.{extension}"
+    return (
+        f'attachment; filename="{ascii_filename}"; '
+        f"filename*=UTF-8''{quote(russian_filename)}"
+    )
+
+
+async def _get_export_report(
+    *,
+    month: int | None,
+    year: int | None,
+    venue_id: uuid.UUID | None,
+    user: User,
+    session: AsyncSession,
+):
+    if not has_permission(user, "can_export_payroll"):
+        raise HTTPException(
+            status_code=403,
+            detail="Недостаточно прав для экспорта отчёта",
+        )
+
+    now = datetime.now(timezone.utc)
+    selected_month = month or now.month
+    selected_year = year or now.year
+    if selected_month < 1 or selected_month > 12:
+        raise HTTPException(status_code=422, detail="Месяц должен быть от 1 до 12")
+
+    effective_venue_id = _export_scope_venue_id(user, venue_id)
+    return await load_report_data(
+        session,
+        month=selected_month,
+        year=selected_year,
+        venue_id=effective_venue_id,
+    )
+
 
 @router.get("/export/xlsx")
+async def export_xlsx(
+    month: int | None = None,
+    year: int | None = None,
+    venue_id: uuid.UUID | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Export a formatted monthly report without recalculating historical payroll."""
+    report = await _get_export_report(
+        month=month,
+        year=year,
+        venue_id=venue_id,
+        user=user,
+        session=session,
+    )
+    return Response(
+        content=build_xlsx(report),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": _export_content_disposition(
+                report.month, report.year, "xlsx"
+            )
+        },
+    )
+
+
+@router.get("/export/csv")
 async def export_csv(
     month: int | None = None,
     year: int | None = None,
@@ -1698,430 +1767,20 @@ async def export_csv(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Export monthly payroll data as CSV for accounting."""
-    if not has_permission(user, "can_export_payroll"):
-        raise HTTPException(status_code=403, detail="Only users with payroll export access can export payroll data")
-
-    now = datetime.now(timezone.utc)
-    m = month or now.month
-    y = year or now.year
-
-    shifts_query = (
-        select(Shift, User)
-        .outerjoin(User, Shift.user_id == User.id)
-        .options(
-            selectinload(Shift.venue),
-        )
-        .where(
-            Shift.status == "approved",
-            func.extract("month", Shift.date) == m,
-            func.extract("year", Shift.date) == y,
-        )
+    """Export raw monthly shift rows as UTF-8 BOM, semicolon-delimited CSV."""
+    report = await _get_export_report(
+        month=month,
+        year=year,
+        venue_id=venue_id,
+        user=user,
+        session=session,
     )
-    if venue_id is not None and _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(Shift.venue_id == venue_id)
-    elif not _can_manage_all_venue_shifts(user):
-        shifts_query = shifts_query.where(Shift.venue_id == user.venue_id)
-    shifts_query = shifts_query.order_by(User.name, Shift.date)
-    result = await session.execute(shifts_query)
-    shifts_with_users = result.all()
-
-    adj_query = (
-        select(Adjustment, User)
-        .join(User, Adjustment.user_id == User.id)
-        .where(
-            Adjustment.month == m,
-            Adjustment.year == y,
-        )
-    )
-    if venue_id is not None and _can_manage_all_venue_shifts(user):
-        adj_query = adj_query.where(Adjustment.venue_id == venue_id)
-    elif not _can_manage_all_venue_shifts(user):
-        adj_query = adj_query.where(Adjustment.venue_id == user.venue_id)
-    adj_result = await session.execute(adj_query)
-    adjustments_with_users = adj_result.all()
-
-    adj_by_user: dict[uuid.UUID, dict] = {}
-    for adj, adj_user in adjustments_with_users:
-        uid = adj.user_id
-        if uid not in adj_by_user:
-            adj_by_user[uid] = {"bonuses": Decimal("0"), "penalties": Decimal("0")}
-        if adj.type == AdjustmentType.bonus:
-            adj_by_user[uid]["bonuses"] += adj.amount
-        else:
-            adj_by_user[uid]["penalties"] += adj.amount
-
-    month_names = [
-        "январь",
-        "февраль",
-        "март",
-        "апрель",
-        "май",
-        "июнь",
-        "июль",
-        "август",
-        "сентябрь",
-        "октябрь",
-        "ноябрь",
-        "декабрь",
-    ]
-    pay_model_labels = {
-        "hourly": "Почасовая",
-        "fixed_shift": "Фикс за смену",
-        "revenue": "Процент от выручки",
-        "hybrid": "Почасовая + процент",
-    }
-    status_labels = {
-        "pending": "На подтверждении",
-        "approved": "Утверждена",
-        "rejected": "Отклонена",
-    }
-
-    period_text = f"{month_names[m - 1].capitalize()} {y}"
-    if venue_id is not None and _can_manage_all_venue_shifts(user):
-        venue_row = await session.get(Venue, venue_id)
-        venue_text = safe_text(getattr(venue_row, "name", None), "Основная точка")
-    elif not _can_manage_all_venue_shifts(user):
-        venue_text = safe_text(getattr(getattr(user, "venue", None), "name", None), "Основная точка")
-    else:
-        venue_text = "Все точки"
-
-    def pay_model_label(value) -> str:
-        return pay_model_labels.get(normalize_pay_model(value), "Почасовая")
-
-    def status_label(value) -> str:
-        return status_labels.get(safe_text(value, "pending"), "Неизвестно")
-
-    def add_title(sheet, columns: int) -> None:
-        last_col = get_column_letter(columns)
-        sheet.merge_cells(f"A1:{last_col}1")
-        sheet.merge_cells(f"A2:{last_col}2")
-        sheet["A1"] = "Порядок.Смены — отчёт по выплатам"
-        sheet["A2"] = f"Период: {period_text} | Точка: {venue_text}"
-        sheet["A1"].font = Font(bold=True, size=14)
-        sheet["A1"].alignment = Alignment(horizontal="left", vertical="center")
-        sheet["A2"].font = Font(size=11)
-        sheet["A2"].alignment = Alignment(horizontal="left", vertical="center")
-
-    def apply_header_row(sheet, row_number: int, headers: list[str]) -> None:
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2F6BFF", end_color="2F6BFF", fill_type="solid")
-        header_align = Alignment(horizontal="center", vertical="center")
-        for col, header in enumerate(headers, 1):
-            cell = sheet.cell(row=row_number, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_align
-
-    def set_formats(sheet, row_number: int, mapping: dict[int, str]) -> None:
-        for col, fmt in mapping.items():
-            sheet.cell(row=row_number, column=col).number_format = fmt
-
-    def autofit(sheet, start_row: int, widths: dict[int, int]) -> None:
-        for col_idx, base_width in widths.items():
-            max_len = base_width
-            for row_cells in sheet.iter_rows(min_row=start_row, min_col=col_idx, max_col=col_idx):
-                value = row_cells[0].value
-                if value is None:
-                    continue
-                max_len = max(max_len, len(str(value)))
-            sheet.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 38)
-
-    shift_rows: list[dict[str, object]] = []
-    user_totals: dict[uuid.UUID, dict[str, object]] = {}
-
-    for shift, shift_user in shifts_with_users:
-        user_name = safe_text(getattr(shift_user, "name", None), "Сотрудник")
-        position = safe_text(getattr(shift_user, "position", None), "")
-        venue_name = "Точка не указана"
-        pay_model_value = normalize_pay_model(getattr(shift_user, "pay_model", None) if shift_user is not None else None)
-
-        shift_venue = getattr(shift, "venue", None)
-        if shift_venue is not None:
-            venue_name = safe_text(getattr(shift_venue, "name", None), venue_name)
-
-        total_hours = safe_decimal(getattr(shift, "total_hours", None))
-        hourly_rate = safe_decimal(getattr(shift_user, "hourly_rate", None) if shift_user is not None else None)
-        revenue = safe_decimal(getattr(shift, "revenue", None))
-        rev_pct = safe_decimal(getattr(shift_user, "revenue_percentage", None) if shift_user is not None else None)
-        payout = calculate_salary(
-            total_hours,
-            hourly_rate,
-            revenue=revenue if revenue != Decimal("0.00") else None,
-            revenue_percentage=rev_pct if rev_pct != Decimal("0.00") else None,
-            pay_model=pay_model_value,
-        )
-        user_id = shift.user_id
-        user_adj = adj_by_user.get(user_id, {"bonuses": Decimal("0"), "penalties": Decimal("0")})
-
-        if user_id not in user_totals:
-            user_totals[user_id] = {
-                "name": user_name,
-                "shifts_count": 0,
-                "hours": Decimal("0.00"),
-                "shift_pay": Decimal("0.00"),
-                "bonuses": user_adj["bonuses"],
-                "penalties": user_adj["penalties"],
-            }
-        user_totals[user_id]["shifts_count"] += 1
-        user_totals[user_id]["hours"] += total_hours
-        user_totals[user_id]["shift_pay"] += payout
-
-        shift_rows.append(
-            {
-                "employee": user_name,
-                "venue": venue_name,
-                "position": position,
-                "date": getattr(shift, "date", None),
-                "start_time": getattr(shift, "start_time", None),
-                "end_time": getattr(shift, "end_time", None),
-                "hours": total_hours,
-                "rate": hourly_rate,
-                "revenue": revenue,
-                "revenue_percent": rev_pct,
-                "pay_model": pay_model_value,
-                "status": safe_text(getattr(shift, "status", None), "pending"),
-                "payout": payout,
-            }
-        )
-
-
-    wb = openpyxl.Workbook()
-    ws_shifts = wb.active
-    ws_shifts.title = "Смены"
-    ws_summary = wb.create_sheet("Сводка")
-
-    shift_headers = [
-        "Сотрудник",
-        "Точка",
-        "Должность",
-        "Дата",
-        "Начало смены",
-        "Конец смены",
-        "Часы",
-        "Ставка",
-        "Выручка",
-        "Процент",
-        "Модель оплаты",
-        "Статус",
-        "К выплате",
-    ]
-    summary_headers = [
-        "Сотрудник",
-        "Смен",
-        "Часы",
-        "Начислено за смены",
-        "Бонусы",
-        "Штрафы",
-        "К выплате",
-    ]
-    russian_months = [
-        "Январь",
-        "Февраль",
-        "Март",
-        "Апрель",
-        "Май",
-        "Июнь",
-        "Июль",
-        "Август",
-        "Сентябрь",
-        "Октябрь",
-        "Ноябрь",
-        "Декабрь",
-    ]
-
-    def style_title(sheet, columns: int) -> None:
-        last_col = get_column_letter(columns)
-        sheet.merge_cells(f"A1:{last_col}1")
-        sheet.merge_cells(f"A2:{last_col}2")
-        sheet["A1"] = "Порядок.Смены — отчёт по выплатам"
-        sheet["A2"] = f"Период: {russian_months[m - 1]} {y} | Точка: {venue_text}"
-        sheet["A1"].font = Font(bold=True, size=14, color="1F2937")
-        sheet["A1"].alignment = Alignment(horizontal="left", vertical="center")
-        sheet["A2"].font = Font(size=11, color="4B5563")
-        sheet["A2"].alignment = Alignment(horizontal="left", vertical="center")
-        sheet["A1"].fill = PatternFill(start_color="EEF2FF", end_color="EEF2FF", fill_type="solid")
-        sheet["A2"].fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-
-    def apply_header(sheet, row_number: int, headers: list[str]) -> None:
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-        header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        for col, header in enumerate(headers, 1):
-            cell = sheet.cell(row=row_number, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_align
-
-    def set_row_formats(sheet, row_number: int, mapping: dict[int, str]) -> None:
-        for col, fmt in mapping.items():
-            sheet.cell(row=row_number, column=col).number_format = fmt
-
-    def autofit(sheet, start_row: int, widths: dict[int, int]) -> None:
-        for col_idx, base_width in widths.items():
-            max_len = base_width
-            for row_cells in sheet.iter_rows(min_row=start_row, min_col=col_idx, max_col=col_idx):
-                value = row_cells[0].value
-                if value is None:
-                    continue
-                max_len = max(max_len, len(str(value)))
-            sheet.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 40)
-
-    if not shift_rows:
-        for sheet, columns in ((ws_shifts, len(shift_headers)), (ws_summary, len(summary_headers))):
-            style_title(sheet, columns)
-            last_col = get_column_letter(columns)
-            sheet.merge_cells(f"A4:{last_col}4")
-            sheet["A4"] = "За выбранный период смен нет"
-            sheet["A4"].font = Font(italic=True, color="6B7280")
-            sheet["A4"].alignment = Alignment(horizontal="center", vertical="center")
-            sheet.freeze_panes = "A4"
-            sheet.sheet_view.showGridLines = False
-            autofit(sheet, start_row=1, widths={1: 24, 2: 18, 3: 18, 4: 14, 5: 14, 6: 14, 7: 14, 8: 14, 9: 14, 10: 12, 11: 20, 12: 16, 13: 16})
-    else:
-        style_title(ws_shifts, len(shift_headers))
-        style_title(ws_summary, len(summary_headers))
-        ws_shifts.freeze_panes = "A4"
-        ws_summary.freeze_panes = "A4"
-        ws_shifts.sheet_view.showGridLines = False
-        ws_summary.sheet_view.showGridLines = False
-
-        apply_header(ws_shifts, 3, shift_headers)
-        ws_shifts.auto_filter.ref = f"A3:M{3 + len(shift_rows)}"
-
-        row = 4
-        for item in shift_rows:
-            ws_shifts.cell(row=row, column=1, value=item["employee"])
-            ws_shifts.cell(row=row, column=2, value=item["venue"])
-            ws_shifts.cell(row=row, column=3, value=item["position"])
-            ws_shifts.cell(row=row, column=4, value=item["date"])
-            ws_shifts.cell(row=row, column=5, value=item["start_time"])
-            ws_shifts.cell(row=row, column=6, value=item["end_time"])
-            ws_shifts.cell(row=row, column=7, value=float(item["hours"]))
-            ws_shifts.cell(row=row, column=8, value=float(item["rate"]))
-            ws_shifts.cell(
-                row=row,
-                column=9,
-                value=float(item["revenue"]) if item["revenue"] != Decimal("0.00") else None,
-            )
-            ws_shifts.cell(
-                row=row,
-                column=10,
-                value=float(item["revenue_percent"]) if item["revenue_percent"] != Decimal("0.00") else None,
-            )
-            ws_shifts.cell(row=row, column=11, value=pay_model_label(item["pay_model"]))
-            ws_shifts.cell(row=row, column=12, value=status_label(item["status"]))
-            ws_shifts.cell(row=row, column=13, value=float(item["payout"]))
-            set_row_formats(
-                ws_shifts,
-                row,
-                {
-                    4: "dd.mm.yyyy",
-                    5: "hh:mm",
-                    6: "hh:mm",
-                    7: "0.00",
-                    8: '#,##0.00 ₽',
-                    9: '#,##0.00 ₽',
-                    10: '0.00',
-                    13: '#,##0.00 ₽',
-                },
-            )
-            row += 1
-
-        apply_header(ws_summary, 3, summary_headers)
-        ws_summary.auto_filter.ref = f"A3:G{3 + len(user_totals) + 1}"
-
-        row = 4
-        total_shifts = 0
-        total_hours = Decimal("0.00")
-        total_shift_pay = Decimal("0.00")
-        total_bonuses = Decimal("0.00")
-        total_penalties = Decimal("0.00")
-        for totals in sorted(user_totals.values(), key=lambda item: str(item["name"]).lower()):
-            net = calculate_payout_total(
-                totals["shift_pay"], totals["bonuses"], totals["penalties"]
-            )
-            total_shifts += int(totals["shifts_count"])
-            total_hours += totals["hours"]
-            total_shift_pay += totals["shift_pay"]
-            total_bonuses += totals["bonuses"]
-            total_penalties += totals["penalties"]
-            ws_summary.cell(row=row, column=1, value=totals["name"])
-            ws_summary.cell(row=row, column=2, value=int(totals["shifts_count"]))
-            ws_summary.cell(row=row, column=3, value=float(totals["hours"]))
-            ws_summary.cell(row=row, column=4, value=float(totals["shift_pay"]))
-            ws_summary.cell(row=row, column=5, value=float(totals["bonuses"]))
-            ws_summary.cell(row=row, column=6, value=float(totals["penalties"]))
-            ws_summary.cell(row=row, column=7, value=float(net.quantize(Decimal("0.01"))))
-            set_row_formats(
-                ws_summary,
-                row,
-                {
-                    2: "0",
-                    3: "0.00",
-                    4: '#,##0.00 ₽',
-                    5: '#,##0.00 ₽',
-                    6: '#,##0.00 ₽',
-                    7: '#,##0.00 ₽',
-                },
-            )
-            row += 1
-
-        ws_summary.cell(row=row, column=1, value="Итого")
-        ws_summary.cell(row=row, column=2, value=total_shifts)
-        ws_summary.cell(row=row, column=3, value=float(total_hours))
-        ws_summary.cell(row=row, column=4, value=float(total_shift_pay))
-        ws_summary.cell(row=row, column=5, value=float(total_bonuses))
-        ws_summary.cell(row=row, column=6, value=float(total_penalties))
-        ws_summary.cell(
-            row=row,
-            column=7,
-            value=float(
-                calculate_payout_total(
-                    total_shift_pay, total_bonuses, total_penalties
-                )
-            ),
-        )
-        for col in range(1, 8):
-            cell = ws_summary.cell(row=row, column=col)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid")
-        set_row_formats(
-            ws_summary,
-            row,
-            {
-                2: "0",
-                3: "0.00",
-                4: '#,##0.00 ₽',
-                5: '#,##0.00 ₽',
-                6: '#,##0.00 ₽',
-                7: '#,##0.00 ₽',
-            },
-        )
-
-        autofit(
-            ws_shifts,
-            start_row=3,
-            widths={1: 22, 2: 18, 3: 18, 4: 14, 5: 14, 6: 14, 7: 10, 8: 14, 9: 14, 10: 10, 11: 20, 12: 16, 13: 16},
-        )
-        autofit(
-            ws_summary,
-            start_row=3,
-            widths={1: 22, 2: 10, 3: 10, 4: 16, 5: 12, 6: 12, 7: 14},
-        )
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    ascii_filename = f"payroll-{y}-{m:02d}.xlsx"
-    russian_filename = f"Порядок.Смены — отчёт по выплатам {russian_months[m - 1].lower()} {y}.xlsx"
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    return Response(
+        content=build_csv(report),
+        media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{ascii_filename}"; '
-                f"filename*=UTF-8''{quote(russian_filename)}"
+            "Content-Disposition": _export_content_disposition(
+                report.month, report.year, "csv"
             )
         },
     )

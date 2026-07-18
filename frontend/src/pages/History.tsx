@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock, CreditCard, Download, SlidersHorizontal, TrendingDown } from 'lucide-react';
-import { Shift, User, Venue, PayrollSummary, downloadPayrollExport, getActiveVenues, getPayrollSummary, getVenues } from '../utils/api';
+import { Clock, CreditCard, Download, FileSpreadsheet, FileText, SlidersHorizontal, TrendingDown } from 'lucide-react';
+import { Shift, User, Venue, PayrollSummary, downloadPayrollCsvExport, downloadPayrollExport, getActiveVenues, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import BottomSheet from '../components/BottomSheet';
@@ -30,9 +30,11 @@ function getVenueLabel(venue: Venue) {
 
 export default function History({ user }: Props) {
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
   const initialMonthValue = `${getCurrentYear()}-${String(getCurrentMonth()).padStart(2, '0')}`;
   const [tab, setTab] = useState<Tab>('shifts');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => ({ month: getCurrentMonth(), year: getCurrentYear() }));
   const [venueFilter, setVenueFilter] = useState('all');
   const [draftMonth, setDraftMonth] = useState(initialMonthValue);
@@ -41,8 +43,8 @@ export default function History({ user }: Props) {
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState<'xlsx' | 'csv' | null>(null);
+  const [exportErrors, setExportErrors] = useState<Record<'xlsx' | 'csv', string | null>>({ xlsx: null, csv: null });
 
   const { month, year } = viewDate;
   const canManagePayroll = useMemo(() => hasPermission(user, 'can_view_team_payroll'), [user]);
@@ -151,11 +153,12 @@ export default function History({ user }: Props) {
     };
   }, [canManagePayroll, month, year, venueScopeId]);
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'xlsx' | 'csv') => {
     try {
-      setExportLoading(true);
-      setExportError(null);
-      const { blob, filename } = await downloadPayrollExport(month, year, venueScopeId);
+      setExportLoading(format);
+      setExportErrors((current) => ({ ...current, [format]: null }));
+      const download = format === 'xlsx' ? downloadPayrollExport : downloadPayrollCsvExport;
+      const { blob, filename } = await download(month, year, venueScopeId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -164,10 +167,14 @@ export default function History({ user }: Props) {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportOpen(false);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Не удалось скачать расчёт начислений.');
+      setExportErrors((current) => ({
+        ...current,
+        [format]: error instanceof Error ? error.message : `Не удалось скачать ${format.toUpperCase()}.`,
+      }));
     } finally {
-      setExportLoading(false);
+      setExportLoading(null);
     }
   };
 
@@ -224,13 +231,13 @@ export default function History({ user }: Props) {
             </div>
             {canExportPayroll && (
               <button
+                ref={exportButtonRef}
                 type="button"
                 className="history-export-button"
-                onClick={handleExport}
-                disabled={exportLoading}
-                aria-label="Выгрузить расчёт начислений в XLSX"
+                onClick={() => setExportOpen(true)}
+                aria-label="Открыть экспорт отчёта"
               >
-                {exportLoading ? <span className="history-spinner" /> : <Download className="h-5 w-5" aria-hidden="true" />}
+                <Download className="h-5 w-5" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -268,7 +275,6 @@ export default function History({ user }: Props) {
           ) : (
             <p className="history-inline-error">Сводка начислений пока недоступна</p>
           )}
-          {exportError && <p className="history-inline-error">{exportError}</p>}
         </section>
       )}
 
@@ -344,6 +350,38 @@ export default function History({ user }: Props) {
           )}
         </section>
       )}
+
+      <BottomSheet
+        open={exportOpen}
+        title="Экспортировать"
+        onClose={() => setExportOpen(false)}
+        returnFocusRef={exportButtonRef}
+      >
+        <div className="history-export-options">
+          <button
+            type="button"
+            className="history-export-option"
+            onClick={() => handleExport('xlsx')}
+            disabled={exportLoading !== null}
+          >
+            <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
+            <span><strong>Excel (.xlsx)</strong><small>Оформленный отчёт</small></span>
+            {exportLoading === 'xlsx' && <span className="history-spinner" aria-label="Готовим Excel" />}
+          </button>
+          {exportErrors.xlsx && <p className="history-inline-error">{exportErrors.xlsx}</p>}
+          <button
+            type="button"
+            className="history-export-option"
+            onClick={() => handleExport('csv')}
+            disabled={exportLoading !== null}
+          >
+            <FileText className="h-5 w-5" aria-hidden="true" />
+            <span><strong>CSV</strong><small>Сырые данные</small></span>
+            {exportLoading === 'csv' && <span className="history-spinner" aria-label="Готовим CSV" />}
+          </button>
+          {exportErrors.csv && <p className="history-inline-error">{exportErrors.csv}</p>}
+        </div>
+      </BottomSheet>
 
       <BottomSheet
         open={filtersOpen}
