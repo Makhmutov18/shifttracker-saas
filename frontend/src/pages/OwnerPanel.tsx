@@ -558,6 +558,9 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentComment, setPaymentComment] = useState('');
+  const selectedPreviewVenueName = venueId
+    ? venues.find((venue) => venue.id === venueId)?.name || 'Точка не указана'
+    : 'Несколько точек';
 
   const loadRuns = async () => {
     try {
@@ -827,7 +830,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-tg-text">{row.user_name || 'Сотрудник'}</p>
-                      <p className="mt-1 text-xs text-tg-hint">{row.venue_name || 'Основная точка'}</p>
+                      <p className="mt-1 text-xs text-tg-hint">{row.venue_name || selectedPreviewVenueName}</p>
                     </div>
                     <p className="owner-money-value shrink-0 text-sm font-semibold text-tg-text">{formatCurrency(row.total_amount)}</p>
                   </div>

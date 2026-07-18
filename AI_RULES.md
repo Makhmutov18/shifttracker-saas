@@ -33,6 +33,17 @@ Permissions already exist.
 Do not refactor permissions unless the task explicitly asks for it.
 Owner always has full access.
 
+## Venue scoping invariant
+
+- `User.venue_id` is the employee's home organizational venue.
+- `Shift.venue_id` is the actual venue where the shift was worked.
+- Team assignment and employee lists are scoped by `User.venue_id`.
+- Venue shifts, hours, revenue and shift accruals are scoped by `Shift.venue_id`.
+- Personal employee accruals include their shifts across all venues.
+- `Adjustment.venue_id` is the venue whose accruals include that adjustment.
+- Never filter venue work with `Shift.venue_id == venue OR User.venue_id == venue`.
+- In Russian UI, use `Основная точка` for an employee and `Точка смены` for work.
+
 ## UI
 The app supports light/dark/system theme.
 Use CSS variables for colors.

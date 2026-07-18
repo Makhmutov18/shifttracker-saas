@@ -292,7 +292,7 @@ function PayrollRunRow({ run }: { run: PersonalPayrollRun }) {
       <button type="button" className="payouts-run-main" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
         <div className="min-w-0 text-left">
           <p className="truncate font-semibold text-tg-text">{run.title || period}</p>
-          <p className="mt-1 truncate text-sm text-tg-hint">{period} · {run.venue_name || 'Основная точка'}</p>
+          <p className="mt-1 truncate text-sm text-tg-hint">{period} · {run.venue_name || 'Все точки'}</p>
         </div>
         <div className="shrink-0 text-right">
           <span className="payouts-run-status" data-status={run.status}>{isPaid ? 'Выплачено' : 'Ожидает выплаты'}</span>

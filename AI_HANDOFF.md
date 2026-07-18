@@ -49,6 +49,15 @@
 - after changes, run the relevant build or compile step
 - always commit and push to `main`
 
+## Venue Scoping Invariant
+
+- `User.venue_id` is the employee's home venue; use it for team assignment.
+- `Shift.venue_id` is the actual work venue; use it for shifts, hours, revenue and venue accruals.
+- Personal employee accruals include all of their venues.
+- `Adjustment.venue_id` identifies the venue of the bonus or deduction.
+- Never broaden a venue filter with `Shift.venue_id == venue OR User.venue_id == venue`.
+- UI labels: `Основная точка` for employee assignment, `Точка смены` for actual work.
+
 ## Standard Finish
 
 - run `git status --short`
