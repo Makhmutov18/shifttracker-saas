@@ -36,6 +36,7 @@ export interface Shift {
   id: string;
   user_id: string;
   venue_id?: string | null;
+  venue_name?: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -45,6 +46,23 @@ export interface Shift {
   status: string;
   comment?: string | null;
   created_at: string;
+}
+
+export interface VenueStatsRow {
+  venue_id: string;
+  venue_name: string;
+  is_active: boolean;
+  assigned_employees_count: number;
+  worked_employees_count: number;
+  approved_shifts_count: number;
+  pending_shifts_count: number;
+  approved_hours: string;
+  shift_accruals: string;
+  bonuses: string;
+  deductions: string;
+  total_accruals: string;
+  revenue: string;
+  payroll_share_percent?: string | null;
 }
 
 export interface PayrollSummaryRow {

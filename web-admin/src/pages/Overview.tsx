@@ -2,23 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Ban, Clock3, FileClock, Store, UserRoundX } from 'lucide-react';
 import { api } from '../api';
 import { AvatarStack, ErrorState, IconBadge, LoadingState, MoneyValue, StatusBadge, type BadgeVariant } from '../components/ui';
-import type { PayrollRunListItem, PayrollSummary, Shift, User, Venue } from '../types';
+import type { PayrollRunListItem, PayrollSummary, Shift, User, Venue, VenueStatsRow } from '../types';
 import { formatDate, formatTime, hasPermission, monthBounds, monthParts } from '../utils';
 import type { RoutePath } from '../components/shell';
 
 type WeeklyAccrual = {
   label: string;
   value: number;
-};
-
-type VenueOverview = {
-  id: string;
-  name: string;
-  employees: number;
-  shifts: number;
-  accrual: number;
-  revenue: number;
-  pending: number;
 };
 
 function plural(value: number, forms: [string, string, string]): string {
@@ -66,10 +56,12 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
   const [users, setUsers] = useState<User[]>([]);
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [runs, setRuns] = useState<PayrollRunListItem[]>([]);
+  const [venueStats, setVenueStats] = useState<VenueStatsRow[]>([]);
   const [runsAvailable, setRunsAvailable] = useState(true);
   const { month, year } = monthParts(periodValue);
   const { start: periodStart, end: periodEnd } = monthBounds(periodValue);
   const canViewPayroll = hasPermission(user, 'can_view_team_payroll');
+  const canViewVenueStats = canViewPayroll || hasPermission(user, 'can_manage_team');
 
   const load = async () => {
     setLoading(true);
@@ -79,6 +71,7 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
       api.users(true),
       canViewPayroll ? api.payrollSummary(month, year, venueId || undefined) : Promise.resolve(null),
       canViewPayroll ? api.payrollRuns(venueId || undefined) : Promise.resolve([]),
+      canViewVenueStats ? api.venueStats(month, year, true) : Promise.resolve([]),
     ]);
     if (requests[0].status === 'fulfilled') setShifts(requests[0].value);
     else setError(requests[0].reason instanceof Error ? requests[0].reason.message : 'Не удалось загрузить обзор.');
@@ -91,10 +84,11 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
       setRuns([]);
       setRunsAvailable(false);
     }
+    setVenueStats(requests[4].status === 'fulfilled' ? requests[4].value : []);
     setLoading(false);
   };
 
-  useEffect(() => { void load(); }, [venueId, canViewPayroll]);
+  useEffect(() => { void load(); }, [venueId, canViewPayroll, canViewVenueStats, month, year]);
 
   const scopedUsers = useMemo(() => users.filter((employee) => !venueId || employee.venue_id === venueId), [users, venueId]);
   const activeUsers = useMemo(() => scopedUsers.filter((employee) => employee.is_active), [scopedUsers]);
@@ -121,7 +115,6 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     inactiveVenues.length ? { icon: Store, tone: 'neutral' as BadgeVariant, text: `${inactiveVenues.length} ${plural(inactiveVenues.length, ['точка находится', 'точки находятся', 'точек находятся'])} в архиве`, action: 'Открыть точки', path: '/venues' as RoutePath } : null,
   ].filter(Boolean) as Array<{ icon: typeof Clock3; tone: BadgeVariant; text: string; action: string; path: RoutePath }>;
   const daysInMonth = new Date(year, month, 0).getDate();
-  const visibleVenues = useMemo(() => (venues ?? []).filter((venue) => venue.is_active && (!venueId || venue.id === venueId)), [venues, venueId]);
   const weeklyAccruals = useMemo<WeeklyAccrual[]>(() => {
     const weeks = Array.from({ length: Math.ceil(daysInMonth / 7) }, (_, index) => ({
       label: `${index * 7 + 1}–${Math.min(daysInMonth, index * 7 + 7)}`,
@@ -133,19 +126,10 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     });
     return weeks;
   }, [approvedShifts, daysInMonth]);
-  const venueOverview = useMemo<VenueOverview[]>(() => visibleVenues.map((venue) => {
-    const venueShifts = shifts.filter((shift) => (shift.venue_id || userMap.get(shift.user_id)?.venue_id) === venue.id);
-    const approvedVenueShifts = venueShifts.filter((shift) => shift.status === 'approved');
-    return {
-      id: venue.id,
-      name: venue.name || 'Точка без названия',
-      employees: activeUsers.filter((employee) => employee.venue_id === venue.id).length,
-      shifts: venueShifts.length,
-      accrual: approvedVenueShifts.reduce((total, shift) => total + numeric(shift.salary_earned), 0),
-      revenue: approvedVenueShifts.reduce((total, shift) => total + numeric(shift.revenue), 0),
-      pending: venueShifts.filter((shift) => shift.status === 'pending').length,
-    };
-  }), [activeUsers, shifts, userMap, visibleVenues]);
+  const venueOverview = useMemo(
+    () => venueStats.filter((row) => row.is_active && (!venueId || row.venue_id === venueId)),
+    [venueId, venueStats],
+  );
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const timeNow = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -156,7 +140,7 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     if (!start || !end) return false;
     return end >= start ? timeNow >= start && timeNow <= end : timeNow >= start || timeNow <= end;
   }).map((shift) => shift.user_id));
-  const activeNow = activeUsers.filter((employee) => activeUserIds.has(employee.id));
+  const activeNow = users.filter((employee) => employee.is_active && activeUserIds.has(employee.id));
   const summaryAvailable = summary !== null;
 
   if (loading) return <LoadingState text="Собираем данные за месяц…" />;
@@ -191,7 +175,7 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
         <div className="overview-section-header"><div><h2>Последние смены</h2><span>До пяти последних записей за период</span></div><button className="section-link" onClick={() => navigate('/shifts')}>Все смены<ArrowRight /></button></div>
         {shifts.length ? <div className="overview-shift-list">{shifts.slice(0, 5).map((shift) => {
           const employee = userMap.get(shift.user_id);
-          const venueName = venueMap.get(shift.venue_id || '')?.name || employee?.venue?.name || 'Основная точка';
+          const venueName = shift.venue_name?.trim() || venueMap.get(shift.venue_id || '')?.name || 'Точка не указана';
           return <button className="overview-shift-row" key={shift.id} onClick={() => navigate('/shifts')}>
             <span className="shift-person"><strong>{employee?.name || 'Сотрудник'}</strong><small>{formatDate(shift.date)} · {formatTime(shift.start_time)}–{formatTime(shift.end_time)}</small></span>
             <span className="shift-venue" title={venueName}>{venueName}</span>
@@ -234,13 +218,13 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
         <div className="overview-section-header"><div><h2>Состояние точек</h2><span>Команда и утверждённые смены за месяц</span></div></div>
         {venueOverview.length ? <div className="venue-overview-list">
           <div className="venue-overview-head" aria-hidden="true"><span>Точка</span><span>Сотрудники</span><span>Смены</span><span>Начислено</span><span>Выручка</span><span>Задачи</span></div>
-          {venueOverview.map((venue) => <div className="venue-overview-row" key={venue.id}>
-            <span className="venue-overview-name"><strong title={venue.name}>{venue.name}</strong></span>
-            <span className="venue-overview-stat"><small>Активные сотрудники</small><strong>{venue.employees}</strong></span>
-            <span className="venue-overview-stat"><small>Смены за месяц</small><strong>{venue.shifts}</strong></span>
-            <span className="venue-overview-stat"><small>Начислено</small><strong>{canViewPayroll ? <MoneyValue value={venue.accrual} /> : <span className="overview-restricted-value">—</span>}</strong></span>
+          {venueOverview.map((venue) => <div className="venue-overview-row" key={venue.venue_id}>
+            <span className="venue-overview-name"><strong title={venue.venue_name}>{venue.venue_name}</strong></span>
+            <span className="venue-overview-stat"><small>Закреплено / работали</small><strong>{venue.assigned_employees_count} / {venue.worked_employees_count}</strong></span>
+            <span className="venue-overview-stat"><small>Утверждённые смены</small><strong>{venue.approved_shifts_count}</strong></span>
+            <span className="venue-overview-stat"><small>Начислено</small><strong>{canViewPayroll ? <MoneyValue value={venue.total_accruals} /> : <span className="overview-restricted-value">—</span>}</strong></span>
             <span className="venue-overview-stat"><small>Выручка</small><strong><MoneyValue value={venue.revenue} /></strong></span>
-            <span className={`venue-overview-stat${venue.pending ? ' has-task' : ''}`}><small>На подтверждении</small><strong>{venue.pending ? `${venue.pending} ${plural(venue.pending, ['смена', 'смены', 'смен'])}` : '—'}</strong></span>
+            <span className={`venue-overview-stat${venue.pending_shifts_count ? ' has-task' : ''}`}><small>На подтверждении</small><strong>{venue.pending_shifts_count ? `${venue.pending_shifts_count} ${plural(venue.pending_shifts_count, ['смена', 'смены', 'смен'])}` : '—'}</strong></span>
           </div>)}
         </div> : <div className="compact-empty"><span>Активных точек нет</span><small>Добавьте точку в разделе управления.</small></div>}
       </section>

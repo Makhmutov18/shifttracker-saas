@@ -32,7 +32,7 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [selected, setSelected] = useState<Shift | null>(null);
-  const [form, setForm] = useState({ start_time: '', end_time: '', revenue: '', comment: '' });
+  const [form, setForm] = useState({ venue_id: '', start_time: '', end_time: '', revenue: '', comment: '' });
   const [confirm, setConfirm] = useState<'approved' | 'rejected' | null>(null);
   const [sortKey, setSortKey] = useState<ShiftSort>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -91,18 +91,18 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
     if (sortKey === next) setSortDirection((value) => value === 'asc' ? 'desc' : 'asc');
     else { setSortKey(next); setSortDirection(next === 'date' ? 'desc' : 'asc'); }
   };
-  const open = (shift: Shift) => { setSelected(shift); setForm({ start_time: (shift.start_time || '').slice(0, 5), end_time: (shift.end_time || '').slice(0, 5), revenue: shift.revenue ?? '', comment: shift.comment ?? '' }); };
+  const open = (shift: Shift) => { setSelected(shift); setForm({ venue_id: shift.venue_id || '', start_time: (shift.start_time || '').slice(0, 5), end_time: (shift.end_time || '').slice(0, 5), revenue: shift.revenue ?? '', comment: shift.comment ?? '' }); };
   const openFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>, shift: Shift) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     open(shift);
   };
   const toggleStatus = (nextStatus: Exclude<ShiftStatusFilter, ''>) => setStatus((current) => current === nextStatus ? '' : nextStatus);
-  const venueName = (shift: Shift, employee?: User) => venueMap.get(shift.venue_id || '')?.name || employee?.venue?.name || 'Основная точка';
+  const venueName = (shift: Shift) => shift.venue_name?.trim() || venueMap.get(shift.venue_id || '')?.name || 'Точка не указана';
   const save = async (nextStatus?: 'approved' | 'rejected') => {
     if (!selected) return; setSaving(true); setError('');
     try {
-      const updated = await api.updateShift(selected.id, { start_time: form.start_time, end_time: form.end_time, revenue: form.revenue || null, comment: form.comment || null, status: nextStatus ?? selected.status });
+      const updated = await api.updateShift(selected.id, { venue_id: form.venue_id || undefined, start_time: form.start_time, end_time: form.end_time, revenue: form.revenue || null, comment: form.comment || null, status: nextStatus ?? selected.status });
       setShifts((current) => current.map((shift) => shift.id === updated.id ? updated : shift));
       setSuccess(nextStatus === 'approved' ? 'Смена утверждена.' : nextStatus === 'rejected' ? 'Смена отклонена.' : 'Изменения смены сохранены.');
       setSelected(null); setConfirm(null);
@@ -150,7 +150,7 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
             onClick={() => open(shift)}
             onKeyDown={(event) => openFromKeyboard(event, shift)}
             key={shift.id}
-          ><td>{formatDate(shift.date)}</td><td><div className="person-cell"><AvatarStack items={[{ name: employeeName }]} max={1} /><span><strong>{employeeName}</strong><small>{employee?.position || 'Без должности'}</small></span></div></td><td>{venueName(shift, employee)}</td><td>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</td><td>{formatNumber(shift.total_hours)} ч</td><td className="align-right"><MoneyValue value={shift.revenue} muted={!shift.revenue} /></td><td className="align-right"><span className="pay-with-info"><MoneyValue value={shift.salary_earned} /><span title={`Модель расчёта: ${payModel}`} aria-label={`Модель расчёта: ${payModel}`}><Info /></span></span></td><td><StatusBadge status={shift.status || 'unknown'} /></td></tr>;
+          ><td>{formatDate(shift.date)}</td><td><div className="person-cell"><AvatarStack items={[{ name: employeeName }]} max={1} /><span><strong>{employeeName}</strong><small>{employee?.position || 'Без должности'}</small></span></div></td><td>{venueName(shift)}</td><td>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</td><td>{formatNumber(shift.total_hours)} ч</td><td className="align-right"><MoneyValue value={shift.revenue} muted={!shift.revenue} /></td><td className="align-right"><span className="pay-with-info"><MoneyValue value={shift.salary_earned} /><span title={`Модель расчёта: ${payModel}`} aria-label={`Модель расчёта: ${payModel}`}><Info /></span></span></td><td><StatusBadge status={shift.status || 'unknown'} /></td></tr>;
         })}
       </DataTable>
       {!filtered.length && <EmptyState title="Смены не найдены" description="Измените фильтры или выберите другой период." />}
@@ -160,13 +160,13 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
         return <button className="mobile-card shift-mobile-card" type="button" key={shift.id} onClick={() => open(shift)} aria-label={`Открыть смену: ${employeeName}, ${formatDate(shift.date)}`}>
           <span className="shift-mobile-card-head"><span className="person-cell"><AvatarStack items={[{ name: employeeName }]} max={1} /><span><strong>{employeeName}</strong><small>{employee?.position || 'Без должности'}</small></span></span><StatusBadge status={shift.status || 'unknown'} /></span>
           <span className="shift-mobile-card-details"><span><small>Дата</small><strong>{formatDate(shift.date)}</strong></span><span><small>Время</small><strong>{formatTime(shift.start_time)}–{formatTime(shift.end_time)}</strong></span></span>
-          <span className="shift-mobile-card-footer"><span><small>Точка</small><strong>{venueName(shift, employee)}</strong></span><span className="align-right"><small>Начислено</small><MoneyValue value={shift.salary_earned} /></span></span>
+          <span className="shift-mobile-card-footer"><span><small>Точка смены</small><strong>{venueName(shift)}</strong></span><span className="align-right"><small>Начислено</small><MoneyValue value={shift.salary_earned} /></span></span>
         </button>;
       })}</div>
       <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
     </section>
     <Drawer title="Детали смены" open={Boolean(selected)} onClose={() => setSelected(null)} footer={<><button className="button secondary" onClick={() => setSelected(null)}>Закрыть</button>{selected?.status === 'pending' && canApprove && <><button className="button secondary" disabled={saving} onClick={() => setConfirm('rejected')}><X />Отклонить</button><button className="button primary" disabled={saving} onClick={() => setConfirm('approved')}><Check />Утвердить</button></>}</>}>
-      {selected && <div className="form-section"><h3>{userMap.get(selected.user_id)?.name || 'Сотрудник'} · {formatDate(selected.date)}</h3><FormField label="Начало смены"><input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Конец смены"><input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Выручка"><input type="number" min="0" value={form.revenue} onChange={(event) => setForm({ ...form, revenue: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Комментарий"><textarea value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} disabled={!canEdit} /></FormField>{canEdit && <button className="button secondary" disabled={saving} onClick={() => void save()}>Сохранить изменения</button>}</div>}
+      {selected && <div className="form-section"><h3>{userMap.get(selected.user_id)?.name || 'Сотрудник'} · {formatDate(selected.date)}</h3><FormField label="Точка смены">{selected.status === 'pending' && canEdit ? <select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })}>{(venues ?? []).filter((venue) => venue.is_active).map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select> : <div className="field-readonly-value">{venueName(selected)}</div>}</FormField><FormField label="Начало смены"><input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Конец смены"><input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Выручка"><input type="number" min="0" value={form.revenue} onChange={(event) => setForm({ ...form, revenue: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Комментарий"><textarea value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} disabled={!canEdit} /></FormField>{canEdit && <button className="button secondary" disabled={saving} onClick={() => void save()}>Сохранить изменения</button>}</div>}
     </Drawer>
     <ConfirmationDialog open={Boolean(confirm)} title={confirm === 'approved' ? 'Утвердить смену?' : 'Отклонить смену?'} text={confirm === 'approved' ? 'Смена войдёт в начисления сотрудника.' : 'Отклонённая смена не войдёт в начисления.'} confirmLabel={confirm === 'approved' ? 'Утвердить' : 'Отклонить'} danger={confirm === 'rejected'} onClose={() => setConfirm(null)} onConfirm={() => confirm && void save(confirm)} />
     <Toast message={success} onClose={() => setSuccess('')} />

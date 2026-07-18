@@ -1,5 +1,5 @@
 import { resolveAuth } from './auth';
-import type { AuditLog, InviteResult, PayrollPreview, PayrollRun, PayrollRunListItem, PayrollSummary, Shift, User, Venue } from './types';
+import type { AuditLog, InviteResult, PayrollPreview, PayrollRun, PayrollRunListItem, PayrollSummary, Shift, User, Venue, VenueStatsRow } from './types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -87,6 +87,7 @@ export const api = {
   updateUser: (id: string, data: Record<string, unknown>) => request<User>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deactivateUser: (id: string) => request(`/api/admin/users/${id}`, { method: 'DELETE' }),
   venues: (includeInactive = true) => request<Venue[]>(`/api/admin/venues${query({ include_inactive: includeInactive })}`),
+  venueStats: (month: number, year: number, includeInactive = false) => request<VenueStatsRow[]>(`/api/venues/stats${query({ month, year, include_inactive: includeInactive })}`),
   createVenue: (name: string) => request<Venue>('/api/admin/venues', { method: 'POST', body: JSON.stringify({ name }) }),
   updateVenue: (id: string, data: { name?: string; is_active?: boolean }) => request<Venue>(`/api/admin/venues/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deactivateVenue: (id: string) => request(`/api/admin/venues/${id}`, { method: 'DELETE' }),

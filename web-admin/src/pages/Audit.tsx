@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Archive, Check, FileClock, Pencil, Plus, X } from 'lucide-react';
 import { api } from '../api';
 import { Badge, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, LoadingState, PageHeader, Pagination, SearchSelect, type BadgeVariant, type SortDirection } from '../components/ui';
-import type { AuditLog } from '../types';
+import type { AuditLog, Venue } from '../types';
 import { formatDateTime } from '../utils';
 
 const actionLabels: Record<string, string> = {
@@ -26,6 +26,7 @@ function actionPresentation(action: string): { icon: typeof Plus; variant: Badge
 
 export function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [type, setType] = useState('');
   const [employee, setEmployee] = useState('');
   const [periodStart, setPeriodStart] = useState('');
@@ -36,12 +37,20 @@ export function AuditPage() {
   const [selected, setSelected] = useState<AuditLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const load = async () => { setLoading(true); setError(''); try { setLogs(await api.audit(1, 100)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось загрузить историю действий.'); } finally { setLoading(false); } };
+  const load = async () => {
+    setLoading(true); setError('');
+    const [auditResult, venueResult] = await Promise.allSettled([api.audit(1, 100), api.venues(true)]);
+    if (auditResult.status === 'fulfilled') setLogs(auditResult.value);
+    else setError(auditResult.reason instanceof Error ? auditResult.reason.message : 'Не удалось загрузить историю действий.');
+    if (venueResult.status === 'fulfilled') setVenues(venueResult.value);
+    setLoading(false);
+  };
   useEffect(() => { void load(); }, []);
   useEffect(() => { setPage(1); }, [type, employee, periodStart, periodEnd, sortKey, sortDirection]);
 
   const types = useMemo(() => Array.from(new Set((logs ?? []).map((log) => log.entity_type))).sort(), [logs]);
   const employees = useMemo(() => Array.from(new Set((logs ?? []).flatMap((log) => [log.user_name, log.target_user_name]).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, 'ru-RU')), [logs]);
+  const venueMap = useMemo(() => new Map((venues ?? []).map((venue) => [venue.id, venue.name])), [venues]);
   const filtered = useMemo(() => (logs ?? []).filter((log) => {
     const day = (log.created_at || '').slice(0, 10);
     return (!type || log.entity_type === type) && (!employee || log.user_name === employee || log.target_user_name === employee) && (!periodStart || day >= periodStart) && (!periodEnd || day <= periodEnd);
@@ -68,7 +77,7 @@ export function AuditPage() {
     <div className="mobile-cards audit-mobile-cards">{pageRows.map((log) => { const presentation = actionPresentation(log.action || ''); const Icon = presentation.icon; return <article className="mobile-card audit-mobile-card" role="button" tabIndex={0} onClick={() => setSelected(log)} onKeyDown={(event) => openFromKeyboard(event, log)} key={log.id}><Badge variant={presentation.variant} icon={<Icon />}>{actionLabels[log.action] || 'Действие'}</Badge><time>{formatDateTime(log.created_at)}</time><span><small>Кто выполнил</small><strong>{log.user_name || 'Пользователь'}</strong></span><span><small>{log.target_user_name ? 'Связанный пользователь' : 'Объект'}</small><strong>{log.target_user_name || entityLabel(log.entity_type)}</strong></span></article>; })}</div>
     <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} /></section>
     <Drawer title="Детали события" open={Boolean(selected)} onClose={() => setSelected(null)}>
-      {selected && <div className="audit-details"><dl><div><dt>Действие</dt><dd>{actionLabels[selected.action] || 'Действие'}</dd></div><div><dt>Дата и время</dt><dd>{formatDateTime(selected.created_at)}</dd></div><div><dt>Кто выполнил</dt><dd>{selected.user_name || 'Пользователь'}</dd></div><div><dt>Связанный пользователь</dt><dd>{selected.target_user_name || 'Не указан'}</dd></div><div><dt>Тип объекта</dt><dd>{entityLabel(selected.entity_type)}</dd></div>{selected.entity_id && <div><dt>Идентификатор объекта</dt><dd>{selected.entity_id}</dd></div>}</dl><AuditChanges oldValue={selected.old_value} newValue={selected.new_value} /></div>}
+      {selected && <div className="audit-details"><dl><div><dt>Действие</dt><dd>{actionLabels[selected.action] || 'Действие'}</dd></div><div><dt>Дата и время</dt><dd>{formatDateTime(selected.created_at)}</dd></div><div><dt>Кто выполнил</dt><dd>{selected.user_name || 'Пользователь'}</dd></div><div><dt>Связанный пользователь</dt><dd>{selected.target_user_name || 'Не указан'}</dd></div><div><dt>Тип объекта</dt><dd>{entityLabel(selected.entity_type)}</dd></div>{selected.entity_id && <div><dt>Идентификатор объекта</dt><dd>{selected.entity_id}</dd></div>}</dl><AuditChanges oldValue={selected.old_value} newValue={selected.new_value} entityType={selected.entity_type} venueMap={venueMap} /></div>}
     </Drawer>
   </div>;
 }
@@ -77,14 +86,15 @@ function entityLabel(value: string): string { return ({ user: 'Сотрудни�
 
 const fieldLabels: Record<string, string> = { name: 'Имя', position: 'Должность', role: 'Роль', venue_id: 'Точка', status: 'Статус', start_time: 'Начало', end_time: 'Конец', revenue: 'Выручка', salary_earned: 'Начислено', amount: 'Сумма', payment_date: 'Дата выплаты', method: 'Способ', comment: 'Комментарий' };
 
-function AuditChanges({ oldValue, newValue }: { oldValue?: Record<string, unknown> | null; newValue?: Record<string, unknown> | null }) {
+function AuditChanges({ oldValue, newValue, entityType, venueMap }: { oldValue?: Record<string, unknown> | null; newValue?: Record<string, unknown> | null; entityType: string; venueMap: Map<string, string> }) {
   const keys = Array.from(new Set([...Object.keys(oldValue || {}), ...Object.keys(newValue || {})]));
   if (!keys.length) return <EmptyState title="Подробные изменения не сохранены" />;
-  return <section className="audit-changes"><div className="audit-changes-head"><strong>Поле</strong><strong>Старое значение</strong><strong>Новое значение</strong></div>{keys.map((key) => <div className="audit-change-row" key={key}><strong>{fieldLabels[key] || key}</strong><AuditValue value={oldValue?.[key]} /><AuditValue value={newValue?.[key]} /></div>)}</section>;
+  return <section className="audit-changes"><div className="audit-changes-head"><strong>Поле</strong><strong>Старое значение</strong><strong>Новое значение</strong></div>{keys.map((key) => <div className="audit-change-row" key={key}><strong>{key === 'venue_id' && entityType === 'shift' ? 'Точка смены' : fieldLabels[key] || key}</strong><AuditValue value={oldValue?.[key]} venueMap={key === 'venue_id' ? venueMap : undefined} /><AuditValue value={newValue?.[key]} venueMap={key === 'venue_id' ? venueMap : undefined} /></div>)}</section>;
 }
 
-function AuditValue({ value }: { value: unknown }) {
+function AuditValue({ value, venueMap }: { value: unknown; venueMap?: Map<string, string> }) {
   if (value === null || value === undefined || value === '') return <span className="audit-empty-value">Не указано</span>;
+  if (venueMap && typeof value === 'string') return <span>{venueMap.get(value) || value}</span>;
   if (typeof value === 'object') return <pre>{JSON.stringify(value, null, 2)}</pre>;
   return <span>{String(value)}</span>;
 }

@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Archive, Building2, Plus, RotateCcw } from 'lucide-react';
 import { api } from '../api';
-import { AvatarStack, Badge, ConfirmationDialog, DataTable, Drawer, EmptyState, ErrorState, FormField, LoadingState, MoneyValue, PageHeader, Pagination, Toast, type SortDirection } from '../components/ui';
-import type { Shift, User, Venue } from '../types';
+import { Badge, ConfirmationDialog, DataTable, Drawer, EmptyState, ErrorState, FormField, LoadingState, MoneyValue, PageHeader, Pagination, Toast, type SortDirection } from '../components/ui';
+import type { Venue, VenueStatsRow } from '../types';
 import { currentMonthValue, monthParts } from '../utils';
 
-type VenueSort = 'name' | 'employees' | 'shifts' | 'accrued' | 'pending' | 'revenue';
+type VenueSort = 'name' | 'assigned' | 'worked' | 'shifts' | 'hours' | 'accrued' | 'pending' | 'revenue' | 'share';
 const PAGE_SIZE = 15;
 
 export function VenuesPage() {
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [venueStats, setVenueStats] = useState<VenueStatsRow[]>([]);
   const [archive, setArchive] = useState(false);
   const [editing, setEditing] = useState<Venue | 'new' | null>(null);
   const [name, setName] = useState('');
@@ -27,31 +26,20 @@ export function VenuesPage() {
   const load = async () => {
     setLoading(true); setError('');
     const { month, year } = monthParts(currentMonthValue());
-    const [venueResult, userResult, shiftResult] = await Promise.allSettled([api.venues(true), api.users(true), api.shifts(month, year)]);
+    const [venueResult, statsResult] = await Promise.allSettled([api.venues(true), api.venueStats(month, year, true)]);
     if (venueResult.status === 'fulfilled') setVenues(venueResult.value); else setError(venueResult.reason instanceof Error ? venueResult.reason.message : 'Не удалось загрузить точки.');
-    setUsers(userResult.status === 'fulfilled' ? userResult.value : []);
-    setShifts(shiftResult.status === 'fulfilled' ? shiftResult.value : []);
+    if (statsResult.status === 'fulfilled') setVenueStats(statsResult.value);
+    else setError(statsResult.reason instanceof Error ? statsResult.reason.message : 'Не удалось загрузить статистику точек.');
     setLoading(false);
   };
   useEffect(() => { void load(); }, []);
   useEffect(() => { setPage(1); }, [archive, sortKey, sortDirection]);
 
-  const stats = useMemo(() => new Map((venues ?? []).map((venue) => {
-    const venueShifts = (shifts ?? []).filter((shift) => shift.venue_id === venue.id);
-    const venueEmployees = (users ?? []).filter((employee) => employee.is_active && employee.venue_id === venue.id);
-    return [venue.id, {
-      employees: venueEmployees.length,
-      employeeNames: venueEmployees.map((employee) => employee.name || 'Сотрудник'),
-      shifts: venueShifts.length,
-      accrued: venueShifts.filter((shift) => shift.status === 'approved').reduce((sum, shift) => sum + Number(shift.salary_earned || 0), 0),
-      pending: venueShifts.filter((shift) => shift.status === 'pending').length,
-      revenue: venueShifts.reduce((sum, shift) => sum + Number(shift.revenue || 0), 0),
-    }];
-  })), [venues, shifts, users]);
+  const stats = useMemo(() => new Map((venueStats ?? []).map((row) => [row.venue_id, row])), [venueStats]);
   const filtered = useMemo(() => (venues ?? []).filter((venue) => venue.is_active !== archive).sort((left, right) => {
     const leftStats = stats.get(left.id) || emptyVenueStats;
     const rightStats = stats.get(right.id) || emptyVenueStats;
-    const values: Record<VenueSort, [string | number, string | number]> = { name: [left.name || '', right.name || ''], employees: [leftStats.employees, rightStats.employees], shifts: [leftStats.shifts, rightStats.shifts], accrued: [leftStats.accrued, rightStats.accrued], pending: [leftStats.pending, rightStats.pending], revenue: [leftStats.revenue, rightStats.revenue] };
+    const values: Record<VenueSort, [string | number, string | number]> = { name: [left.name || '', right.name || ''], assigned: [leftStats.assigned_employees_count, rightStats.assigned_employees_count], worked: [leftStats.worked_employees_count, rightStats.worked_employees_count], shifts: [leftStats.approved_shifts_count, rightStats.approved_shifts_count], hours: [Number(leftStats.approved_hours), Number(rightStats.approved_hours)], accrued: [Number(leftStats.total_accruals), Number(rightStats.total_accruals)], pending: [leftStats.pending_shifts_count, rightStats.pending_shifts_count], revenue: [Number(leftStats.revenue), Number(rightStats.revenue)], share: [Number(leftStats.payroll_share_percent || -1), Number(rightStats.payroll_share_percent || -1)] };
     const [a, b] = values[sortKey];
     const result = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ru-RU');
     return sortDirection === 'asc' ? result : -result;
@@ -65,15 +53,15 @@ export function VenuesPage() {
   const openFromKeyboard = (event: KeyboardEvent<HTMLElement>, venue: Venue) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); open(venue); };
 
   if (loading) return <LoadingState text="Загружаем точки…" />;
-  if (error && !venues.length) return <ErrorState message={error} retry={load} />;
+  if (error && !venueStats.length) return <ErrorState message={error} retry={load} />;
   return <div className="venues-page">
     <PageHeader title="Точки" description="Точки заведения и их активность за текущий месяц." action={<button className="button primary" onClick={() => open('new')}><Plus />Добавить точку</button>} />
     {error && <div className="notice error">{error}</div>}
     <div className="employee-list-tabs" role="tablist" aria-label="Состояние точек"><button type="button" role="tab" aria-selected={!archive} className={!archive ? 'active' : ''} onClick={() => setArchive(false)}>Активные <span>{venues.filter((venue) => venue.is_active).length}</span></button><button type="button" role="tab" aria-selected={archive} className={archive ? 'active' : ''} onClick={() => setArchive(true)}>Архив <span>{venues.filter((venue) => !venue.is_active).length}</span></button></div>
-    <section className="panel"><DataTable label="Список точек" headers={[{ label: 'Точка', sortKey: 'name' }, { label: 'Сотрудников', sortKey: 'employees' }, { label: 'Смен за текущий месяц', sortKey: 'shifts' }, { label: 'Начислено за текущий месяц', sortKey: 'accrued', align: 'right' }, { label: 'Требует подтверждения', sortKey: 'pending' }, { label: 'Выручка за текущий месяц', sortKey: 'revenue', align: 'right' }, 'Действия']} sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} empty={!filtered.length}>
-      {pageRows.map((venue) => { const venueStats = stats.get(venue.id) || emptyVenueStats; return <tr className="venue-table-row" tabIndex={0} onClick={() => open(venue)} onKeyDown={(event) => openFromKeyboard(event, venue)} key={venue.id}><td><div className="venue-name-cell"><span><Building2 /></span><strong>{venue.name || 'Точка без названия'}</strong></div></td><td><div className="venue-team-cell"><AvatarStack items={venueStats.employeeNames.map((employeeName) => ({ name: employeeName }))} max={3} /><span>{venueStats.employees}</span></div></td><td>{venueStats.shifts}</td><td className="align-right"><MoneyValue value={venueStats.accrued} muted={!venueStats.accrued} /></td><td><Badge variant={venueStats.pending > 0 ? 'warning' : 'neutral'}>{venueStats.pending}</Badge></td><td className="align-right"><MoneyValue value={venueStats.revenue} muted={!venueStats.revenue} /></td><td><div className="row-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{venue.is_active ? <button className="icon-button danger-icon" onClick={() => setConfirm(venue)} aria-label="В архив"><Archive /></button> : <button className="icon-button" onClick={() => void restore(venue)} aria-label="Восстановить"><RotateCcw /></button>}</div></td></tr>; })}
+    <section className="panel"><DataTable label="Список точек" headers={[{ label: 'Точка', sortKey: 'name' }, { label: 'Закреплено / работали', sortKey: 'assigned' }, { label: 'Смены / часы', sortKey: 'shifts' }, { label: 'Начислено', sortKey: 'accrued', align: 'right' }, { label: 'Pending', sortKey: 'pending' }, { label: 'Выручка', sortKey: 'revenue', align: 'right' }, { label: 'Доля ФОТ', sortKey: 'share', align: 'right' }, 'Действия']} sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} empty={!filtered.length}>
+      {pageRows.map((venue) => { const row = stats.get(venue.id) || emptyVenueStats; return <tr className="venue-table-row" tabIndex={0} onClick={() => open(venue)} onKeyDown={(event) => openFromKeyboard(event, venue)} key={venue.id}><td><div className="venue-name-cell"><span><Building2 /></span><strong>{venue.name || 'Точка без названия'}</strong></div></td><td>{row.assigned_employees_count} / {row.worked_employees_count}</td><td>{row.approved_shifts_count} / {Number(row.approved_hours).toLocaleString('ru-RU')} ч</td><td className="align-right"><MoneyValue value={row.total_accruals} muted={!Number(row.total_accruals)} /></td><td><Badge variant={row.pending_shifts_count > 0 ? 'warning' : 'neutral'}>{row.pending_shifts_count}</Badge></td><td className="align-right"><MoneyValue value={row.revenue} muted={!Number(row.revenue)} /></td><td className="align-right">{row.payroll_share_percent == null ? '—' : `${Number(row.payroll_share_percent).toLocaleString('ru-RU')}%`}</td><td><div className="row-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{venue.is_active ? <button className="icon-button danger-icon" onClick={() => setConfirm(venue)} aria-label="В архив"><Archive /></button> : <button className="icon-button" onClick={() => void restore(venue)} aria-label="Восстановить"><RotateCcw /></button>}</div></td></tr>; })}
     </DataTable>{!filtered.length && <EmptyState title={archive ? 'Архив точек пуст' : 'Точек пока нет'} description={!archive ? 'Добавьте первую точку, чтобы привязывать к ней сотрудников и смены.' : 'Архивные точки появятся здесь.'} />}
-    <div className="mobile-cards venue-mobile-cards">{pageRows.map((venue) => { const venueStats = stats.get(venue.id) || emptyVenueStats; return <article className="mobile-card venue-mobile-card" role="button" tabIndex={0} onClick={() => open(venue)} onKeyDown={(event) => openFromKeyboard(event, venue)} key={venue.id}><div className="venue-mobile-head"><span><Building2 /></span><strong>{venue.name || 'Точка без названия'}</strong></div><div className="venue-mobile-details"><span><small>Сотрудников</small><strong>{venueStats.employees}</strong></span><span><small>Смен</small><strong>{venueStats.shifts}</strong></span><span><small>Начислено</small><MoneyValue value={venueStats.accrued} muted={!venueStats.accrued} /></span><span><small>Требует подтверждения</small><Badge variant={venueStats.pending > 0 ? 'warning' : 'neutral'}>{venueStats.pending}</Badge></span><span><small>Выручка</small><MoneyValue value={venueStats.revenue} muted={!venueStats.revenue} /></span></div><div className="venue-mobile-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{venue.is_active ? <button className="icon-button danger-icon" onClick={() => setConfirm(venue)} aria-label="В архив"><Archive /></button> : <button className="icon-button" onClick={() => void restore(venue)} aria-label="Восстановить"><RotateCcw /></button>}</div></article>; })}</div>
+    <div className="mobile-cards venue-mobile-cards">{pageRows.map((venue) => { const row = stats.get(venue.id) || emptyVenueStats; return <article className="mobile-card venue-mobile-card" role="button" tabIndex={0} onClick={() => open(venue)} onKeyDown={(event) => openFromKeyboard(event, venue)} key={venue.id}><div className="venue-mobile-head"><span><Building2 /></span><strong>{venue.name || 'Точка без названия'}</strong></div><div className="venue-mobile-details"><span><small>Закреплено / работали</small><strong>{row.assigned_employees_count} / {row.worked_employees_count}</strong></span><span><small>Смены / часы</small><strong>{row.approved_shifts_count} / {Number(row.approved_hours).toLocaleString('ru-RU')} ч</strong></span><span><small>Начислено</small><MoneyValue value={row.total_accruals} muted={!Number(row.total_accruals)} /></span><span><small>На подтверждении</small><Badge variant={row.pending_shifts_count > 0 ? 'warning' : 'neutral'}>{row.pending_shifts_count}</Badge></span><span><small>Выручка</small><MoneyValue value={row.revenue} muted={!Number(row.revenue)} /></span><span><small>Доля ФОТ</small><strong>{row.payroll_share_percent == null ? '—' : `${Number(row.payroll_share_percent).toLocaleString('ru-RU')}%`}</strong></span></div><div className="venue-mobile-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{venue.is_active ? <button className="icon-button danger-icon" onClick={() => setConfirm(venue)} aria-label="В архив"><Archive /></button> : <button className="icon-button" onClick={() => void restore(venue)} aria-label="Восстановить"><RotateCcw /></button>}</div></article>; })}</div>
     <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} /></section>
     <Drawer title={editing === 'new' ? 'Добавить точку' : 'Редактировать точку'} open={Boolean(editing)} onClose={() => setEditing(null)} footer={<><button className="button secondary" onClick={() => setEditing(null)}>Отмена</button><button className="button primary" disabled={saving} onClick={() => void save()}>{editing === 'new' ? 'Добавить точку' : 'Сохранить'}</button></>}><div className="form-section"><FormField label="Название точки"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Например: Кофейня на Ленина" /></FormField></div></Drawer>
     <ConfirmationDialog open={Boolean(confirm)} title="Отправить точку в архив?" text="Точка останется в истории. Система не позволит архивировать её, если к ней привязаны активные сотрудники или смены." confirmLabel="В архив" danger onClose={() => setConfirm(null)} onConfirm={() => void deactivate()} />
@@ -81,4 +69,4 @@ export function VenuesPage() {
   </div>;
 }
 
-const emptyVenueStats = { employees: 0, employeeNames: [] as string[], shifts: 0, accrued: 0, pending: 0, revenue: 0 };
+const emptyVenueStats: VenueStatsRow = { venue_id: '', venue_name: '', is_active: true, assigned_employees_count: 0, worked_employees_count: 0, approved_shifts_count: 0, pending_shifts_count: 0, approved_hours: '0', shift_accruals: '0', bonuses: '0', deductions: '0', total_accruals: '0', revenue: '0', payroll_share_percent: null };
