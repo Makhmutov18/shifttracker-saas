@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { Calculator, Check, CircleDollarSign, Plus, X } from 'lucide-react';
-import { api } from '../api';
+import { Calculator, Check, CircleDollarSign, Download, FileSpreadsheet, FileText, LoaderCircle, Plus, X } from 'lucide-react';
+import { api, type ExportFormat } from '../api';
 import { ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, Metric, MoneyValue, PageHeader, Pagination, StatusBadge, Toast, type SortDirection } from '../components/ui';
 import type { PayrollPreview, PayrollRun, PayrollRunItem, PayrollRunListItem, User, Venue } from '../types';
-import { currentMonthValue, formatDate, formatNumber, isOwnerOrAdmin, monthBounds } from '../utils';
+import { currentMonthValue, formatDate, formatNumber, hasPermission, isOwnerOrAdmin, monthBounds, monthParts } from '../utils';
 
 type ConfirmAction = { type: 'finalize' | 'cancel'; run: PayrollRun } | null;
 type RunSort = 'period' | 'status' | 'amount' | 'remaining';
@@ -22,6 +22,15 @@ function formatPayrollShare(value?: string | number | null) {
   return `${amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
+function formatReportMonth(value: string): string {
+  const { month, year } = monthParts(value);
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year)) return 'Период не выбран';
+  const label = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' })
+    .format(new Date(year, month - 1, 1))
+    .replace(/\s*г\.$/, '');
+  return `${label.charAt(0).toLocaleUpperCase('ru-RU')}${label.slice(1)}`;
+}
+
 export function PayrollPage({ user, venues, venueId }: { user: User; venues: Venue[]; venueId: string }) {
   const bounds = monthBounds(currentMonthValue());
   const [periodStart, setPeriodStart] = useState(bounds.start);
@@ -31,6 +40,10 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const [createOpen, setCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportMonth, setExportMonth] = useState(currentMonthValue());
+  const [exportLoading, setExportLoading] = useState<ExportFormat | null>(null);
+  const [exportError, setExportError] = useState('');
   const [revenueInput, setRevenueInput] = useState('');
   const [selected, setSelected] = useState<PayrollRun | null>(null);
   const [revenueEditOpen, setRevenueEditOpen] = useState(false);
@@ -50,6 +63,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const canAct = isOwnerOrAdmin(user);
+  const canExport = hasPermission(user, 'can_export_payroll');
 
   const loadRuns = async () => {
     setLoading(true); setError('');
@@ -128,6 +142,35 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   };
   const openCreate = () => { setPreview(null); setRevenueInput(''); setCreateError(''); setCreateOpen(true); };
   const closeCreate = () => { if (createBusy) return; setCreateOpen(false); setPreview(null); setRevenueInput(''); setCreateError(''); };
+  const openExport = () => { setExportMonth(currentMonthValue()); setExportError(''); setExportOpen(true); };
+  const closeExport = () => { if (exportLoading) return; setExportOpen(false); setExportError(''); };
+  const downloadReport = async (format: ExportFormat) => {
+    if (!canExport) return;
+    const { month, year } = monthParts(exportMonth);
+    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year)) {
+      setExportError('Выберите месяц отчёта.');
+      return;
+    }
+    setExportLoading(format); setExportError('');
+    try {
+      const download = await api.createReportDownloadLink(format, month, year, venueId || undefined);
+      const url = new URL(download.url);
+      if (url.protocol !== 'https:') throw new Error('Безопасная ссылка на скачивание недоступна.');
+      const anchor = document.createElement('a');
+      anchor.href = url.toString();
+      anchor.download = download.file_name;
+      anchor.rel = 'noopener';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setExportOpen(false);
+    } catch (reason) {
+      setExportError(reason instanceof Error ? reason.message : 'Не удалось подготовить отчёт. Попробуйте ещё раз.');
+    } finally {
+      setExportLoading(null);
+    }
+  };
   const updatePeriodStart = (value: string) => { setPeriodStart(value); setPreview(null); setCreateError(''); };
   const updatePeriodEnd = (value: string) => { setPeriodEnd(value); setPreview(null); setCreateError(''); };
   const selectedVenueName = venueId ? venues.find((venue) => venue.id === venueId)?.name || 'Точка не указана' : 'Все точки';
@@ -145,7 +188,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   if (error && !runs.length && !preview) return <ErrorState message={error} retry={loadRuns} />;
 
   return <div className="payroll-page">
-    <PageHeader title="Расчёты выплат" description="Формируйте начисления за период и фиксируйте фактические выплаты." action={canAct ? <button className="button primary" onClick={openCreate}><Plus />Новый расчёт</button> : undefined} />
+    <PageHeader title="Расчёты выплат" description="Формируйте начисления за период и фиксируйте фактические выплаты." action={canExport || canAct ? <div className="page-header-actions">{canExport && <button className="button secondary" type="button" onClick={openExport}><Download />Экспорт</button>}{canAct && <button className="button primary" type="button" onClick={openCreate}><Plus />Новый расчёт</button>}</div> : undefined} />
     <section className="payroll-summary" aria-label="Финансовая сводка">
       <div><span>Начислено</span><strong><MoneyValue value={totals.accrued} /></strong></div>
       <div><span>Выплачено</span><strong><MoneyValue value={totals.paid} /></strong></div>
@@ -170,6 +213,22 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       })}</div>
       <Pagination page={page} pageSize={PAGE_SIZE} total={filteredRuns.length} onPage={setPage} />
     </section>
+
+    {canExport && <Drawer title="Экспорт отчёта" open={exportOpen} onClose={closeExport}>
+      <div className="payroll-export-drawer">
+        <FormField label="Месяц отчёта"><input type="month" value={exportMonth} onChange={(event) => { setExportMonth(event.target.value); setExportError(''); }} disabled={Boolean(exportLoading)} /></FormField>
+        <div className="payroll-export-context"><span>Область отчёта</span><strong>{selectedVenueName}</strong><small>Отчёт: {formatReportMonth(exportMonth)} · {selectedVenueName}</small></div>
+        {exportError && <div className="notice error" role="alert">{exportError}</div>}
+        <div className="payroll-export-options" aria-label="Формат отчёта">
+          <button className="payroll-export-option" type="button" disabled={Boolean(exportLoading)} onClick={() => void downloadReport('xlsx')}>
+            <span className="payroll-export-option-icon"><FileSpreadsheet /></span><span className="payroll-export-option-copy"><strong>Excel (.xlsx)</strong><small>Оформленный отчёт с несколькими листами</small></span><span className="payroll-export-option-status">{exportLoading === 'xlsx' ? <><LoaderCircle className="spin" />Готовим…</> : 'Скачать'}</span>
+          </button>
+          <button className="payroll-export-option" type="button" disabled={Boolean(exportLoading)} onClick={() => void downloadReport('csv')}>
+            <span className="payroll-export-option-icon"><FileText /></span><span className="payroll-export-option-copy"><strong>CSV</strong><small>Сырые данные смен</small></span><span className="payroll-export-option-status">{exportLoading === 'csv' ? <><LoaderCircle className="spin" />Готовим…</> : 'Скачать'}</span>
+          </button>
+        </div>
+      </div>
+    </Drawer>}
 
     <Drawer title="Новый расчёт" open={createOpen} onClose={closeCreate} size="wide" footer={<><button className="button secondary" disabled={createBusy} onClick={closeCreate}>Отмена</button>{preview?.rows.length ? <button className="button primary" disabled={createBusy || !canAct} onClick={() => void createRun()}><Plus />Сформировать черновик</button> : <button className="button primary" disabled={createBusy} onClick={() => void doPreview()}><Calculator />Предварительный расчёт</button>}</>}>
       <div className="payroll-create-drawer">

@@ -158,6 +158,7 @@ a { color: inherit; }
 .page-header h1 { margin: 0; font-size: 30px; line-height: 1.2; }
 .page-header p { margin: 7px 0 0; color: var(--text-muted); max-width: 720px; }
 .page-action { flex: 0 0 auto; }
+.page-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .button { min-height: 44px; border: 1px solid transparent; border-radius: var(--radius-control); padding: 0 16px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .button svg { width: 18px; height: 18px; }
 .button.primary { background: var(--accent); color: var(--text-on-accent); box-shadow: none; }
@@ -472,6 +473,24 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .payroll-table-row.is-draft > td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
 .payroll-table-row.has-remaining .payroll-remaining .money { color: var(--warning); font-weight: 700; }
 .payroll-create-drawer { display: grid; gap: 20px; }
+.payroll-export-drawer { display: grid; gap: 20px; }
+.payroll-export-context { display: grid; gap: 4px; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.payroll-export-context span, .payroll-export-context small { color: var(--text-muted); }
+.payroll-export-context span { font-size: 12px; font-weight: 650; }
+.payroll-export-context strong { overflow-wrap: anywhere; font-size: 16px; }
+.payroll-export-context small { font-size: 12px; line-height: 1.5; }
+.payroll-export-options { display: grid; gap: 10px; }
+.payroll-export-option { width: 100%; min-height: 86px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--control-surface); color: var(--text); text-align: left; }
+.payroll-export-option:hover { background: var(--surface-hover); }
+.payroll-export-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.payroll-export-option:disabled { opacity: .6; cursor: wait; }
+.payroll-export-option-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--radius-control); background: var(--surface-muted); color: var(--accent); }
+.payroll-export-option-icon svg { width: 21px; height: 21px; }
+.payroll-export-option-copy { min-width: 0; display: grid; gap: 4px; }
+.payroll-export-option-copy strong { font-size: 14px; }
+.payroll-export-option-copy small { color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.payroll-export-option-status { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.payroll-export-option-status svg { width: 16px; height: 16px; }
 .payroll-create-controls { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .payroll-create-venue { min-width: 220px; display: grid; gap: 4px; }
 .payroll-create-venue span, .payroll-create-venue small { color: var(--text-muted); }
@@ -677,6 +696,8 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .venue-control, .topbar-venue-filter { width: auto; max-width: none; min-width: 0; flex: 1 1 auto; }
   .content { padding: 18px 14px; }
   .page-header { align-items: stretch; flex-direction: column; }
+  .page-action, .page-header-actions { width: 100%; }
+  .page-header-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .page-action .button { width: 100%; }
   .metrics { grid-template-columns: 1fr 1fr; }
   .metric { min-height: 100px; }
@@ -712,6 +733,9 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .venue-overview-stat > small { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 11px; }
   .weekly-accrual-chart { padding-inline: 14px; }
   .payroll-summary strong { font-size: 17px; }
+  .payroll-export-option { grid-template-columns: 40px minmax(0, 1fr); gap: 12px; }
+  .payroll-export-option-icon { width: 40px; height: 40px; }
+  .payroll-export-option-status { grid-column: 2; }
   .payroll-summary > div:not(.payroll-summary-progress) { padding: 14px; }
   .payroll-create-controls { align-items: stretch; flex-direction: column; }
   .payroll-create-venue { min-width: 0; }

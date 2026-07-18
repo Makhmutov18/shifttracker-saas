@@ -3,6 +3,13 @@ import type { AuditLog, InviteResult, PayrollPreview, PayrollRun, PayrollRunList
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
+export type ExportFormat = 'xlsx' | 'csv';
+
+export interface ReportDownloadLink {
+  url: string;
+  file_name: string;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -78,6 +85,10 @@ export const api = {
   payrollPreview: (start: string, end: string, venueId?: string) => request<PayrollPreview>(`/api/payroll-runs/preview${query({ period_start: start, period_end: end, venue_id: venueId })}`),
   payrollRuns: (venueId?: string) => request<PayrollRunListItem[]>(`/api/payroll-runs${query({ venue_id: venueId })}`),
   payrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}`),
+  createReportDownloadLink: (format: ExportFormat, month: number, year: number, venueId?: string) => request<ReportDownloadLink>('/api/export/download-link', {
+    method: 'POST',
+    body: JSON.stringify({ format, month, year, venue_id: venueId }),
+  }),
   createPayrollRun: (data: { title?: string; period_start: string; period_end: string; venue_id?: string; notes?: string; revenue_total?: number }) => request<PayrollRun>('/api/payroll-runs', { method: 'POST', body: JSON.stringify(data) }),
   updatePayrollRunRevenue: (id: string, revenueTotal: number | null) => request<PayrollRun>(`/api/payroll-runs/${id}/revenue`, { method: 'PATCH', body: JSON.stringify({ revenue_total: revenueTotal }) }),
   finalizePayrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}/finalize`, { method: 'POST' }),
