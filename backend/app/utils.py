@@ -110,6 +110,19 @@ def calculate_payout_total(
     return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def calculate_payroll_share(
+    total_amount: Decimal,
+    revenue_total: Decimal | None,
+) -> Decimal | None:
+    """Return payroll as a percentage of a saved period revenue snapshot."""
+    revenue = safe_decimal(revenue_total)
+    if revenue <= Decimal("0.00"):
+        return None
+    return (
+        safe_decimal(total_amount) / revenue * Decimal("100")
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def get_current_month_range() -> tuple[datetime, datetime]:
     """Returns (start_of_month, end_of_month) in UTC."""
     now = datetime.now(timezone.utc)

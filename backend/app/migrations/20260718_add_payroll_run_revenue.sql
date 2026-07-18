@@ -1,0 +1,2 @@
+ALTER TABLE payroll_runs
+ADD COLUMN IF NOT EXISTS revenue_total NUMERIC(14,2);

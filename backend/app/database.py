@@ -169,6 +169,11 @@ async def init_db():
         """))
 
         await conn.execute(text("""
+            ALTER TABLE payroll_runs
+            ADD COLUMN IF NOT EXISTS revenue_total NUMERIC(14,2);
+        """))
+
+        await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL REFERENCES users(id),

@@ -24,6 +24,7 @@ from app.schemas import (
     AuditLogOut, AdjustmentCreate, AdjustmentOut,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
+    PayrollRunRevenueUpdate,
     PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
     VenueStatsRow,
 )
@@ -34,6 +35,7 @@ from app.utils import (
     normalize_pay_model,
     safe_decimal,
     calculate_payout_total,
+    calculate_payroll_share,
     safe_text,
     shift_status_label,
 )
@@ -833,6 +835,19 @@ async def create_payroll_run(
         raise HTTPException(status_code=403, detail="Only owners and admins can create payroll runs")
     if payroll_data.period_start > payroll_data.period_end:
         raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
+    if payroll_data.revenue_total is not None and payroll_data.venue_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Выручку можно указать только для расчёта конкретной точки",
+        )
+
+    revenue_total = (
+        safe_decimal(payroll_data.revenue_total).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        if payroll_data.revenue_total is not None
+        else None
+    )
 
     source_shifts_query = (
         select(Shift.id)
@@ -905,6 +920,7 @@ async def create_payroll_run(
         status=PayrollRunStatus.draft,
         total_amount=preview.total_amount,
         total_paid=Decimal("0.00"),
+        revenue_total=revenue_total,
         created_by_id=user.id,
         venue_id=payroll_data.venue_id,
         notes=payroll_data.notes,
@@ -934,18 +950,16 @@ async def create_payroll_run(
     try:
         session.add(payroll_run)
         await session.flush()
-        saved_result = await session.execute(
-            select(PayrollRun)
-            .options(selectinload(PayrollRun.items), selectinload(PayrollRun.payments))
-            .where(PayrollRun.id == payroll_run.id)
-        )
-        saved_run = saved_result.scalar_one()
         await session.commit()
     except Exception:
         await session.rollback()
         raise
 
-    return saved_run
+    return await get_payroll_run(
+        payroll_run_id=payroll_run.id,
+        user=user,
+        session=session,
+    )
 
 
 @router.get("/payroll-runs", response_model=list[PayrollRunListItem])
@@ -988,6 +1002,10 @@ async def list_payroll_runs(
             employees_count=len(run.items),
             total_amount=run.total_amount,
             total_paid=run.total_paid,
+            revenue_total=run.revenue_total,
+            payroll_share_percent=calculate_payroll_share(
+                run.total_amount, run.revenue_total
+            ),
             created_by_id=run.created_by_id,
             created_by_name=safe_text(getattr(run.created_by_user, "name", None), "Пользователь"),
             created_at=run.created_at,
@@ -1082,6 +1100,10 @@ async def get_payroll_run(
         status=run.status.value if hasattr(run.status, "value") else str(run.status),
         total_amount=run.total_amount,
         total_paid=run.total_paid,
+        revenue_total=run.revenue_total,
+        payroll_share_percent=calculate_payroll_share(
+            run.total_amount, run.revenue_total
+        ),
         created_by_id=run.created_by_id,
         venue_id=run.venue_id,
         venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Все точки",
@@ -1122,6 +1144,82 @@ async def get_payroll_run(
             )
             for payment in run.payments
         ],
+    )
+
+
+@router.patch("/payroll-runs/{payroll_run_id}/revenue", response_model=PayrollRunRead)
+async def update_payroll_run_revenue(
+    payroll_run_id: uuid.UUID,
+    revenue_data: PayrollRunRevenueUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Только владелец или администратор может изменить выручку")
+
+    result = await session.execute(
+        select(PayrollRun).where(PayrollRun.id == payroll_run_id)
+    )
+    run = result.scalar_one_or_none()
+    if run is None or not _payroll_run_is_visible(run, user):
+        raise HTTPException(status_code=404, detail="Расчёт не найден")
+    if run.venue_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Выручку можно указать только для расчёта конкретной точки",
+        )
+    if run.status != PayrollRunStatus.draft:
+        raise HTTPException(
+            status_code=409,
+            detail="Выручку можно изменить только в черновике расчёта",
+        )
+
+    previous_revenue = run.revenue_total
+    run.revenue_total = (
+        safe_decimal(revenue_data.revenue_total).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        if revenue_data.revenue_total is not None
+        else None
+    )
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    payroll_share_percent = calculate_payroll_share(
+        run.total_amount, run.revenue_total
+    )
+    try:
+        session.add(
+            AuditLog(
+                user_id=user.id,
+                venue_id=run.venue_id,
+                action="payroll_revenue_updated",
+                entity_type="payroll_run",
+                entity_id=run.id,
+                old_value={
+                    "revenue_total": str(previous_revenue) if previous_revenue is not None else None,
+                },
+                new_value={
+                    "revenue_total": str(run.revenue_total) if run.revenue_total is not None else None,
+                    "payroll_share_percent": str(payroll_share_percent) if payroll_share_percent is not None else None,
+                },
+            )
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception(
+            "Audit log write failed after payroll revenue update",
+            extra={"payroll_run_id": str(run.id)},
+        )
+
+    return await get_payroll_run(
+        payroll_run_id=run.id,
+        user=user,
+        session=session,
     )
 
 

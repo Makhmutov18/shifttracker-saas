@@ -277,6 +277,11 @@ class PayrollRunCreate(BaseModel):
     period_end: date
     venue_id: Optional[uuid.UUID] = None
     notes: Optional[str] = None
+    revenue_total: Optional[Decimal] = Field(None, ge=0)
+
+
+class PayrollRunRevenueUpdate(BaseModel):
+    revenue_total: Optional[Decimal] = Field(None, ge=0)
 
 
 class PayrollPaymentRead(BaseModel):
@@ -334,6 +339,8 @@ class PayrollRunRead(BaseModel):
     status: str
     total_amount: Decimal = Decimal("0.00")
     total_paid: Decimal = Decimal("0.00")
+    revenue_total: Optional[Decimal] = None
+    payroll_share_percent: Optional[Decimal] = None
     created_by_id: uuid.UUID
     venue_id: Optional[uuid.UUID] = None
     venue_name: Optional[str] = None
@@ -359,6 +366,8 @@ class PayrollRunListItem(BaseModel):
     employees_count: int = 0
     total_amount: Decimal = Decimal("0.00")
     total_paid: Decimal = Decimal("0.00")
+    revenue_total: Optional[Decimal] = None
+    payroll_share_percent: Optional[Decimal] = None
     created_by_id: uuid.UUID
     created_by_name: Optional[str] = None
     created_at: datetime
