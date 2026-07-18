@@ -217,13 +217,12 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
       <section className="overview-panel venue-overview-panel">
         <div className="overview-section-header"><div><h2>Состояние точек</h2><span>Команда и утверждённые смены за месяц</span></div></div>
         {venueOverview.length ? <div className="venue-overview-list">
-          <div className="venue-overview-head" aria-hidden="true"><span>Точка</span><span>Сотрудники</span><span>Смены</span><span>Начислено</span><span>Выручка</span><span>Задачи</span></div>
+          <div className="venue-overview-head" aria-hidden="true"><span>Точка</span><span>Сотрудники</span><span>Смены / часы</span><span>Начислено</span><span>Задачи</span></div>
           {venueOverview.map((venue) => <div className="venue-overview-row" key={venue.venue_id}>
             <span className="venue-overview-name"><strong title={venue.venue_name}>{venue.venue_name}</strong></span>
             <span className="venue-overview-stat"><small>Закреплено / работали</small><strong>{venue.assigned_employees_count} / {venue.worked_employees_count}</strong></span>
-            <span className="venue-overview-stat"><small>Утверждённые смены</small><strong>{venue.approved_shifts_count}</strong></span>
+            <span className="venue-overview-stat"><small>Смены / часы</small><strong>{venue.approved_shifts_count} / {Number(venue.approved_hours).toLocaleString('ru-RU')} ч</strong></span>
             <span className="venue-overview-stat"><small>Начислено</small><strong>{canViewPayroll ? <MoneyValue value={venue.total_accruals} /> : <span className="overview-restricted-value">—</span>}</strong></span>
-            <span className="venue-overview-stat"><small>Выручка</small><strong><MoneyValue value={venue.revenue} /></strong></span>
             <span className={`venue-overview-stat${venue.pending_shifts_count ? ' has-task' : ''}`}><small>На подтверждении</small><strong>{venue.pending_shifts_count ? `${venue.pending_shifts_count} ${plural(venue.pending_shifts_count, ['смена', 'смены', 'смен'])}` : '—'}</strong></span>
           </div>)}
         </div> : <div className="compact-empty"><span>Активных точек нет</span><small>Добавьте точку в разделе управления.</small></div>}

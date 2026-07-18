@@ -1873,7 +1873,6 @@ function VenuesTab() {
                     (userItem) => userItem.is_active && (userItem.venue_id === venue.id || userItem.venue?.id === venue.id)
                   ).length;
                   const assignedCount = stats?.assigned_employees_count ?? assignedFallback;
-                  const revenue = Number(stats?.revenue || 0);
                   return (
                     <div key={venue.id} className="owner-employee-card owner-list-row" data-archived={showVenueArchive ? 'true' : 'false'}>
                     <div className="flex items-start justify-between gap-3">
@@ -1917,9 +1916,7 @@ function VenuesTab() {
                               <div><span>Работали</span><strong>{stats.worked_employees_count}</strong></div>
                               <div><span>Смены</span><strong>{stats.approved_shifts_count}</strong></div>
                               <div><span>Часы</span><strong>{formatHours(stats.approved_hours)}</strong></div>
-                              <div><span>Начислено</span><strong>{formatCurrency(stats.total_accruals)}</strong></div>
-                              {revenue > 0 && <div><span>Выручка</span><strong>{formatCurrency(stats.revenue)}</strong></div>}
-                              {revenue > 0 && <div><span>Доля ФОТ</span><strong>{stats.payroll_share_percent == null ? '—' : `${Number(stats.payroll_share_percent).toLocaleString('ru-RU')}%`}</strong></div>}
+                              <div className="owner-venue-accrual"><span>Начислено</span><strong>{formatCurrency(stats.total_accruals)}</strong></div>
                             </>
                           ) : null}
                         </div>

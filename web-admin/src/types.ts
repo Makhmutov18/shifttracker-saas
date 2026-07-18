@@ -61,8 +61,6 @@ export interface VenueStatsRow {
   bonuses: string;
   deductions: string;
   total_accruals: string;
-  revenue: string;
-  payroll_share_percent?: string | null;
 }
 
 export interface PayrollSummaryRow {

@@ -249,8 +249,6 @@ class VenueStatsRow(BaseModel):
     bonuses: Decimal = Decimal("0.00")
     deductions: Decimal = Decimal("0.00")
     total_accruals: Decimal = Decimal("0.00")
-    revenue: Decimal = Decimal("0.00")
-    payroll_share_percent: Optional[Decimal] = None
 
 
 # ═════ Payroll Runs ═════

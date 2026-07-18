@@ -191,7 +191,6 @@ async def list_venue_stats(
             func.count(case((pending_status, Shift.id), else_=None)),
             func.coalesce(func.sum(case((approved_status, Shift.total_hours), else_=0)), 0),
             func.coalesce(func.sum(case((approved_status, Shift.salary_earned), else_=0)), 0),
-            func.coalesce(func.sum(case((approved_status, Shift.revenue), else_=0)), 0),
         )
         .where(
             Shift.venue_id.in_(venue_ids),
@@ -207,9 +206,8 @@ async def list_venue_stats(
             "pending": int(pending or 0),
             "hours": safe_decimal(hours),
             "accruals": safe_decimal(accruals),
-            "revenue": safe_decimal(revenue),
         }
-        for venue_id, worked, approved, pending, hours, accruals, revenue in shift_result.all()
+        for venue_id, worked, approved, pending, hours, accruals in shift_result.all()
     }
 
     adjustment_result = await session.execute(
@@ -246,13 +244,7 @@ async def list_venue_stats(
         shift_accruals = shift_stats.get("accruals", Decimal("0.00"))
         bonuses = adjustment_stats.get("bonuses", Decimal("0.00"))
         deductions = adjustment_stats.get("deductions", Decimal("0.00"))
-        revenue = shift_stats.get("revenue", Decimal("0.00"))
         total_accruals = calculate_payout_total(shift_accruals, bonuses, deductions)
-        payroll_share_percent = None
-        if revenue > Decimal("0.00"):
-            payroll_share_percent = (
-                total_accruals / revenue * Decimal("100")
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         rows.append(
             VenueStatsRow(
@@ -268,8 +260,6 @@ async def list_venue_stats(
                 bonuses=bonuses,
                 deductions=deductions,
                 total_accruals=total_accruals,
-                revenue=revenue,
-                payroll_share_percent=payroll_share_percent,
             )
         )
     return rows

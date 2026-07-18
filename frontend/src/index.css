@@ -2790,6 +2790,10 @@ button:disabled {
   text-align: right;
 }
 
+.owner-venue-stats-grid .owner-venue-accrual {
+  grid-column: 1 / -1;
+}
+
 .owner-venue-pending,
 .owner-venue-stats-unavailable {
   margin-top: 0.55rem;

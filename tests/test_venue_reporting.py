@@ -85,10 +85,10 @@ class VenueReportingTests(unittest.TestCase):
             "bonuses",
             "deductions",
             "total_accruals",
-            "revenue",
-            "payroll_share_percent",
         }
         self.assertTrue(expected_fields.issubset(VenueStatsRow.model_fields))
+        self.assertNotIn("revenue", VenueStatsRow.model_fields)
+        self.assertNotIn("payroll_share_percent", VenueStatsRow.model_fields)
 
     def test_venue_stats_aggregate_correct_sources_without_n_plus_one(self) -> None:
         source = _endpoint_source("list_venue_stats")
@@ -100,10 +100,19 @@ class VenueReportingTests(unittest.TestCase):
         self.assertIn('Shift.status == "pending"', source)
         self.assertIn("func.distinct", source)
         self.assertIn("calculate_payout_total", source)
-        self.assertIn('Decimal("0.01")', source)
-        self.assertIn('revenue > Decimal("0.00")', source)
+        self.assertNotIn("Shift.revenue", source)
+        self.assertNotIn("payroll_share_percent", source)
         self.assertNotIn("Expense", source)
         self.assertNotIn("await session.execute", source[source.index("for venue in venues:"):])
+
+    def test_shift_revenue_and_salary_calculation_remain_available(self) -> None:
+        shift_source = (BACKEND_DIR / "app" / "models.py").read_text(encoding="utf-8")
+        utils_source = (BACKEND_DIR / "app" / "utils.py").read_text(encoding="utf-8")
+        self.assertIn("revenue: Mapped[Optional[Decimal]]", shift_source)
+        self.assertIn("def calculate_salary", utils_source)
+        self.assertIn('pay_model == "revenue"', utils_source)
+        self.assertIn('pay_model == "hybrid"', utils_source)
+        self.assertIn("revenue * revenue_percentage", utils_source)
 
     def test_personal_monthly_stats_remain_cross_venue(self) -> None:
         source = _endpoint_source("monthly_stats")
