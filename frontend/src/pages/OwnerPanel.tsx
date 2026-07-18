@@ -299,17 +299,21 @@ function TeamEmployeeCard({
 }) {
   const isSelf = employee.id === currentUser.id;
   const hasManagementAccess = canAccessOwnerPanel(employee);
+  const managementRoleLabel = getManagementRoleLabel(employee);
+  const showRoleBadge = managementRoleLabel === 'Старший'
+    || managementRoleLabel === 'Администратор'
+    || managementRoleLabel === 'Владелец';
   const hasRevenueShare = (employee.pay_model === 'revenue' || employee.pay_model === 'hybrid')
     && Number(employee.revenue_percentage) > 0;
 
   return (
     <article className="owner-employee-card" data-archived={archived ? 'true' : 'false'}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <UserAvatar
             name={employee.name || 'Сотрудник'}
             photoUrl={employee.telegram_photo_url}
-            sizeClassName="h-9 w-9"
+            sizeClassName="h-10 w-10"
             textClassName="text-xs"
           />
           <div className="min-w-0 flex-1">
@@ -318,12 +322,14 @@ function TeamEmployeeCard({
               {archived && <span className="owner-status-badge" data-status="archived">В архиве</span>}
             </div>
             <p className="owner-employee-position">{getPositionLabel(employee)}</p>
-            {hasManagementAccess && (
+            {(showRoleBadge || hasManagementAccess) && (
               <div className="owner-employee-badges" aria-label="Роль и доступ">
-                <span className="owner-employee-badge">{getManagementRoleLabel(employee)}</span>
-                <span className="owner-employee-badge" data-access="management">
-                  Управление
-                </span>
+                {showRoleBadge && <span className="owner-employee-badge">{managementRoleLabel}</span>}
+                {hasManagementAccess && (
+                  <span className="owner-employee-badge" data-access="management">
+                    Управление
+                  </span>
+                )}
               </div>
             )}
           </div>
