@@ -33,6 +33,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
   const [saved, setSaved] = useState<{ hours: string; salary: string; status: Shift['status']; venueName: string } | null>(null);
 
   const needsRevenue = user.pay_model === 'revenue' || user.pay_model === 'hybrid';
+  const homeVenueId = user.venue_id || user.venue?.id || '';
   const homeVenueName = user.venue?.name?.trim() || 'Основная точка';
   const venueName = venues.find((venue) => venue.id === venueId)?.name?.trim() || homeVenueName;
   const isToday = date === getTodayDate();
@@ -80,8 +81,8 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         setVenueId((current) => (
           activeVenues.some((venue) => venue.id === current)
             ? current
-            : activeVenues.some((venue) => venue.id === user.venue_id)
-            ? user.venue_id
+            : activeVenues.some((venue) => venue.id === homeVenueId)
+            ? homeVenueId
             : activeVenues[0].id
         ));
       })
@@ -98,7 +99,7 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [user.venue, user.venue_id]);
+  }, [homeVenueId, user.venue]);
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -180,9 +181,9 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
         <button type="button" onClick={onBack} className="shift-back-button" aria-label="Вернуться на главную">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-semibold text-tg-text">Новая смена</h1>
-          <p className="mt-1 truncate text-sm text-tg-hint">Точка смены: {venueName}</p>
+          <p className="shift-form-subtitle">Основная точка: {homeVenueName}</p>
         </div>
       </header>
 
@@ -259,12 +260,18 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
           </div>
           <p className="shift-venue-help">
             {venuesUnavailable
-              ? `Список точек недоступен. Используется основная точка: ${homeVenueName}`
-              : venueId === user.venue_id
-              ? `Основная точка · ${getPayModelLabel(user)}`
-              : `Основная точка: ${homeVenueName} · ${getPayModelLabel(user)}`}
+              ? 'Список точек временно недоступен. Это ваша основная точка.'
+              : venueId === homeVenueId
+              ? 'Это ваша основная точка'
+              : 'Смена будет отнесена к этой точке'}
           </p>
         </section>
+
+        <div className="shift-pay-context" aria-label="Условия оплаты сотрудника">
+          <span>Условия оплаты</span>
+          <strong>{getPayModelLabel(user)}</strong>
+          <small>Применяются ко всем вашим сменам</small>
+        </div>
 
         {needsRevenue && (
           <section className="shift-form-section" aria-labelledby="shift-revenue-title">
@@ -280,7 +287,6 @@ export default function ShiftForm({ user, onBack, onOpenHistory }: Props) {
               placeholder="0 ₽"
               className="shift-revenue-input"
             />
-            <p className="mt-2 text-sm text-tg-hint">Модель оплаты: {getPayModelLabel(user)}</p>
           </section>
         )}
 

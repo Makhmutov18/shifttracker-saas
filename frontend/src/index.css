@@ -653,6 +653,14 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.shift-form-subtitle {
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .shift-back-button {
   display: flex;
   width: 2.75rem;
@@ -845,6 +853,37 @@ button:disabled {
   line-height: 1.4;
 }
 
+.shift-pay-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.2rem 0.75rem;
+  padding-block: 0.2rem;
+}
+
+.shift-pay-context span,
+.shift-pay-context small {
+  color: var(--text-secondary);
+}
+
+.shift-pay-context span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.shift-pay-context strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.shift-pay-context small {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+}
+
 .shift-revenue-input,
 .shift-comment-input {
   width: 100%;
@@ -986,6 +1025,18 @@ button:disabled {
 
   .shift-time-grid input {
     padding-inline: 0.55rem;
+  }
+
+  .shift-pay-context {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-pay-context strong {
+    text-align: left;
+  }
+
+  .shift-pay-context small {
+    grid-column: auto;
   }
 }
 
@@ -2430,6 +2481,87 @@ button:disabled {
   margin-top: 0.55rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-subtle);
+}
+
+.owner-inline-warning {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.owner-venue-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.owner-venue-heading p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.owner-venue-stats {
+  margin-top: 0.65rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-venue-period {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.owner-venue-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+  margin-top: 0.55rem;
+}
+
+.owner-venue-stats-grid div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.owner-venue-stats-grid span,
+.owner-venue-stats-unavailable {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.owner-venue-stats-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.owner-venue-pending,
+.owner-venue-stats-unavailable {
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.owner-venue-pending {
+  color: var(--warning);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .owner-status-action,

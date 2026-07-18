@@ -108,6 +108,23 @@ export interface Venue {
   is_active: boolean;
 }
 
+export interface VenueStatsRow {
+  venue_id: string;
+  venue_name: string;
+  is_active: boolean;
+  assigned_employees_count: number;
+  worked_employees_count: number;
+  approved_shifts_count: number;
+  pending_shifts_count: number;
+  approved_hours: string;
+  shift_accruals: string;
+  bonuses: string;
+  deductions: string;
+  total_accruals: string;
+  revenue: string;
+  payroll_share_percent: string | null;
+}
+
 function normalizeVenue(raw: unknown): Venue {
   const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
 
@@ -609,6 +626,13 @@ export async function getVenues(includeInactive = false): Promise<Venue[]> {
   const qs = params.toString();
   const venues = await request<Venue[]>(`/admin/venues${qs ? `?${qs}` : ''}`);
   return Array.isArray(venues) ? venues.map(normalizeVenue) : [];
+}
+
+export async function getVenueStats(month: number, year: number, includeInactive = false): Promise<VenueStatsRow[]> {
+  const params = new URLSearchParams({ month: String(month), year: String(year) });
+  if (includeInactive) params.set('include_inactive', 'true');
+  const rows = await request<VenueStatsRow[]>(`/venues/stats?${params.toString()}`);
+  return Array.isArray(rows) ? rows : [];
 }
 
 export async function createVenue(data: VenueCreateRequest): Promise<Venue> {

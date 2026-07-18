@@ -30,6 +30,7 @@ import {
   Shift,
   User,
   Venue,
+  VenueStatsRow,
   createAdjustment,
   createUser,
   createVenue,
@@ -47,6 +48,7 @@ import {
   finalizePayrollRun,
   getUsers,
   getVenues,
+  getVenueStats,
   updateShift,
   updateUser,
   updateVenue,
@@ -1649,8 +1651,10 @@ function ApproveTab() {
 function VenuesTab() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [venueStats, setVenueStats] = useState<VenueStatsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statsError, setStatsError] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [newVenueName, setNewVenueName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1663,9 +1667,26 @@ function VenuesTab() {
     try {
       setLoading(true);
       setError(null);
-      const [venuesData, usersData] = await Promise.allSettled([getVenues(true), getUsers(true)]);
-      setVenues(venuesData.status === 'fulfilled' && Array.isArray(venuesData.value) ? venuesData.value : []);
+      setStatsError(false);
+      const now = new Date();
+      const [venuesData, usersData, statsData] = await Promise.allSettled([
+        getVenues(true),
+        getUsers(true),
+        getVenueStats(now.getMonth() + 1, now.getFullYear(), true),
+      ]);
+      if (venuesData.status === 'fulfilled') {
+        setVenues(Array.isArray(venuesData.value) ? venuesData.value : []);
+      } else {
+        setVenues([]);
+        setError('Не удалось загрузить точки');
+      }
       setUsers(usersData.status === 'fulfilled' && Array.isArray(usersData.value) ? usersData.value : []);
+      if (statsData.status === 'fulfilled') {
+        setVenueStats(Array.isArray(statsData.value) ? statsData.value : []);
+      } else {
+        setVenueStats([]);
+        setStatsError(true);
+      }
     } catch (err: any) {
       setVenues([]);
       setUsers([]);
@@ -1770,6 +1791,12 @@ function VenuesTab() {
   const activeVenues = venues.filter((venue) => venue.is_active);
   const archivedVenues = venues.filter((venue) => !venue.is_active);
   const visibleVenues = showVenueArchive ? archivedVenues : activeVenues;
+  const venueStatsMap = new Map(venueStats.map((row) => [row.venue_id, row]));
+  const activeAssignedFallback = users.filter((userItem) => userItem.is_active && Boolean(userItem.venue_id || userItem.venue?.id)).length;
+  const activeAssignedCount = venueStats.length > 0
+    ? activeVenues.reduce((total, venue) => total + (venueStatsMap.get(venue.id)?.assigned_employees_count ?? 0), 0)
+    : activeAssignedFallback;
+  const statsMonthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date());
 
   return (
     <div className="space-y-3">
@@ -1778,8 +1805,8 @@ function VenuesTab() {
           <EmployeeStat label="Активных" value={venues.filter((venue) => venue.is_active).length} />
           <EmployeeStat label="В архиве" value={venues.filter((venue) => !venue.is_active).length} />
           <EmployeeStat
-            label="Сотрудников"
-            value={users.filter((userItem) => Boolean(userItem.venue_id || userItem.venue?.id)).length}
+            label="Закреплено"
+            value={activeAssignedCount}
           />
         </div>
       </div>
@@ -1807,6 +1834,7 @@ function VenuesTab() {
       </form>
 
       {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/30 dark:text-rose-200">{error}</p>}
+      {statsError && <p className="owner-inline-warning">Статистика точек временно недоступна. Управление точками продолжает работать.</p>}
       {success && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-200">{success}</p>}
 
       {venues.length === 0 ? (
@@ -1837,12 +1865,15 @@ function VenuesTab() {
               </div>
             ) : (
               <div className="owner-list-items">
-                {visibleVenues.map((venue) => {
-                const isEditing = editingVenueId === venue.id;
-                const isBusy = statusVenueId === venue.id;
-                const employeeCount = users.filter(
-                  (userItem) => userItem?.venue_id === venue.id || userItem?.venue?.id === venue.id
-                ).length;
+                 {visibleVenues.map((venue) => {
+                  const isEditing = editingVenueId === venue.id;
+                  const isBusy = statusVenueId === venue.id;
+                  const stats = venueStatsMap.get(venue.id);
+                  const assignedFallback = users.filter(
+                    (userItem) => userItem.is_active && (userItem.venue_id === venue.id || userItem.venue?.id === venue.id)
+                  ).length;
+                  const assignedCount = stats?.assigned_employees_count ?? assignedFallback;
+                  const revenue = Number(stats?.revenue || 0);
                   return (
                     <div key={venue.id} className="owner-employee-card owner-list-row" data-archived={showVenueArchive ? 'true' : 'false'}>
                     <div className="flex items-start justify-between gap-3">
@@ -1856,12 +1887,9 @@ function VenuesTab() {
                             placeholder="Название точки"
                           />
                         ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium text-tg-text">{venue.name}</p>
+                          <div className="owner-venue-heading">
+                            <p>{venue.name}</p>
                           {showVenueArchive && <span className="owner-status-badge" data-status="archived">В архиве</span>}
-                          <span className="text-xs text-tg-hint">
-                            {employeeCount} сотрудников
-                          </span>
                         </div>
                       )}
                     </div>
@@ -1878,6 +1906,30 @@ function VenuesTab() {
                         </button>
                       )}
                     </div>
+
+                    {!isEditing && (
+                      <div className="owner-venue-stats">
+                        <p className="owner-venue-period">Статистика за {statsMonthLabel}</p>
+                        <div className="owner-venue-stats-grid">
+                          <div><span>Закреплено</span><strong>{assignedCount}</strong></div>
+                          {stats ? (
+                            <>
+                              <div><span>Работали</span><strong>{stats.worked_employees_count}</strong></div>
+                              <div><span>Смены</span><strong>{stats.approved_shifts_count}</strong></div>
+                              <div><span>Часы</span><strong>{formatHours(stats.approved_hours)}</strong></div>
+                              <div><span>Начислено</span><strong>{formatCurrency(stats.total_accruals)}</strong></div>
+                              {revenue > 0 && <div><span>Выручка</span><strong>{formatCurrency(stats.revenue)}</strong></div>}
+                              {revenue > 0 && <div><span>Доля ФОТ</span><strong>{stats.payroll_share_percent == null ? '—' : `${Number(stats.payroll_share_percent).toLocaleString('ru-RU')}%`}</strong></div>}
+                            </>
+                          ) : null}
+                        </div>
+                        {stats ? (
+                          stats.pending_shifts_count > 0 && <p className="owner-venue-pending">Ожидают подтверждения: {stats.pending_shifts_count}</p>
+                        ) : (
+                          <p className="owner-venue-stats-unavailable">Рабочая статистика недоступна</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="owner-venue-row-actions">
                       {isEditing ? (
