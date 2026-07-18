@@ -245,10 +245,6 @@ function getManagementEnabledState(role: User['role'], permissions?: PermissionM
   return canAccessOwnerPanel({ role, permissions: permissions ?? {} });
 }
 
-function getManagementBadge(user: Pick<User, 'role' | 'permissions'>) {
-  return canAccessOwnerPanel(user) ? 'Есть доступ к управлению' : 'Обычный сотрудник';
-}
-
 function getManagementRoleLabel(user: Pick<User, 'role' | 'permissions'>) {
   if (user.role === 'owner') return 'Владелец';
   if (user.role === 'admin') return 'Администратор';
@@ -302,6 +298,7 @@ function TeamEmployeeCard({
   busy?: boolean;
 }) {
   const isSelf = employee.id === currentUser.id;
+  const hasManagementAccess = canAccessOwnerPanel(employee);
   const hasRevenueShare = (employee.pay_model === 'revenue' || employee.pay_model === 'hybrid')
     && Number(employee.revenue_percentage) > 0;
 
@@ -320,7 +317,13 @@ function TeamEmployeeCard({
               <p>{employee.name || 'Сотрудник'}</p>
               {archived && <span className="owner-status-badge" data-status="archived">В архиве</span>}
             </div>
-            <p className="owner-employee-role">{getPositionLabel(employee)} · {getManagementRoleLabel(employee)}</p>
+            <p className="owner-employee-position">{getPositionLabel(employee)}</p>
+            <div className="owner-employee-badges" aria-label="Роль и доступ">
+              <span className="owner-employee-badge">{getManagementRoleLabel(employee)}</span>
+              <span className="owner-employee-badge" data-access={hasManagementAccess ? 'management' : 'employee'}>
+                {hasManagementAccess ? 'Управление' : 'Без управления'}
+              </span>
+            </div>
           </div>
         </div>
         <button
@@ -334,15 +337,14 @@ function TeamEmployeeCard({
       </div>
 
       <div className="owner-employee-details">
-        <p><span>Основная точка</span><strong>{getShortVenueLabel(employee.venue)}</strong></p>
+        <p><span>Основная точка</span><span className="owner-employee-value">{getShortVenueLabel(employee.venue)}</span></p>
         <p>
           <span>Оплата</span>
-          <strong>
-            {getPayModelLabel(employee.pay_model)} · {getPayRateLabel(employee)}
-            {hasRevenueShare ? ` · ${employee.revenue_percentage}%` : ''}
-          </strong>
+          <span className="owner-employee-value owner-employee-pay">
+            <small>{getPayModelLabel(employee.pay_model)}</small>
+            <b>{getPayRateLabel(employee)}{hasRevenueShare ? ` + ${employee.revenue_percentage}%` : ''}</b>
+          </span>
         </p>
-        <p><span>Доступ</span><strong>{getManagementBadge(employee)}</strong></p>
       </div>
 
       <div className="owner-danger-zone">
@@ -2454,7 +2456,7 @@ function TeamTab({ user }: { user: User }) {
             <p className="mt-1 text-sm text-tg-hint">{showArchive ? 'Деактивированные сотрудники появятся здесь и останутся с историей смен.' : 'Перенесите сотрудника из архива или добавьте нового через приглашение.'}</p>
           </div>
         ) : (
-          <div className="owner-list-items">
+          <div className="owner-list-items owner-team-list">
             {visibleUsers.map((u) => (
               <TeamEmployeeCard
                 key={u.id}

@@ -114,33 +114,48 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     rejected.length ? { icon: Ban, tone: 'danger' as BadgeVariant, text: `${rejected.length} ${plural(rejected.length, ['смена отклонена', 'смены отклонены', 'смен отклонено'])} за месяц`, action: 'Проверить смены', path: '/shifts' as RoutePath } : null,
     inactiveVenues.length ? { icon: Store, tone: 'neutral' as BadgeVariant, text: `${inactiveVenues.length} ${plural(inactiveVenues.length, ['точка находится', 'точки находятся', 'точек находятся'])} в архиве`, action: 'Открыть точки', path: '/venues' as RoutePath } : null,
   ].filter(Boolean) as Array<{ icon: typeof Clock3; tone: BadgeVariant; text: string; action: string; path: RoutePath }>;
+  const now = new Date();
   const daysInMonth = new Date(year, month, 0).getDate();
+  const selectedMonthIndex = year * 12 + month - 1;
+  const currentMonthIndex = now.getFullYear() * 12 + now.getMonth();
+  const visibleDays = selectedMonthIndex < currentMonthIndex
+    ? daysInMonth
+    : selectedMonthIndex === currentMonthIndex
+      ? Math.min(now.getDate(), daysInMonth)
+      : 0;
   const weeklyAccruals = useMemo<WeeklyAccrual[]>(() => {
-    const weeks = Array.from({ length: Math.ceil(daysInMonth / 7) }, (_, index) => ({
-      label: `${index * 7 + 1}–${Math.min(daysInMonth, index * 7 + 7)}`,
+    const weeks = Array.from({ length: Math.ceil(visibleDays / 7) }, (_, index) => ({
+      label: `${index * 7 + 1}–${Math.min(visibleDays, index * 7 + 7)}`,
       value: 0,
     }));
     approvedShifts.forEach((shift) => {
       const day = Number((shift.date || '').slice(8, 10));
-      if (day >= 1 && day <= daysInMonth) weeks[Math.floor((day - 1) / 7)].value += numeric(shift.salary_earned);
+      if (day >= 1 && day <= visibleDays) weeks[Math.floor((day - 1) / 7)].value += numeric(shift.salary_earned);
     });
     return weeks;
-  }, [approvedShifts, daysInMonth]);
+  }, [approvedShifts, daysInMonth, visibleDays]);
   const venueOverview = useMemo(
     () => venueStats.filter((row) => row.is_active && (!venueId || row.venue_id === venueId)),
     [venueId, venueStats],
   );
-  const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const timeNow = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const activeUserIds = new Set(shifts.filter((shift) => {
+  const activeShifts = shifts.filter((shift) => {
     if (shift.date !== today || shift.status === 'rejected') return false;
     const start = (shift.start_time || '').slice(0, 5);
     const end = (shift.end_time || '').slice(0, 5);
     if (!start || !end) return false;
     return end >= start ? timeNow >= start && timeNow <= end : timeNow >= start || timeNow <= end;
-  }).map((shift) => shift.user_id));
+  });
+  const activeShiftByUser = new Map(activeShifts.map((shift) => [shift.user_id, shift]));
+  const activeUserIds = new Set(activeShiftByUser.keys());
   const activeNow = users.filter((employee) => employee.is_active && activeUserIds.has(employee.id));
+  const activeVenueSummary = Array.from(activeNow.reduce((summaryMap, employee) => {
+    const shift = activeShiftByUser.get(employee.id);
+    const venueName = shift?.venue_name?.trim() || venueMap.get(shift?.venue_id || employee.venue_id || '')?.name || 'Точка не указана';
+    summaryMap.set(venueName, (summaryMap.get(venueName) ?? 0) + 1);
+    return summaryMap;
+  }, new Map<string, number>()).entries());
   const summaryAvailable = summary !== null;
 
   if (loading) return <LoadingState text="Собираем данные за месяц…" />;
@@ -171,20 +186,46 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     </section>
 
     <div className="overview-work-grid">
-      <section className="overview-panel shifts-panel">
-        <div className="overview-section-header"><div><h2>Последние смены</h2><span>До пяти последних записей за период</span></div><button className="section-link" onClick={() => navigate('/shifts')}>Все смены<ArrowRight /></button></div>
-        {shifts.length ? <div className="overview-shift-list">{shifts.slice(0, 5).map((shift) => {
-          const employee = userMap.get(shift.user_id);
-          const venueName = shift.venue_name?.trim() || venueMap.get(shift.venue_id || '')?.name || 'Точка не указана';
-          return <button className="overview-shift-row" key={shift.id} onClick={() => navigate('/shifts')}>
-            <span className="shift-person"><strong>{employee?.name || 'Сотрудник'}</strong><small>{formatDate(shift.date)} · {formatTime(shift.start_time)}–{formatTime(shift.end_time)}</small></span>
-            <span className="shift-venue" title={venueName}>{venueName}</span>
-            <StatusBadge status={shift.status || 'unknown'} />
-            {canViewPayroll ? <MoneyValue value={shift.salary_earned} /> : <span className="overview-restricted-value" title="Нет доступа к начислениям">—</span>}
-            <ArrowRight className="row-arrow" />
-          </button>;
-        })}</div> : <div className="compact-empty"><span>За этот месяц смен нет</span><small>Новые смены появятся здесь после создания.</small></div>}
-      </section>
+      <div className="overview-main-stack">
+        <section className="overview-panel shifts-panel">
+          <div className="overview-section-header"><div><h2>Последние смены</h2><span>До пяти последних записей за период</span></div><button className="section-link" onClick={() => navigate('/shifts')}>Все смены<ArrowRight /></button></div>
+          {shifts.length ? <div className="overview-shift-list">{shifts.slice(0, 5).map((shift) => {
+            const employee = userMap.get(shift.user_id);
+            const venueName = shift.venue_name?.trim() || venueMap.get(shift.venue_id || '')?.name || 'Точка не указана';
+            return <button className="overview-shift-row" key={shift.id} onClick={() => navigate('/shifts')}>
+              <span className="shift-person"><strong>{employee?.name || 'Сотрудник'}</strong><small>{formatDate(shift.date)} · {formatTime(shift.start_time)}–{formatTime(shift.end_time)}</small></span>
+              <span className="shift-venue" title={venueName}>{venueName}</span>
+              <StatusBadge status={shift.status || 'unknown'} />
+              {canViewPayroll ? <MoneyValue value={shift.salary_earned} /> : <span className="overview-restricted-value" title="Нет доступа к начислениям">—</span>}
+              <ArrowRight className="row-arrow" />
+            </button>;
+          })}</div> : <div className="compact-empty"><span>За этот месяц смен нет</span><small>Новые смены появятся здесь после создания.</small></div>}
+        </section>
+
+        <section className="overview-panel venue-overview-panel">
+          <div className="overview-section-header"><div><h2>Состояние точек</h2><span>Команда и утверждённые смены за месяц</span></div></div>
+          {venueOverview.length ? <div className="venue-overview-list">
+            <div className="venue-overview-head" aria-hidden="true"><span>Точка</span><span>Сотрудники</span><span>Смены / часы</span><span>Начислено</span><span>Задачи</span></div>
+            {venueOverview.map((venue) => <div className="venue-overview-row" key={venue.venue_id}>
+              <span className="venue-overview-name"><strong title={venue.venue_name}>{venue.venue_name}</strong></span>
+              <span className="venue-overview-stat"><small>Закреплено / работали</small><strong>{venue.assigned_employees_count} / {venue.worked_employees_count}</strong></span>
+              <span className="venue-overview-stat"><small>Смены / часы</small><strong>{venue.approved_shifts_count} / {Number(venue.approved_hours).toLocaleString('ru-RU')} ч</strong></span>
+              <span className="venue-overview-stat"><small>Начислено</small><strong>{canViewPayroll ? <MoneyValue value={venue.total_accruals} /> : <span className="overview-restricted-value">—</span>}</strong></span>
+              <span className={`venue-overview-stat${venue.pending_shifts_count ? ' has-task' : ''}`}><small>На подтверждении</small><strong>{venue.pending_shifts_count ? `${venue.pending_shifts_count} ${plural(venue.pending_shifts_count, ['смена', 'смены', 'смен'])}` : '—'}</strong></span>
+            </div>)}
+          </div> : <div className="compact-empty"><span>Активных точек нет</span><small>Добавьте точку в разделе управления.</small></div>}
+        </section>
+
+        <section className="overview-panel recent-runs-panel">
+          <div className="overview-section-header"><div><h2>Последние расчёты</h2><span>Зафиксированные начисления</span></div>{canViewPayroll ? <button className="section-link" onClick={() => navigate('/payroll')}>Все расчёты<ArrowRight /></button> : null}</div>
+          {!canViewPayroll ? <div className="compact-empty"><span>Нет доступа к расчётам</span><small>Требуется право просмотра выплат.</small></div> : !runsAvailable ? <div className="compact-empty"><span>Не удалось загрузить расчёты</span><small>Обновите страницу или попробуйте позже.</small></div> : runs.length ? <div className="overview-run-list">{runs.slice(0, 3).map((run) => (
+            <button className="overview-run-row" key={run.id} onClick={() => navigate('/payroll')}>
+              <span><strong>{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</strong><small>{run.venue_name || 'Все точки'}</small></span>
+              <span><StatusBadge status={run.status || 'unknown'} /><strong><MoneyValue value={run.total_amount} /></strong><small>Осталось <MoneyValue value={Math.max(0, numeric(run.total_amount) - numeric(run.total_paid))} /></small></span>
+            </button>
+          ))}</div> : <div className="compact-empty"><span>Расчётов пока нет</span><small>Они появятся после формирования начислений.</small></div>}
+        </section>
+      </div>
 
       <div className="overview-side-stack">
         <section className="overview-panel attention-panel">
@@ -198,40 +239,17 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
 
         <section className="overview-panel on-shift-panel">
           <div className="overview-section-header"><div><h2>Сейчас на смене</h2><span>Активные сотрудники</span></div></div>
-          {activeNow.length ? <div className="on-shift-content"><AvatarStack items={activeNow.map((employee) => ({ name: employee.name || 'Сотрудник' }))} max={6} /><div><strong>{activeNow.length} {plural(activeNow.length, ['сотрудник', 'сотрудника', 'сотрудников'])}</strong><span>{activeNow.slice(0, 3).map((employee) => employee.name).join(', ')}</span></div></div> : <div className="compact-empty"><span>Сейчас активных смен нет</span><small>Сотрудники появятся здесь в рабочее время.</small></div>}
+          {activeNow.length ? <div className="on-shift-content">
+            <div className="on-shift-summary"><AvatarStack items={activeNow.map((employee) => ({ name: employee.name || 'Сотрудник' }))} max={5} /><div><strong>{activeNow.length} {plural(activeNow.length, ['сотрудник', 'сотрудника', 'сотрудников'])}</strong><span>{activeNow.slice(0, 3).map((employee) => employee.name || 'Сотрудник').join(', ')}</span></div></div>
+            <div className="on-shift-venues">{activeVenueSummary.map(([venueName, count]) => <span key={venueName}><b>{count}</b><small title={venueName}>{venueName}</small></span>)}</div>
+          </div> : <div className="compact-empty"><span>Сейчас активных смен нет</span><small>Сотрудники появятся здесь в рабочее время.</small></div>}
         </section>
 
-        <section className="overview-panel recent-runs-panel">
-          <div className="overview-section-header"><div><h2>Последние расчёты</h2><span>Зафиксированные начисления</span></div>{canViewPayroll ? <button className="section-link" onClick={() => navigate('/payroll')}>Все расчёты<ArrowRight /></button> : null}</div>
-          {!canViewPayroll ? <div className="compact-empty"><span>Нет доступа к расчётам</span><small>Требуется право просмотра выплат.</small></div> : !runsAvailable ? <div className="compact-empty"><span>Не удалось загрузить расчёты</span><small>Обновите страницу или попробуйте позже.</small></div> : runs.length ? <div className="overview-run-list">{runs.slice(0, 3).map((run) => (
-            <button className="overview-run-row" key={run.id} onClick={() => navigate('/payroll')}>
-              <span><strong>{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</strong><small>{run.venue_name || 'Все точки'}</small></span>
-              <span><StatusBadge status={run.status || 'unknown'} /><strong><MoneyValue value={run.total_amount} /></strong><small>Осталось <MoneyValue value={Math.max(0, numeric(run.total_amount) - numeric(run.total_paid))} /></small></span>
-            </button>
-          ))}</div> : <div className="compact-empty"><span>Расчётов пока нет</span><small>Они появятся после формирования начислений.</small></div>}
+        <section className="overview-panel accrual-chart-panel">
+          <div className="overview-section-header"><div><h2>Динамика начислений</h2><span>Утверждённые смены по неделям</span></div></div>
+          <WeeklyAccrualChart allowed={canViewPayroll} series={weeklyAccruals} />
         </section>
       </div>
-    </div>
-
-    <div className="overview-insights-grid">
-      <section className="overview-panel venue-overview-panel">
-        <div className="overview-section-header"><div><h2>Состояние точек</h2><span>Команда и утверждённые смены за месяц</span></div></div>
-        {venueOverview.length ? <div className="venue-overview-list">
-          <div className="venue-overview-head" aria-hidden="true"><span>Точка</span><span>Сотрудники</span><span>Смены / часы</span><span>Начислено</span><span>Задачи</span></div>
-          {venueOverview.map((venue) => <div className="venue-overview-row" key={venue.venue_id}>
-            <span className="venue-overview-name"><strong title={venue.venue_name}>{venue.venue_name}</strong></span>
-            <span className="venue-overview-stat"><small>Закреплено / работали</small><strong>{venue.assigned_employees_count} / {venue.worked_employees_count}</strong></span>
-            <span className="venue-overview-stat"><small>Смены / часы</small><strong>{venue.approved_shifts_count} / {Number(venue.approved_hours).toLocaleString('ru-RU')} ч</strong></span>
-            <span className="venue-overview-stat"><small>Начислено</small><strong>{canViewPayroll ? <MoneyValue value={venue.total_accruals} /> : <span className="overview-restricted-value">—</span>}</strong></span>
-            <span className={`venue-overview-stat${venue.pending_shifts_count ? ' has-task' : ''}`}><small>На подтверждении</small><strong>{venue.pending_shifts_count ? `${venue.pending_shifts_count} ${plural(venue.pending_shifts_count, ['смена', 'смены', 'смен'])}` : '—'}</strong></span>
-          </div>)}
-        </div> : <div className="compact-empty"><span>Активных точек нет</span><small>Добавьте точку в разделе управления.</small></div>}
-      </section>
-
-      <section className="overview-panel accrual-chart-panel">
-        <div className="overview-section-header"><div><h2>Динамика начислений</h2><span>Утверждённые смены по неделям</span></div></div>
-        <WeeklyAccrualChart allowed={canViewPayroll} series={weeklyAccruals} />
-      </section>
     </div>
   </div>;
 }

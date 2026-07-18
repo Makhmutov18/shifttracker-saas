@@ -774,28 +774,58 @@ button:disabled {
 }
 
 .dashboard-ai-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 0.9rem;
   margin-top: 0.75rem;
   padding-block: 0.65rem;
   border-block: 1px solid var(--border-subtle);
-  overflow-wrap: anywhere;
-  color: var(--text-primary);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.55;
 }
 
-.dashboard-ai-summary-signals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.8rem;
-  margin-top: 0.6rem;
+.dashboard-ai-summary-metrics div {
+  min-width: 0;
+}
+
+.dashboard-ai-summary-metrics dt {
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.dashboard-ai-summary-metrics dd {
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
   line-height: 1.4;
 }
 
 .dashboard-ai-summary-list {
+  position: relative;
   margin-top: 0.75rem;
+  padding-left: 0.75rem;
+}
+
+.dashboard-ai-summary-list::before {
+  position: absolute;
+  top: 0.15rem;
+  bottom: 0.1rem;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  content: '';
+}
+
+.dashboard-ai-summary-list.is-attention::before {
+  background: var(--warning);
+  opacity: 0.65;
+}
+
+.dashboard-ai-summary-list.is-actions::before {
+  background: var(--tg-primary);
+  opacity: 0.75;
 }
 
 .dashboard-ai-summary-list h4 {
@@ -2800,6 +2830,25 @@ button:disabled {
 .owner-employee-card { background: var(--surface-muted); }
 .owner-approval-card { border: 1px solid var(--border-subtle); background: var(--surface); }
 
+.owner-team-list {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-muted);
+}
+
+.owner-list-surface .owner-team-list .owner-employee-card {
+  padding: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.85rem;
+  background: var(--surface);
+}
+
+.owner-list-surface .owner-team-list .owner-employee-card + .owner-employee-card {
+  border-top: 1px solid var(--border-subtle);
+}
+
 .owner-list-row,
 .owner-list-surface .owner-employee-card {
   border-radius: 0;
@@ -2833,11 +2882,37 @@ button:disabled {
   white-space: nowrap;
 }
 
-.owner-employee-role {
+.owner-employee-position {
   margin-top: 0.25rem;
   color: var(--text-secondary);
   font-size: 0.75rem;
   line-height: 1.35;
+}
+
+.owner-employee-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.owner-employee-badge {
+  display: inline-flex;
+  min-height: 1.4rem;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.owner-employee-badge[data-access='management'] {
+  color: var(--tg-primary);
 }
 
 .owner-status-badge {
@@ -2866,10 +2941,8 @@ button:disabled {
 
 .owner-employee-details {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 0.65rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border-subtle);
+  gap: 0.65rem;
+  margin-top: 0.9rem;
 }
 
 .owner-employee-details p,
@@ -2889,21 +2962,35 @@ button:disabled {
 }
 
 .owner-employee-details strong,
+.owner-employee-value,
 .owner-approval-facts strong {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text-primary);
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: right;
+}
+
+.owner-employee-pay {
+  display: grid;
+  justify-items: end;
+  gap: 0.1rem;
+}
+
+.owner-employee-pay small {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+}
+
+.owner-employee-pay b {
+  font-weight: 650;
 }
 
 .owner-danger-zone {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.6rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-subtle);
+  margin-top: 0.75rem;
 }
 
 .owner-venue-row-actions {

@@ -308,27 +308,24 @@ export default function Dashboard({ user, onNavigate }: Props) {
 
           {aiSummary ? (
             <div className="dashboard-ai-summary-result" aria-live="polite">
-              <h3>{aiSummary.headline || 'Сводка готова'}</h3>
+              <h3>{aiSummary.headline || 'Главный вывод за неделю'}</h3>
               <p className="dashboard-ai-summary-text">{aiSummary.summary || 'Данные недели собраны.'}</p>
-              <p className="dashboard-ai-summary-metrics">
-                {formatShiftCount(aiSummary.metrics.approved_shifts_count)} · {formatHours(aiSummary.metrics.approved_hours)} · {formatCurrency(aiSummary.metrics.approved_accruals)} · {formatEmployeeCount(aiSummary.metrics.unique_worked_employees_count)}
-              </p>
-              {(aiSummary.metrics.pending_shifts_count > 0 || aiSummary.metrics.cross_venue_shifts_count > 0) && (
-                <div className="dashboard-ai-summary-signals">
-                  {aiSummary.metrics.pending_shifts_count > 0 && <span>На подтверждении: {aiSummary.metrics.pending_shifts_count}</span>}
-                  {aiSummary.metrics.cross_venue_shifts_count > 0 && <span>На других точках: {formatShiftCount(aiSummary.metrics.cross_venue_shifts_count)}</span>}
-                </div>
-              )}
+              <dl className="dashboard-ai-summary-metrics" aria-label="Проверенные метрики недели">
+                <div><dt>Утверждено</dt><dd>{formatShiftCount(aiSummary.metrics.approved_shifts_count)}</dd></div>
+                <div><dt>Часы</dt><dd>{formatHours(aiSummary.metrics.approved_hours)}</dd></div>
+                <div><dt>Начислено</dt><dd>{formatCurrency(aiSummary.metrics.approved_accruals)}</dd></div>
+                <div><dt>Сотрудники</dt><dd>{formatEmployeeCount(aiSummary.metrics.unique_worked_employees_count)}</dd></div>
+              </dl>
               {aiSummary.attention.length > 0 && (
-                <div className="dashboard-ai-summary-list">
+                <div className="dashboard-ai-summary-list is-attention">
                   <h4>Обратить внимание</h4>
                   <ul>{aiSummary.attention.slice(0, 3).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               )}
               {aiSummary.actions.length > 0 && (
-                <div className="dashboard-ai-summary-list">
+                <div className="dashboard-ai-summary-list is-actions">
                   <h4>Что проверить</h4>
-                  <ul>{aiSummary.actions.slice(0, 3).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                  <ul>{aiSummary.actions.slice(0, 2).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               )}
               <p className="dashboard-ai-summary-disclaimer">Сводка создана ИИ на основе агрегированных данных приложения. Важные решения стоит перепроверять.</p>
