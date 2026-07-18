@@ -62,6 +62,8 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
   const { start: periodStart, end: periodEnd } = monthBounds(periodValue);
   const canViewPayroll = hasPermission(user, 'can_view_team_payroll');
   const canViewVenueStats = canViewPayroll || hasPermission(user, 'can_manage_team');
+  const periodMonth = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date(year, month - 1, 1));
+  const periodLabel = `${periodMonth.charAt(0).toUpperCase()}${periodMonth.slice(1)} ${year}`;
 
   const load = async () => {
     setLoading(true);
@@ -162,6 +164,10 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
   if (error && !shifts.length) return <ErrorState message={error} retry={load} />;
 
   return <div className="overview-page">
+    <header className="overview-heading">
+      <h1>Обзор</h1>
+      <p>{periodLabel}</p>
+    </header>
     <section className="overview-metrics" aria-label="Финансовая сводка за месяц">
       <article className="overview-metric">
         <span>Предварительно начислено</span>

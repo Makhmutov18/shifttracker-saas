@@ -16,12 +16,6 @@ import { currentMonthValue, hasPermission } from './utils';
 const titles: Record<RoutePath, string> = { '/overview': 'Обзор', '/shifts': 'Смены', '/payroll': 'Расчёты выплат', '/employees': 'Команда', '/venues': 'Точки', '/audit': 'История действий' };
 const routes = Object.keys(titles) as RoutePath[];
 
-function monthLabel(value: string): string {
-  const [year, month] = value.split('-').map(Number);
-  const monthName = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date(year, month - 1, 1));
-  return `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`;
-}
-
 function currentRoute(): RoutePath {
   const path = (window.location.pathname.replace(/^\/admin/, '') || '/overview') as RoutePath;
   return routes.includes(path) ? path : '/overview';
@@ -52,7 +46,6 @@ export default function App() {
   const [loading, setLoading] = useState(initialAuth.source !== 'unavailable');
   const [error, setError] = useState('');
   const overviewPeriod = currentMonthValue();
-  const overviewVenue = venueId ? venues.find((venue) => venue.id === venueId)?.name ?? 'Точка не указана' : 'Все точки';
 
   const load = async () => {
     setLoading(true); setError('');
@@ -106,6 +99,5 @@ export default function App() {
     : route === '/venues' ? <VenuesPage />
     : <AuditPage />;
 
-  const secondaryContext = route === '/overview' ? `${monthLabel(overviewPeriod)} · ${overviewVenue}` : undefined;
-  return <AppShell route={route} user={user} venues={venues} venueId={venueId} onVenue={setVenueId} theme={theme} onTheme={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} onNavigate={navigate} onLogout={() => void logout()} title={titles[route]} secondaryContext={secondaryContext}>{page}</AppShell>;
+  return <AppShell route={route} user={user} venues={venues} venueId={venueId} onVenue={setVenueId} theme={theme} onTheme={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} onNavigate={navigate} onLogout={() => void logout()} title={titles[route]}>{page}</AppShell>;
 }

@@ -2,6 +2,8 @@ import React, { type ReactNode } from 'react';
 import {
   Building2,
   CalendarClock,
+  Check,
+  ChevronDown,
   ClipboardCheck,
   History,
   LayoutDashboard,
@@ -16,7 +18,6 @@ import {
 } from 'lucide-react';
 import type { User, Venue } from '../types';
 import { hasPermission, roleLabels } from '../utils';
-import { SearchSelect } from './ui';
 
 export type RoutePath = '/overview' | '/shifts' | '/payroll' | '/employees' | '/venues' | '/audit';
 
@@ -43,6 +44,64 @@ function userRoleLabel(user: User): string {
   return roleLabels[user.role] ?? 'Сотрудник';
 }
 
+function VenueSwitcher({ venues, venueId, onVenue, collapsed }: { venues: Venue[]; venueId: string; onVenue: (value: string) => void; collapsed: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const options = (venues ?? []).filter((venue) => venue.is_active || venue.id === venueId);
+  const selectedVenue = options.find((venue) => venue.id === venueId);
+  const selectedName = selectedVenue?.name?.trim() || 'Все точки';
+
+  React.useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener('mousedown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  const selectVenue = (value: string) => {
+    onVenue(value);
+    setOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
+  };
+
+  return <div className="sidebar-venue-switcher" ref={rootRef}>
+    <button
+      className={`venue-switcher-trigger${open ? ' open' : ''}`}
+      type="button"
+      ref={triggerRef}
+      onClick={() => setOpen((value) => !value)}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-label={`Точка: ${selectedName}`}
+      title={collapsed ? selectedName : undefined}
+    >
+      <Building2 />
+      <span className="venue-switcher-copy"><small>Точка</small><strong>{selectedName}</strong></span>
+      <ChevronDown className="venue-switcher-chevron" />
+    </button>
+    {open && <div className="venue-switcher-popover" role="listbox" aria-label="Выбор точки">
+      <button type="button" role="option" aria-selected={!venueId} className={!venueId ? 'selected' : ''} onClick={() => selectVenue('')}>
+        <span>Все точки</span>{!venueId && <Check />}
+      </button>
+      {options.map((venue) => <button type="button" role="option" aria-selected={venue.id === venueId} className={venue.id === venueId ? 'selected' : ''} key={venue.id} onClick={() => selectVenue(venue.id)}>
+        <span title={venue.name}>{venue.name || 'Точка без названия'}</span>{venue.id === venueId && <Check />}
+      </button>)}
+    </div>}
+  </div>;
+}
+
 export function Sidebar({
   route,
   user,
@@ -54,6 +113,9 @@ export function Sidebar({
   theme,
   onTheme,
   onLogout,
+  venues,
+  venueId,
+  onVenue,
 }: {
   route: RoutePath;
   user: User;
@@ -65,6 +127,9 @@ export function Sidebar({
   theme: 'light' | 'dark';
   onTheme: () => void;
   onLogout: () => void;
+  venues: Venue[];
+  venueId: string;
+  onVenue: (value: string) => void;
 }) {
   const roleLabel = userRoleLabel(user);
   const photoUrl = user.telegram_photo_url?.trim() ?? '';
@@ -79,6 +144,7 @@ export function Sidebar({
         <button className="icon-button sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button>
         <button className="icon-button sidebar-close" onClick={onClose} aria-label="Закрыть меню"><X /></button>
       </div>
+      <VenueSwitcher venues={venues} venueId={venueId} onVenue={onVenue} collapsed={collapsed} />
       <nav className="sidebar-navigation" aria-label="Основная навигация">
         {navigationGroups.map((group) => {
           const items = group.items.filter(({ path }) => canOpen(path, user));
@@ -116,38 +182,19 @@ export function Sidebar({
   </>;
 }
 
-export function TopBar({
-  venues,
-  venueId,
-  onVenue,
+function MobileHeader({
   onMenu,
   title,
-  secondaryContext,
   action,
 }: {
-  venues: Venue[];
-  venueId: string;
-  onVenue: (value: string) => void;
   onMenu: () => void;
   title: string;
-  secondaryContext?: string;
   action?: ReactNode;
 }) {
-  return <header className="topbar">
-    <div className="topbar-left">
-      <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
-      <div className="topbar-heading">
-        <strong className="topbar-title">{title}</strong>
-        {secondaryContext && <span className="topbar-secondary">{secondaryContext}</span>}
-      </div>
-    </div>
-    <div className="topbar-right">
-      <div className="topbar-venue-filter">
-        <Building2 />
-        <div className="topbar-venue-copy"><span>Точка</span><SearchSelect value={venueId} onChange={onVenue} placeholder="Все точки" options={(venues ?? []).filter((venue) => venue.is_active).map((venue) => ({ value: venue.id, label: venue.name }))} /></div>
-      </div>
-      {action}
-    </div>
+  return <header className="mobile-header">
+    <button className="icon-button menu-button" onClick={onMenu} aria-label="Открыть меню"><Menu /></button>
+    <strong className="mobile-header-title">{title}</strong>
+    {action && <div className="mobile-header-action">{action}</div>}
   </header>;
 }
 
@@ -163,7 +210,6 @@ export function AppShell({
   onLogout,
   children,
   title,
-  secondaryContext,
   action,
 }: {
   route: RoutePath;
@@ -177,16 +223,15 @@ export function AppShell({
   onLogout: () => void;
   children: ReactNode;
   title: string;
-  secondaryContext?: string;
   action?: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   return <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-    <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} theme={theme} onTheme={onTheme} onLogout={onLogout} />
+    <Sidebar route={route} user={user} onNavigate={onNavigate} open={menuOpen} onClose={() => setMenuOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} theme={theme} onTheme={onTheme} onLogout={onLogout} venues={venues} venueId={venueId} onVenue={onVenue} />
     <main>
       <div className="workspace">
-        <TopBar venues={venues} venueId={venueId} onVenue={onVenue} onMenu={() => setMenuOpen(true)} title={title} secondaryContext={secondaryContext} action={action} />
+        <MobileHeader onMenu={() => setMenuOpen(true)} title={title} action={action} />
         <div className="content">{children}</div>
       </div>
     </main>
