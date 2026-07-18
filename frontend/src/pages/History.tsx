@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, CreditCard, Download, FileSpreadsheet, FileText, SlidersHorizontal, TrendingDown } from 'lucide-react';
-import { Shift, User, Venue, PayrollSummary, downloadPayrollCsvExport, downloadPayrollExport, getActiveVenues, getPayrollSummary, getVenues } from '../utils/api';
+import { Shift, User, Venue, PayrollSummary, createReportDownloadLink, getActiveVenues, getPayrollSummary, getVenues } from '../utils/api';
 import { useShifts } from '../hooks/useShifts';
 import { useExpenses } from '../hooks/useExpenses';
 import BottomSheet from '../components/BottomSheet';
 import ShiftCard from '../components/ShiftCard';
 import { formatCurrency, formatDate, formatHours, getCurrentMonth, getCurrentYear } from '../utils/helpers';
 import { hasPermission } from '../utils/permissions';
+import { getWebApp } from '../utils/telegram';
 
 interface Props {
   user: User;
@@ -157,16 +158,41 @@ export default function History({ user }: Props) {
     try {
       setExportLoading(format);
       setExportErrors((current) => ({ ...current, [format]: null }));
-      const download = format === 'xlsx' ? downloadPayrollExport : downloadPayrollCsvExport;
-      const { blob, filename } = await download(month, year, venueScopeId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const download = await createReportDownloadLink(format, month, year, venueScopeId);
+      const downloadUrl = new URL(download.url);
+      if (downloadUrl.protocol !== 'https:') {
+        throw new Error('Безопасная ссылка на скачивание недоступна.');
+      }
+
+      const webApp = getWebApp();
+      const canUseNativeDownload = Boolean(
+        webApp?.downloadFile
+        && webApp.isVersionAtLeast?.('8.0'),
+      );
+
+      if (canUseNativeDownload && webApp?.downloadFile) {
+        const accepted = await new Promise<boolean>((resolve, reject) => {
+          try {
+            webApp.downloadFile?.(
+              { url: downloadUrl.toString(), file_name: download.file_name },
+              resolve,
+            );
+          } catch (error) {
+            reject(error);
+          }
+        });
+        if (!accepted) {
+          throw new Error('Скачивание отменено.');
+        }
+      } else {
+        const link = document.createElement('a');
+        link.href = downloadUrl.toString();
+        link.download = download.file_name;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
       setExportOpen(false);
     } catch (error) {
       setExportErrors((current) => ({

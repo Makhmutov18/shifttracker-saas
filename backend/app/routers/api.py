@@ -6,8 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import quote
+import secrets
+
+import jwt
 
 from app.database import get_session
+from app.config import settings
 from app.models import (
     User, Venue, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
     PayrollRun, PayrollRunItem, PayrollRunStatus, PayrollPayment,
@@ -22,7 +26,7 @@ from app.schemas import (
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollRunRevenueUpdate,
     PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
-    VenueStatsRow,
+    VenueStatsRow, ExportDownloadLinkRequest, ExportDownloadLinkOut,
 )
 from app.auth import authenticate_request
 from app.utils import (
@@ -43,6 +47,29 @@ import logging
 
 router = APIRouter(prefix="/api", tags=["api"])
 logger = logging.getLogger(__name__)
+
+EXPORT_DOWNLOAD_PATH_PREFIX = "/api/export/download/"
+EXPORT_DOWNLOAD_ISSUER = "shifttracker-saas"
+EXPORT_DOWNLOAD_AUDIENCE = "report-download"
+EXPORT_DOWNLOAD_TTL_SECONDS = 120
+
+
+class ReportDownloadAccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if record.name == "uvicorn.access" and isinstance(args, tuple) and len(args) >= 3:
+            request_path = args[2]
+            if isinstance(request_path, str) and request_path.startswith(EXPORT_DOWNLOAD_PATH_PREFIX):
+                redacted_args = list(args)
+                redacted_args[2] = f"{EXPORT_DOWNLOAD_PATH_PREFIX}[redacted]"
+                record.args = tuple(redacted_args)
+        return True
+
+
+def install_report_download_access_log_filter() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, ReportDownloadAccessLogFilter) for item in access_logger.filters):
+        access_logger.addFilter(ReportDownloadAccessLogFilter())
 
 
 def _can_manage_all_venue_shifts(user: User) -> bool:
@@ -1694,12 +1721,117 @@ def _export_scope_venue_id(user: User, requested_venue_id: uuid.UUID | None) -> 
     return user.venue_id
 
 
+def _export_filenames(month: int, year: int, extension: str) -> tuple[str, str]:
+    return (
+        f"shift-report-{year}-{month:02d}.{extension}",
+        f"Порядок.Смены — отчёт {year}-{month:02d}.{extension}",
+    )
+
+
 def _export_content_disposition(month: int, year: int, extension: str) -> str:
-    ascii_filename = f"shift-report-{year}-{month:02d}.{extension}"
-    russian_filename = f"Порядок.Смены — отчёт {year}-{month:02d}.{extension}"
+    ascii_filename, russian_filename = _export_filenames(month, year, extension)
     return (
         f'attachment; filename="{ascii_filename}"; '
         f"filename*=UTF-8''{quote(russian_filename)}"
+    )
+
+
+def _normalize_export_period(month: int | None, year: int | None) -> tuple[int, int]:
+    now = datetime.now(timezone.utc)
+    selected_month = month or now.month
+    selected_year = year or now.year
+    if selected_month < 1 or selected_month > 12:
+        raise HTTPException(status_code=422, detail="Месяц должен быть от 1 до 12")
+    return selected_month, selected_year
+
+
+def _create_export_download_token(
+    *,
+    user_id: uuid.UUID,
+    export_format: str,
+    month: int,
+    year: int,
+    venue_id: uuid.UUID | None,
+    now: datetime | None = None,
+) -> str:
+    if export_format not in {"xlsx", "csv"}:
+        raise ValueError("unsupported export format")
+    issued_at = now or datetime.now(timezone.utc)
+    payload = {
+        "iss": EXPORT_DOWNLOAD_ISSUER,
+        "aud": EXPORT_DOWNLOAD_AUDIENCE,
+        "purpose": "report-download",
+        "sub": str(user_id),
+        "format": export_format,
+        "month": month,
+        "year": year,
+        "venue_id": str(venue_id) if venue_id is not None else None,
+        "iat": issued_at,
+        "exp": issued_at + timedelta(seconds=EXPORT_DOWNLOAD_TTL_SECONDS),
+        "jti": secrets.token_urlsafe(12),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def _decode_export_download_token(signed_token: str) -> dict[str, object]:
+    claims = jwt.decode(
+        signed_token,
+        settings.SECRET_KEY,
+        algorithms=["HS256"],
+        audience=EXPORT_DOWNLOAD_AUDIENCE,
+        issuer=EXPORT_DOWNLOAD_ISSUER,
+        options={
+            "require": ["exp", "iat", "iss", "aud", "purpose", "sub", "format", "month", "year"],
+        },
+    )
+    if claims.get("purpose") != "report-download":
+        raise ValueError("invalid token purpose")
+
+    export_format = claims.get("format")
+    month = claims.get("month")
+    year = claims.get("year")
+    if export_format not in {"xlsx", "csv"}:
+        raise ValueError("invalid export format")
+    if isinstance(month, bool) or not isinstance(month, int) or month < 1 or month > 12:
+        raise ValueError("invalid export month")
+    if isinstance(year, bool) or not isinstance(year, int) or year < 2000 or year > 2100:
+        raise ValueError("invalid export year")
+
+    user_id = uuid.UUID(str(claims.get("sub")))
+    raw_venue_id = claims.get("venue_id")
+    if raw_venue_id is not None and not isinstance(raw_venue_id, str):
+        raise ValueError("invalid export venue")
+    venue_id = uuid.UUID(raw_venue_id) if raw_venue_id else None
+    return {
+        "user_id": user_id,
+        "format": export_format,
+        "month": month,
+        "year": year,
+        "venue_id": venue_id,
+    }
+
+
+def _build_export_response(report, export_format: str) -> Response:
+    if export_format == "xlsx":
+        content = build_xlsx(report)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif export_format == "csv":
+        content = build_csv(report)
+        media_type = "text/csv; charset=utf-8"
+    else:
+        raise ValueError("unsupported export format")
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": _export_content_disposition(
+                report.month, report.year, export_format
+            ),
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "https://web.telegram.org",
+        },
     )
 
 
@@ -1717,11 +1849,7 @@ async def _get_export_report(
             detail="Недостаточно прав для экспорта отчёта",
         )
 
-    now = datetime.now(timezone.utc)
-    selected_month = month or now.month
-    selected_year = year or now.year
-    if selected_month < 1 or selected_month > 12:
-        raise HTTPException(status_code=422, detail="Месяц должен быть от 1 до 12")
+    selected_month, selected_year = _normalize_export_period(month, year)
 
     effective_venue_id = _export_scope_venue_id(user, venue_id)
     return await load_report_data(
@@ -1730,6 +1858,64 @@ async def _get_export_report(
         year=selected_year,
         venue_id=effective_venue_id,
     )
+
+
+@router.post("/export/download-link", response_model=ExportDownloadLinkOut)
+async def create_export_download_link(
+    payload: ExportDownloadLinkRequest,
+    user: User = Depends(get_current_user),
+):
+    if not has_permission(user, "can_export_payroll"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта отчёта")
+
+    selected_month, selected_year = _normalize_export_period(payload.month, payload.year)
+    effective_venue_id = _export_scope_venue_id(user, payload.venue_id)
+    signed_token = _create_export_download_token(
+        user_id=user.id,
+        export_format=payload.format,
+        month=selected_month,
+        year=selected_year,
+        venue_id=effective_venue_id,
+    )
+    _, file_name = _export_filenames(selected_month, selected_year, payload.format)
+    return ExportDownloadLinkOut(
+        url=(
+            f"{settings.effective_webapp_url.rstrip('/')}"
+            f"{EXPORT_DOWNLOAD_PATH_PREFIX}{signed_token}"
+        ),
+        file_name=file_name,
+    )
+
+
+@router.get("/export/download/{signed_token}")
+async def download_export(
+    signed_token: str,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        claims = _decode_export_download_token(signed_token)
+    except (jwt.PyJWTError, ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Ссылка на скачивание недействительна или истекла")
+
+    user = await session.get(User, claims["user_id"])
+    if user is None:
+        raise HTTPException(status_code=401, detail="Ссылка на скачивание недействительна или истекла")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Пользователь деактивирован")
+    if not has_permission(user, "can_export_payroll"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта отчёта")
+
+    signed_venue_id = claims["venue_id"]
+    if not _can_manage_all_venue_shifts(user) and signed_venue_id != user.venue_id:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта этой точки")
+
+    report = await load_report_data(
+        session,
+        month=claims["month"],
+        year=claims["year"],
+        venue_id=signed_venue_id,
+    )
+    return _build_export_response(report, claims["format"])
 
 
 @router.get("/export/xlsx")
@@ -1748,15 +1934,7 @@ async def export_xlsx(
         user=user,
         session=session,
     )
-    return Response(
-        content=build_xlsx(report),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": _export_content_disposition(
-                report.month, report.year, "xlsx"
-            )
-        },
-    )
+    return _build_export_response(report, "xlsx")
 
 
 @router.get("/export/csv")
@@ -1775,15 +1953,7 @@ async def export_csv(
         user=user,
         session=session,
     )
-    return Response(
-        content=build_csv(report),
-        media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": _export_content_disposition(
-                report.month, report.year, "csv"
-            )
-        },
-    )
+    return _build_export_response(report, "csv")
 
 @router.post("/reminders/shifts")
 async def send_shift_reminders(

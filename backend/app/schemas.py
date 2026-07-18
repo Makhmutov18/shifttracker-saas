@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 from datetime import date, time, datetime
 from decimal import Decimal
 import uuid
@@ -395,6 +395,18 @@ class PersonalPayrollRunRead(BaseModel):
     paid_amount: Decimal = Decimal("0.00")
     remaining_amount: Decimal = Decimal("0.00")
     payments: list[PersonalPayrollPaymentRead] = Field(default_factory=list)
+
+
+class ExportDownloadLinkRequest(BaseModel):
+    format: Literal["xlsx", "csv"]
+    month: Optional[int] = Field(default=None, ge=1, le=12)
+    year: Optional[int] = Field(default=None, ge=2000, le=2100)
+    venue_id: Optional[uuid.UUID] = None
+
+
+class ExportDownloadLinkOut(BaseModel):
+    url: str
+    file_name: str
 
 
 # ─── Read-only AI summary ───────────────────────────────────────────────────

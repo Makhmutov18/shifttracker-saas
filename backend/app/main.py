@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import settings
 from app.database import init_db
-from app.routers.api import router as api_router
+from app.routers.api import install_report_download_access_log_filter, router as api_router
 from app.routers.admin import router as admin_router
 from app.routers.web_auth import install_oidc_access_log_filter, router as web_auth_router
 from app.routers.ai import router as ai_router
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     global _bot, _dispatcher
 
     install_oidc_access_log_filter()
+    install_report_download_access_log_filter()
     logger.info("Starting up...")
     await init_db()
     logger.info("Database initialized")

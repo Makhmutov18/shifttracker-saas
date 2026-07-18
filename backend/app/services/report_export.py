@@ -378,14 +378,25 @@ async def load_report_data(
 
 HEADER_FILL = PatternFill("solid", fgColor="2563EB")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
+TITLE_FILL = PatternFill("solid", fgColor="FFFFFF")
+BODY_FILL = PatternFill("solid", fgColor="FFFFFF")
+BODY_ALT_FILL = PatternFill("solid", fgColor="F5F8FC")
+BODY_FONT = Font(color="111827")
 TITLE_FONT = Font(color="111827", bold=True, size=15)
 SUBTITLE_FONT = Font(color="64748B", size=10)
 TOTAL_FILL = PatternFill("solid", fgColor="E2E8F0")
-THIN_BORDER = Border(bottom=Side(style="thin", color="CBD5E1"))
+TOTAL_FONT = Font(color="111827", bold=True)
+LIGHT_SIDE = Side(style="thin", color="D8DEE8")
+THIN_BORDER = Border(left=LIGHT_SIDE, right=LIGHT_SIDE, top=LIGHT_SIDE, bottom=LIGHT_SIDE)
 
 
 def _set_title(sheet, report: ReportData, columns: int) -> None:
     last_column = get_column_letter(columns)
+    for row_number in range(1, 4):
+        for column in range(1, columns + 1):
+            cell = sheet.cell(row=row_number, column=column)
+            cell.fill = TITLE_FILL
+            cell.font = BODY_FONT
     sheet.merge_cells(f"A1:{last_column}1")
     sheet.merge_cells(f"A2:{last_column}2")
     sheet["A1"] = "Порядок.Смены — отчёт"
@@ -403,6 +414,7 @@ def _prepare_sheet(sheet, report: ReportData, headers: list[str]) -> None:
         cell = sheet.cell(row=4, column=index, value=header)
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
+        cell.border = THIN_BORDER
         cell.alignment = Alignment(vertical="center", wrap_text=True)
     sheet.freeze_panes = "A5"
     sheet.sheet_view.showGridLines = False
@@ -433,8 +445,13 @@ def _add_table(sheet, *, name: str, columns: int, last_row: int) -> None:
 def _finish_sheet(sheet, widths: list[int]) -> None:
     for index, width in enumerate(widths, 1):
         sheet.column_dimensions[get_column_letter(index)].width = width
-    for row in sheet.iter_rows(min_row=5):
+    for row_number, row in enumerate(sheet.iter_rows(min_row=5), start=5):
+        row_fill = BODY_FILL if (row_number - 5) % 2 == 0 else BODY_ALT_FILL
         for cell in row:
+            if cell.fill.fill_type != "solid":
+                cell.fill = row_fill
+                cell.font = BODY_FONT
+            cell.border = THIN_BORDER
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
@@ -442,6 +459,7 @@ def _write_empty(sheet, columns: int, message: str) -> None:
     sheet.merge_cells(start_row=5, start_column=1, end_row=5, end_column=columns)
     cell = sheet.cell(row=5, column=1, value=message)
     cell.font = Font(color="64748B", italic=True)
+    cell.fill = BODY_FILL
     cell.alignment = Alignment(horizontal="center", vertical="center")
     sheet.row_dimensions[5].height = 28
 
@@ -503,7 +521,7 @@ def _write_shifts(workbook: Workbook, report: ReportData) -> None:
         ]
         for column, value in enumerate(totals, 1):
             cell = sheet.cell(row=total_row, column=column, value=value)
-            cell.font = Font(bold=True)
+            cell.font = TOTAL_FONT
             cell.fill = TOTAL_FILL
             cell.border = THIN_BORDER
         sheet.cell(total_row, 8).number_format = HOURS_FORMAT
@@ -539,7 +557,7 @@ def _write_employees(workbook: Workbook, report: ReportData) -> None:
         for column, key in ((4, "approved_shifts"), (5, "hours"), (6, "shift_amount"), (7, "bonuses"), (8, "deductions"), (9, "total"), (10, "cross_venue")):
             sheet.cell(total_row, column, sum((row[key] for row in report.employees), Decimal("0")))
         for cell in sheet[total_row]:
-            cell.font = Font(bold=True)
+            cell.font = TOTAL_FONT
             cell.fill = TOTAL_FILL
         sheet.cell(total_row, 5).number_format = HOURS_FORMAT
         for column in (6, 7, 8, 9):
@@ -566,7 +584,7 @@ def _write_adjustments(workbook: Workbook, report: ReportData) -> None:
         sheet.cell(total_row, 5, sum((row["amount"] for row in report.adjustments), Decimal("0")))
         sheet.cell(total_row, 5).number_format = MONEY_FORMAT
         for cell in sheet[total_row]:
-            cell.font = Font(bold=True)
+            cell.font = TOTAL_FONT
             cell.fill = TOTAL_FILL
     _finish_sheet(sheet, [18, 24, 22, 15, 16, 42, 24])
 
@@ -602,7 +620,7 @@ def _write_payroll_runs(workbook: Workbook, report: ReportData) -> None:
             sheet.cell(total_row, column, sum((row[key] for row in report.payroll_runs), Decimal("0")))
             sheet.cell(total_row, column).number_format = MONEY_FORMAT
         for cell in sheet[total_row]:
-            cell.font = Font(bold=True)
+            cell.font = TOTAL_FONT
             cell.fill = TOTAL_FILL
     _finish_sheet(sheet, [30, 16, 16, 22, 18, 17, 17, 17, 17, 13, 23])
 

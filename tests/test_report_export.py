@@ -243,11 +243,25 @@ class ReportExportTests(unittest.TestCase):
         self.assertEqual(workbook["Смены"]["M5"].number_format, MONEY_FORMAT)
         self.assertEqual(workbook["Расчёты и выплаты"]["J5"].number_format, "0.00%")
 
+        shifts_sheet = workbook["Смены"]
+        self.assertEqual(shifts_sheet["A1"].fill.fill_type, "solid")
+        self.assertEqual(shifts_sheet["A2"].fill.fill_type, "solid")
+        self.assertEqual(shifts_sheet["A5"].fill.fill_type, "solid")
+        self.assertEqual(shifts_sheet["A6"].fill.fill_type, "solid")
+        self.assertNotEqual(
+            shifts_sheet["A5"].fill.fgColor.rgb,
+            shifts_sheet["A6"].fill.fgColor.rgb,
+        )
+        self.assertEqual(shifts_sheet["A8"].fill.fill_type, "solid")
+        self.assertEqual(shifts_sheet["A8"].fill.fgColor.type, "rgb")
+        self.assertEqual(shifts_sheet["A5"].font.color.type, "rgb")
+
         empty = assemble_report_data(
             month=7, year=2026, venue_name="Все точки", shifts=[], adjustments=[], payroll_runs=[]
         )
         empty_book = load_workbook(io.BytesIO(build_xlsx(empty)))
         self.assertEqual(empty_book["Смены"]["A5"].value, "За выбранный период смен нет")
+        self.assertEqual(empty_book["Смены"]["A5"].fill.fill_type, "solid")
 
     def test_formula_injection_is_neutralized_in_xlsx_and_csv(self) -> None:
         self.assertEqual(safe_spreadsheet_text("=1+1"), "'=1+1")
@@ -264,8 +278,8 @@ class ReportExportTests(unittest.TestCase):
         source = API_SOURCE
         self.assertIn('filename="{ascii_filename}"', source)
         self.assertIn("filename*=UTF-8''", source)
-        self.assertIn('report.month, report.year, "xlsx"', _endpoint_source("export_xlsx"))
-        self.assertIn('report.month, report.year, "csv"', _endpoint_source("export_csv"))
+        self.assertIn('_build_export_response(report, "xlsx")', _endpoint_source("export_xlsx"))
+        self.assertIn('_build_export_response(report, "csv")', _endpoint_source("export_csv"))
 
 
 if __name__ == "__main__":

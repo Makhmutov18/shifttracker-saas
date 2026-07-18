@@ -816,62 +816,24 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // Export
 
-function getDownloadFilename(response: Response, extension: 'xlsx' | 'csv', month?: number, year?: number) {
-  const fallback = month && year
-    ? `shift-report-${year}-${String(month).padStart(2, '0')}.${extension}`
-    : `shift-report.${extension}`;
-  const disposition = response.headers.get('content-disposition') || '';
-
-  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1]);
-    } catch {
-      return fallback;
-    }
-  }
-
-  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
-  if (asciiMatch?.[1]) {
-    return asciiMatch[1];
-  }
-
-  return fallback;
+export interface ReportDownloadLink {
+  url: string;
+  file_name: string;
 }
 
-async function downloadReportExport(
-  extension: 'xlsx' | 'csv',
+export function createReportDownloadLink(
+  format: 'xlsx' | 'csv',
   month?: number,
   year?: number,
   venueId?: string,
-): Promise<{ blob: Blob; filename: string }> {
-  const params = new URLSearchParams();
-  if (month) params.set('month', String(month));
-  if (year) params.set('year', String(year));
-  if (venueId) params.set('venue_id', String(venueId));
-  const qs = params.toString();
-
-  const response = await fetch(`${API_BASE}/export/${extension}${qs ? `?${qs}` : ''}`, {
-    headers: {
-      'X-Init-Data': getInitData(),
-    },
+): Promise<ReportDownloadLink> {
+  return request<ReportDownloadLink>('/export/download-link', {
+    method: 'POST',
+    body: JSON.stringify({
+      format,
+      month,
+      year,
+      venue_id: venueId,
+    }),
   });
-
-  if (!response.ok) {
-    const body = await readResponseBody(response);
-    throw new Error(extractErrorMessage(body, 'Не удалось скачать отчет', response.status));
-  }
-
-  return {
-    blob: await response.blob(),
-    filename: getDownloadFilename(response, extension, month, year),
-  };
-}
-
-export function downloadPayrollExport(month?: number, year?: number, venueId?: string) {
-  return downloadReportExport('xlsx', month, year, venueId);
-}
-
-export function downloadPayrollCsvExport(month?: number, year?: number, venueId?: string) {
-  return downloadReportExport('csv', month, year, venueId);
 }

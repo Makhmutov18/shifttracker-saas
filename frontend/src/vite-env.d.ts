@@ -12,6 +12,12 @@ interface TelegramWebAppUser {
 
 interface TelegramWebApp {
   initData: string;
+  version?: string;
+  isVersionAtLeast?: (version: string) => boolean;
+  downloadFile?: (
+    params: { url: string; file_name: string },
+    callback?: (accepted: boolean) => void,
+  ) => void;
   initDataUnsafe: {
     query_id?: string;
     user?: TelegramWebAppUser;
