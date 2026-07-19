@@ -627,8 +627,9 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 
 .overview-page { display: grid; gap: 20px; }
 .overview-heading { display: grid; gap: 4px; }
-.overview-heading h1 { margin: 0; font-size: 30px; line-height: 1.2; }
-.overview-heading p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.overview-heading h1 { margin: 0; overflow-wrap: anywhere; font-size: clamp(25px, 2.4vw, 30px); line-height: 1.2; }
+.overview-heading-status { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.4; }
+.overview-heading-context { color: var(--text-caption); font-size: 12px; line-height: 1.4; }
 .overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .overview-metric { min-width: 0; min-height: 116px; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-soft); }
 .overview-metric > span { color: var(--text-muted); font-size: 12px; }
@@ -720,7 +721,6 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .mobile-header-title { min-width: 0; overflow: hidden; color: var(--text); font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-header-action { min-width: 0; margin-left: auto; }
   .content { padding-inline: 28px; }
-  .overview-heading h1 { display: none; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric:nth-child(2) { border-right: 0; }
   .metric:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
@@ -763,8 +763,10 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
   .loading-state { min-height: 360px; padding: 20px; grid-template-rows: 32px 92px 200px auto; }
   .skeleton-grid { grid-template-columns: 1fr 1fr; }
   .overview-page { gap: 18px; }
-  .overview-heading { gap: 2px; }
-  .overview-heading p { font-size: 12px; }
+  .overview-heading { gap: 3px; }
+  .overview-heading h1 { font-size: 24px; }
+  .overview-heading-status { font-size: 13px; }
+  .overview-heading-context { font-size: 11px; }
   .overview-metrics { grid-template-columns: 1fr; gap: 10px; }
   .overview-metric { min-height: 104px; }
   .overview-section-header { align-items: flex-start; }

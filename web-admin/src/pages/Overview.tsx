@@ -29,6 +29,12 @@ function compactMoney(value: number): string {
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
+function greetingForHour(hour: number): string {
+  if (hour >= 5 && hour < 12) return 'Доброе утро';
+  if (hour >= 12 && hour < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
 function FinancialValue({ allowed, available = true, value }: { allowed: boolean; available?: boolean; value: number }) {
   if (!allowed) return <span className="overview-restricted-value">Нет доступа</span>;
   if (!available) return <span className="overview-restricted-value">Недоступно</span>;
@@ -159,14 +165,24 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
     return summaryMap;
   }, new Map<string, number>()).entries());
   const summaryAvailable = summary !== null;
+  const firstName = user.name?.trim().split(/\s+/)[0] || 'коллега';
+  const venueContext = venueId ? venueMap.get(venueId)?.name?.trim() || 'Точка не указана' : 'Все точки';
+  const overviewStatus = pending.length
+    ? `${pending.length} ${plural(pending.length, ['смена ждёт', 'смены ждут', 'смен ждут'])} подтверждения`
+    : canViewPayroll && runsAvailable && unpaidRuns.length
+      ? `${unpaidRuns.length} ${plural(unpaidRuns.length, ['расчёт с остатком', 'расчёта с остатком', 'расчётов с остатком'])}`
+      : activeNow.length
+        ? `${activeNow.length} ${plural(activeNow.length, ['сотрудник сейчас на смене', 'сотрудника сейчас на смене', 'сотрудников сейчас на смене'])}`
+        : 'Всё под контролем';
 
   if (loading) return <LoadingState text="Собираем данные за месяц…" />;
   if (error && !shifts.length) return <ErrorState message={error} retry={load} />;
 
   return <div className="overview-page">
     <header className="overview-heading">
-      <h1>Обзор</h1>
-      <p>{periodLabel}</p>
+      <h1>{greetingForHour(now.getHours())}, {firstName}</h1>
+      <p className="overview-heading-status">{overviewStatus}</p>
+      <small className="overview-heading-context">{periodLabel} · {venueContext}</small>
     </header>
     <section className="overview-metrics" aria-label="Финансовая сводка за месяц">
       <article className="overview-metric">
