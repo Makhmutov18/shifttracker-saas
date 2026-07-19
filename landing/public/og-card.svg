@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F7F8FA"/>
+  <path d="M88 220V120c0-33.137 26.863-60 60-60h72c33.137 0 60 26.863 60 60v100h-56v-94c0-8.837-7.163-16-16-16h-48c-8.837 0-16 7.163-16 16v94H88Z" fill="#0F1115"/>
+  <circle cx="298" cy="198" r="10" fill="#0077FF"/>
+  <text x="88" y="330" fill="#0F1115" font-family="Inter,Arial,sans-serif" font-size="68" font-weight="700">Порядок.Смены</text>
+  <text x="88" y="420" fill="#0F1115" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="600">Смены, люди и расчёты —</text>
+  <text x="88" y="478" fill="#0F1115" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="600">в одном порядке</text>
+  <line x1="88" y1="542" x2="1112" y2="542" stroke="#D9DEE7"/>
+  <text x="88" y="584" fill="#697386" font-family="Inter,Arial,sans-serif" font-size="22">Система для бизнеса со сменным персоналом</text>
+</svg>
+

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://poryadok-smeny.makhmutov18m.chatgpt.site/sitemap.xml
+
