@@ -158,6 +158,16 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
   const activeShiftByUser = new Map(activeShifts.map((shift) => [shift.user_id, shift]));
   const activeUserIds = new Set(activeShiftByUser.keys());
   const activeNow = users.filter((employee) => employee.is_active && activeUserIds.has(employee.id));
+  const upcomingShift = [...shifts]
+    .filter((shift) => {
+      const start = (shift.start_time || '').slice(0, 5);
+      return shift.status !== 'rejected' && Boolean(shift.date && start) && `${shift.date}T${start}` > `${today}T${timeNow}`;
+    })
+    .sort((left, right) => `${left.date}T${left.start_time}`.localeCompare(`${right.date}T${right.start_time}`))[0];
+  const upcomingEmployee = upcomingShift ? userMap.get(upcomingShift.user_id) : undefined;
+  const upcomingVenueName = upcomingShift
+    ? upcomingShift.venue_name?.trim() || venueMap.get(upcomingShift.venue_id || '')?.name || 'Точка не указана'
+    : '';
   const activeVenueSummary = Array.from(activeNow.reduce((summaryMap, employee) => {
     const shift = activeShiftByUser.get(employee.id);
     const venueName = shift?.venue_name?.trim() || venueMap.get(shift?.venue_id || employee.venue_id || '')?.name || 'Точка не указана';
@@ -260,10 +270,15 @@ export function Overview({ user, venues, venueId, periodValue, navigate }: { use
         </section>
 
         <section className="overview-panel on-shift-panel">
-          <div className="overview-section-header"><div><h2>Сейчас на смене</h2><span>Активные сотрудники</span></div></div>
+          <div className="overview-section-header"><div><h2>Сейчас на смене</h2><span>{activeNow.length ? 'Активные сотрудники' : upcomingShift ? 'Следующая по расписанию' : 'Активные сотрудники'}</span></div></div>
           {activeNow.length ? <div className="on-shift-content">
             <div className="on-shift-summary"><AvatarStack items={activeNow.map((employee) => ({ name: employee.name || 'Сотрудник' }))} max={5} /><div><strong>{activeNow.length} {plural(activeNow.length, ['сотрудник', 'сотрудника', 'сотрудников'])}</strong><span>{activeNow.slice(0, 3).map((employee) => employee.name || 'Сотрудник').join(', ')}</span></div></div>
             <div className="on-shift-venues">{activeVenueSummary.map(([venueName, count]) => <span key={venueName}><b>{count}</b><small title={venueName}>{venueName}</small></span>)}</div>
+          </div> : upcomingShift ? <div className="upcoming-shift-content">
+            <span className="upcoming-shift-kicker">Ближайшая смена</span>
+            <strong>{formatDate(upcomingShift.date)} · {formatTime(upcomingShift.start_time)}</strong>
+            <span className="upcoming-shift-person">{upcomingEmployee?.name || 'Сотрудник'}</span>
+            <small title={upcomingVenueName}>{upcomingVenueName}</small>
           </div> : <div className="compact-empty"><span>Сейчас активных смен нет</span><small>Сотрудники появятся здесь в рабочее время.</small></div>}
         </section>
 
