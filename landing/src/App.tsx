@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { animate, createScope, createTimeline, stagger } from 'animejs';
 import {
   ArrowRight,
   Building2,
@@ -118,6 +119,7 @@ function ProductImage({ src, alt, mobile = false }: { src: string; alt: string; 
 }
 
 export default function App() {
+  const motionRoot = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleId, setRoleId] = useState<(typeof roles)[number]['id']>('owner');
   const [hours, setHours] = useState(8);
@@ -135,27 +137,86 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const items = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
-    if (!('IntersectionObserver' in window)) {
-      items.forEach((item) => item.classList.add('is-visible'));
+    const root = motionRoot.current;
+    if (!root) return;
+
+    const scenes = Array.from(root.querySelectorAll<HTMLElement>('[data-motion-scene]'));
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      scenes.forEach((scene) => { scene.dataset.motionPlayed = 'true'; });
       return;
     }
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      });
-    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
-    items.forEach((item) => {
-      const bounds = item.getBoundingClientRect();
-      if (bounds.top < window.innerHeight && bounds.bottom > 0) {
-        item.classList.add('is-visible');
+
+    const scope = createScope({ root: motionRoot });
+    scope.add(() => {
+      const playScene = (scene: HTMLElement) => {
+        if (scene.dataset.motionPlayed === 'true') return;
+        scene.dataset.motionPlayed = 'true';
+
+        scope.execute(() => {
+          const sceneName = scene.dataset.motionScene;
+
+          if (sceneName === 'hero') {
+            const copyItems = scene.querySelectorAll<HTMLElement>('.eyebrow, h1, .hero-lead');
+            const actionItems = scene.querySelectorAll<HTMLElement>('.hero-actions, .risk-note');
+            const productItems = scene.querySelectorAll<HTMLElement>('.product-image');
+            createTimeline({ defaults: { ease: 'outCubic' } })
+              .add(copyItems, { opacity: { from: 0 }, y: { from: 20 }, duration: 460, delay: stagger(72) }, 0)
+              .add(actionItems, { opacity: { from: 0.7 }, y: { from: 14 }, duration: 400, delay: stagger(58) }, 250)
+              .add(productItems, { opacity: { from: 0.35 }, y: { from: 22 }, scale: { from: 0.985 }, duration: 560, delay: stagger(90) }, 190);
+            return;
+          }
+
+          if (sceneName === 'comparison') {
+            animate(scene.querySelectorAll('.section-heading'), { opacity: { from: 0.5 }, y: { from: 16 }, duration: 420, ease: 'outCubic' });
+            animate(scene.querySelectorAll('.comparison-before li'), {
+              opacity: { from: 0.55 },
+              x: { from: -14 },
+              duration: 480,
+              delay: stagger(45),
+              ease: 'outCubic',
+            });
+            animate(scene.querySelectorAll('.comparison-arrow'), { opacity: { from: 0.35 }, x: { from: -10 }, duration: 430, delay: 160, ease: 'outCubic' });
+            animate(scene.querySelectorAll('.comparison-after li'), { opacity: { from: 0.55 }, x: { from: 14 }, duration: 480, delay: stagger(45, { start: 180 }), ease: 'outCubic' });
+            return;
+          }
+
+          if (sceneName === 'workflow') {
+            createTimeline({ defaults: { ease: 'outCubic' } })
+              .add(scene.querySelectorAll('.section-heading'), { opacity: { from: 0.45 }, y: { from: 18 }, duration: 420 }, 0)
+              .add(scene.querySelectorAll('.workflow-list li'), { opacity: { from: 0.42 }, x: { from: -16 }, duration: 430, delay: stagger(72) }, 110);
+            return;
+          }
+
+          if (sceneName === 'feature') {
+            createTimeline({ defaults: { ease: 'outCubic' } })
+              .add(scene.querySelectorAll('.feature-copy'), { opacity: { from: 0.45 }, y: { from: 18 }, duration: 460 }, 0)
+              .add(scene.querySelectorAll('.product-image'), { opacity: { from: 0.35 }, y: { from: 20 }, scale: { from: 0.99 }, duration: 520 }, 120);
+          }
+        });
+      };
+
+      const hero = root.querySelector<HTMLElement>('[data-motion-scene="hero"]');
+      if (hero) playScene(hero);
+
+      const observedScenes = scenes.filter((scene) => scene !== hero);
+      if (!('IntersectionObserver' in window)) {
+        observedScenes.forEach(playScene);
         return;
       }
-      observer.observe(item);
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          playScene(entry.target as HTMLElement);
+          observer.unobserve(entry.target);
+        });
+      }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+
+      observedScenes.forEach((scene) => observer.observe(scene));
+      return () => observer.disconnect();
     });
-    return () => observer.disconnect();
+
+    return () => scope.revert();
   }, []);
 
   return <>
@@ -183,10 +244,10 @@ export default function App() {
       </div>
     </header>
 
-    <main id="main">
-      <section className="hero section" id="top">
+    <main id="main" ref={motionRoot}>
+      <section className="hero section" id="top" data-motion-scene="hero">
         <div className="container hero-grid">
-          <div className="hero-copy" data-reveal>
+          <div className="hero-copy">
             <p className="eyebrow">Для бизнеса со сменным персоналом</p>
             <h1>Смены, люди и расчёты — в одном порядке</h1>
             <p className="hero-lead">Порядок.Смены собирает график, фактические выходы, часы, начисления и выплаты в одном месте — без бесконечных таблиц, переписок и ручных сверок.</p>
@@ -196,7 +257,7 @@ export default function App() {
             </div>
             <p className="risk-note"><CheckCircle2 />Настроим первую точку и поможем перенести сотрудников.</p>
           </div>
-          <div className="hero-product" data-reveal>
+          <div className="hero-product">
             <ProductImage src="/screens/admin-overview.png" alt="Обзор точек, смен и расчётов в web-админке Порядок.Смены" />
             <ProductImage src="/screens/mini-dashboard.png" alt="Главный экран сотрудника в Telegram Mini App Порядок.Смены" mobile />
           </div>
@@ -211,7 +272,7 @@ export default function App() {
       </section>
 
       <section className="section problem-section">
-        <div className="container" data-reveal>
+        <div className="container" data-motion-scene="comparison">
           <div className="section-heading">
             <p className="section-index">01</p>
             <h2>Excel, чаты и память администратора — не система учёта</h2>
@@ -234,15 +295,15 @@ export default function App() {
         </div>
       </section>
 
-      <section className="section workflow-section" id="workflow">
+      <section className="section workflow-section" id="workflow" data-motion-scene="workflow">
         <div className="container">
-          <div className="section-heading" data-reveal>
+          <div className="section-heading">
             <p className="section-index">02</p>
             <h2>Один рабочий ритм — от смены до выплаты</h2>
             <p>Каждое действие получает понятный статус, ответственного и место в общей истории.</p>
           </div>
           <ol className="workflow-list">
-            {workflow.map(([number, title, text]) => <li key={number} data-reveal>
+            {workflow.map(([number, title, text]) => <li key={number}>
               <span className="workflow-number">{number}</span>
               <span className="workflow-mark" aria-hidden="true"><Logo compact /></span>
               <div><h3>{title}</h3><p>{text}</p></div>
@@ -258,17 +319,17 @@ export default function App() {
             <h2>Рабочие инструменты вместо ещё одной таблицы</h2>
           </div>
 
-          <article className="feature-block" data-reveal>
+          <article className="feature-block" data-motion-scene="feature">
             <div className="feature-copy"><CalendarCheck2 /><p className="feature-kicker">Смены и подтверждения</p><h3>Проверяйте факт, а не собирайте сообщения</h3><p>Сотрудник вносит смену, управляющий видит детали и принимает решение. Pending-записи не теряются в чате.</p><ul><li>Кто, где и когда работал</li><li>Часы, статус и начисление</li><li>Редактирование, approve и reject</li></ul></div>
             <ProductImage src="/screens/admin-shifts.png" alt="Таблица смен со статусами в web-админке" />
           </article>
 
-          <article className="feature-block feature-reversed" data-reveal>
+          <article className="feature-block feature-reversed" data-motion-scene="feature">
             <div className="feature-copy"><WalletCards /><p className="feature-kicker">Расчёты и выплаты</p><h3>Отделяйте начисленное от фактически выплаченного</h3><p>Расчёт сохраняется как снимок периода. Частичные и полные выплаты фиксируются отдельно и не меняют историю задним числом.</p><ul><li>Утверждённые смены, бонусы и удержания</li><li>Черновик и фиксация расчёта</li><li>Начислено, выплачено и осталось</li></ul></div>
             <ProductImage src="/screens/admin-payroll.png" alt="Расчёты выплат в web-админке" />
           </article>
 
-          <article className="feature-block" data-reveal>
+          <article className="feature-block">
             <div className="feature-copy"><Building2 /><p className="feature-kicker">Точки и роли</p><h3>Одна команда может работать в разных местах</h3><p>Основная точка сотрудника и фактическая точка смены учитываются отдельно. Управляющий видит только разрешённый контур.</p><ul><li>Активные и архивные сотрудники</li><li>Несколько точек без дублирования людей</li><li>Роли и точечные разрешения</li></ul></div>
             <ProductImage src="/screens/admin-team.png" alt="Управление командой и ролями в web-админке" />
           </article>
