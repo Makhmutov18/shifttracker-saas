@@ -1,431 +1,263 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { animate, createScope, createTimeline, stagger } from 'animejs';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  Building2,
-  Calculator,
-  CalendarCheck2,
+  CaretDown,
   Check,
-  CheckCircle2,
-  ChevronDown,
-  CircleDollarSign,
-  FileSpreadsheet,
-  Menu,
-  MessageSquareText,
+  Clock,
+  CurrencyRub,
+  DeviceMobile,
+  FileXls,
+  List,
+  ListChecks,
+  MapPin,
   ShieldCheck,
-  Users,
-  WalletCards,
+  Storefront,
+  UsersThree,
   X,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import { siteConfig } from './config';
 
-const navigation = [
-  { label: 'Возможности', href: '#features' },
-  { label: 'Как работает', href: '#workflow' },
-  { label: 'Тарифы', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' },
+const workflow = [
+  { number: '01', title: 'Сотрудник вносит смену', text: 'В Telegram, сразу после работы.' },
+  { number: '02', title: 'Администратор проверяет', text: 'Видит часы, точку, выручку и начисление.' },
+  { number: '03', title: 'Владелец фиксирует расчёт', text: 'Сохраняет суммы и отмечает реальные выплаты.' },
 ];
 
-const industries = ['Кофейни и рестораны', 'Кальянные', 'Киберклубы', 'Сервисные команды', 'Небольшие сети'];
-
-const workflow = [
-  ['01', 'Добавьте точки и сотрудников', 'Зафиксируйте структуру команды, роли и правила оплаты.'],
-  ['02', 'Создайте смены', 'Сотрудник или управляющий вносит фактически отработанную смену.'],
-  ['03', 'Подтвердите время', 'Ответственный проверяет детали и утверждает или отклоняет запись.'],
-  ['04', 'Соберите начисления', 'Система учитывает утверждённые смены, бонусы и удержания.'],
-  ['05', 'Зафиксируйте выплаты', 'Полная или частичная выплата сохраняется отдельным событием.'],
-  ['06', 'Посмотрите общую картину', 'Собственник видит точки, задачи, расчёты и историю действий.'],
+const capabilities = [
+  { icon: ListChecks, title: 'Подтверждение смен', text: 'Ожидающие смены собраны в одной очереди с понятными статусами.' },
+  { icon: CurrencyRub, title: 'Начисления и выплаты', text: 'Отдельно видно, сколько начислено, выплачено и осталось.' },
+  { icon: MapPin, title: 'Несколько точек', text: 'Основная точка сотрудника и фактическая точка смены не смешиваются.' },
+  { icon: UsersThree, title: 'Команда и доступы', text: 'Роли сотрудника, администратора и владельца с нужными правами.' },
+  { icon: FileXls, title: 'Отчёты без ручной сборки', text: 'Готовый Excel и CSV по сменам, сотрудникам и расчётам.' },
+  { icon: ShieldCheck, title: 'История действий', text: 'Изменения и управленческие действия остаются проверяемыми.' },
 ];
 
 const roles = [
-  {
-    id: 'owner',
-    label: 'Собственник',
-    title: 'Спокойный обзор без ручного сбора отчётов',
-    text: 'Видит точки, начисления, выплаты, остатки и отклонения в одном рабочем контуре.',
-    points: ['Состояние всех доступных точек', 'Расчёты и фактические выплаты', 'История действий и экспорт'],
-  },
-  {
-    id: 'manager',
-    label: 'Управляющий',
-    title: 'Понятная очередь операционных задач',
-    text: 'Работает со сменами своей команды и сразу понимает, что требует подтверждения.',
-    points: ['Проверка и редактирование смен', 'Команда и её настройки', 'Бонусы и удержания по правилам доступа'],
-  },
-  {
-    id: 'employee',
-    label: 'Сотрудник',
-    title: 'Собственные смены и деньги без лишних вопросов',
-    text: 'Видит только свои смены, текущие начисления и историю зафиксированных выплат.',
-    points: ['Быстрое внесение смены', 'Статусы и история изменений', 'Начислено, выплачено и осталось'],
-  },
-] as const;
-
-const pricing = [
-  {
-    name: 'Старт',
-    price: '4 900 ₽',
-    scope: 'До 25 сотрудников · 1 точка',
-    points: ['Сотрудники и смены', 'Подтверждения и роли', 'Текущие начисления', 'Telegram Mini App'],
-    recommended: false,
-  },
-  {
-    name: 'Рост',
-    price: '9 900 ₽',
-    scope: 'До 80 сотрудников · до 5 точек',
-    points: ['Несколько точек', 'Расширенные права', 'Расчёты и выплаты', 'XLSX/CSV и аудит действий'],
-    recommended: true,
-  },
-  {
-    name: 'Сеть',
-    price: '24 900 ₽',
-    scope: 'До 300 сотрудников · несколько точек',
-    points: ['Единый обзор по точкам', 'Разграничение управленческого доступа', 'Расширенный контур расчётов', 'Приоритетная поддержка запуска'],
-    recommended: false,
-  },
-] as const;
+  ['Сотруднику', 'Внести смену, проверить статус и увидеть историю выплат.'],
+  ['Администратору', 'Проверить смены, управлять командой и подготовить расчёт.'],
+  ['Владельцу', 'Понять, что требует внимания, и видеть деньги по каждой точке.'],
+];
 
 const faqs = [
-  ['Для каких компаний подходит продукт?', 'Для кофеен, ресторанов, сервисных команд и небольших сетей, где люди работают сменами, а фактические часы и выплаты приходится сводить вручную.'],
-  ['Сколько занимает запуск?', 'Срок зависит от количества точек, сотрудников и правил оплаты. В пилоте мы вместе проверяем исходную таблицу, настраиваем первую точку и только после этого подключаем команду.'],
-  ['Можно ли работать с несколькими точками?', 'Да. Смена привязывается к фактической точке работы, а сотрудник сохраняет свою основную точку. Доступ к данным зависит от роли и разрешений.'],
-  ['Как сотрудники подключаются к системе?', 'Администратор добавляет сотрудника и выдаёт приглашение. Дальше сотрудник открывает Telegram Mini App и работает под своим Telegram-аккаунтом.'],
-  ['Где работает приложение?', 'Для сотрудников и быстрых действий есть Telegram Mini App. Для собственника и управляющего доступна web-админка на компьютере или планшете.'],
-  ['Как рассчитываются начисления?', 'Начисления строятся только по утверждённым сменам и сохранённым правилам оплаты. Бонусы прибавляются, удержания вычитаются. Фактические выплаты фиксируются отдельно.'],
-  ['Можно ли выгрузить данные?', 'Да. Управленческий пользователь с соответствующим правом может скачать оформленный XLSX-отчёт или CSV с сырыми данными смен.'],
-  ['Что происходит с текущими таблицами?', 'Мы не обещаем автоматический импорт. В пилоте перенос — это услуга запуска: вы присылаете таблицу, мы вместе проверяем структуру и переносим основные данные.'],
-  ['Что входит в пилот?', 'Первичная настройка, перенос исходных данных, запуск первой точки, сбор обратной связи и прямой канал поддержки на период проверки продукта.'],
-  ['Как защищены данные разных компаний?', 'Доступ требует авторизации через Telegram и проверяется на backend по ролям и разрешениям. В пилоте рабочий контур каждой компании настраивается отдельно; расширенная multi-workspace модель развивается поэтапно.'],
-] as const;
+  ['Это замена кассе или бухгалтерии?', 'Нет. Порядок.Смены отвечает за смены, начисления и фиксацию выплат. Касса и бухгалтерский учёт остаются в своих системах.'],
+  ['Нужно устанавливать приложение сотрудникам?', 'Нет. Сотрудники работают внутри Telegram Mini App, а владельцы и администраторы могут использовать веб-панель.'],
+  ['Можно учитывать работу на разных точках?', 'Да. Смена хранит фактическую точку работы отдельно от основной точки сотрудника.'],
+  ['Система сама переводит зарплату?', 'Нет. Она рассчитывает и фиксирует факт выплаты, но не переводит деньги.'],
+];
 
-function Logo({ compact = false }: { compact?: boolean }) {
-  return <span className={`logo${compact ? ' logo-compact' : ''}`} aria-label="Порядок.Смены">
-    <svg viewBox="0 0 48 40" aria-hidden="true">
-      <path d="M4 36V16C4 8.268 10.268 2 18 2h12c7.732 0 14 6.268 14 14v20H34V17a5 5 0 0 0-5-5H19a5 5 0 0 0-5 5v19H4Z" />
-    </svg>
-    {!compact && <span>Порядок<span className="logo-dot">.</span>Смены</span>}
-  </span>;
-}
-
-function ActionLink({ href, children, variant = 'primary', className = '' }: { href: string; children: React.ReactNode; variant?: 'primary' | 'secondary' | 'text'; className?: string }) {
-  const external = /^https?:\/\//.test(href);
-  return <a className={`button button-${variant} ${className}`.trim()} href={href} {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}>{children}</a>;
-}
-
-function ProductImage({ src, alt, mobile = false }: { src: string; alt: string; mobile?: boolean }) {
-  return <div className={`product-image${mobile ? ' product-image-mobile' : ''}`}>
-    <img src={src} alt={alt} width={mobile ? 390 : 1440} height={mobile ? 844 : 900} loading="lazy" />
-  </div>;
-}
-
-export default function App() {
-  const motionRoot = useRef<HTMLElement>(null);
+function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [roleId, setRoleId] = useState<(typeof roles)[number]['id']>('owner');
-  const [hours, setHours] = useState(8);
-  const [hourCost, setHourCost] = useState(700);
-  const [extraCost, setExtraCost] = useState(5000);
-  const activeRole = roles.find((role) => role.id === roleId) ?? roles[0];
-  const manualCost = useMemo(() => Math.max(0, hours) * 4.3 * Math.max(0, hourCost) + Math.max(0, extraCost), [extraCost, hourCost, hours]);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, []);
-
-  useEffect(() => {
-    const root = motionRoot.current;
-    if (!root) return;
-
-    const scenes = Array.from(root.querySelectorAll<HTMLElement>('[data-motion-scene]'));
+    const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      scenes.forEach((scene) => { scene.dataset.motionPlayed = 'true'; });
+      elements.forEach((element) => element.dataset.visible = 'true');
       return;
     }
 
-    const scope = createScope({ root: motionRoot });
-    scope.add(() => {
-      const playScene = (scene: HTMLElement) => {
-        if (scene.dataset.motionPlayed === 'true') return;
-        scene.dataset.motionPlayed = 'true';
-
-        scope.execute(() => {
-          const sceneName = scene.dataset.motionScene;
-
-          if (sceneName === 'hero') {
-            const copyItems = scene.querySelectorAll<HTMLElement>('.eyebrow, h1, .hero-lead');
-            const actionItems = scene.querySelectorAll<HTMLElement>('.hero-actions, .risk-note');
-            const productItems = scene.querySelectorAll<HTMLElement>('.product-image');
-            createTimeline({ defaults: { ease: 'outCubic' } })
-              .add(copyItems, { opacity: { from: 0 }, y: { from: 20 }, duration: 460, delay: stagger(72) }, 0)
-              .add(actionItems, { opacity: { from: 0.7 }, y: { from: 14 }, duration: 400, delay: stagger(58) }, 250)
-              .add(productItems, { opacity: { from: 0.35 }, y: { from: 22 }, scale: { from: 0.985 }, duration: 560, delay: stagger(90) }, 190);
-            return;
-          }
-
-          if (sceneName === 'comparison') {
-            animate(scene.querySelectorAll('.section-heading'), { opacity: { from: 0.5 }, y: { from: 16 }, duration: 420, ease: 'outCubic' });
-            animate(scene.querySelectorAll('.comparison-before li'), {
-              opacity: { from: 0.55 },
-              x: { from: -14 },
-              duration: 480,
-              delay: stagger(45),
-              ease: 'outCubic',
-            });
-            animate(scene.querySelectorAll('.comparison-arrow'), { opacity: { from: 0.35 }, x: { from: -10 }, duration: 430, delay: 160, ease: 'outCubic' });
-            animate(scene.querySelectorAll('.comparison-after li'), { opacity: { from: 0.55 }, x: { from: 14 }, duration: 480, delay: stagger(45, { start: 180 }), ease: 'outCubic' });
-            return;
-          }
-
-          if (sceneName === 'workflow') {
-            createTimeline({ defaults: { ease: 'outCubic' } })
-              .add(scene.querySelectorAll('.section-heading'), { opacity: { from: 0.45 }, y: { from: 18 }, duration: 420 }, 0)
-              .add(scene.querySelectorAll('.workflow-list li'), { opacity: { from: 0.42 }, x: { from: -16 }, duration: 430, delay: stagger(72) }, 110);
-            return;
-          }
-
-          if (sceneName === 'feature') {
-            createTimeline({ defaults: { ease: 'outCubic' } })
-              .add(scene.querySelectorAll('.feature-copy'), { opacity: { from: 0.45 }, y: { from: 18 }, duration: 460 }, 0)
-              .add(scene.querySelectorAll('.product-image'), { opacity: { from: 0.35 }, y: { from: 20 }, scale: { from: 0.99 }, duration: 520 }, 120);
-          }
-        });
-      };
-
-      const hero = root.querySelector<HTMLElement>('[data-motion-scene="hero"]');
-      if (hero) playScene(hero);
-
-      const observedScenes = scenes.filter((scene) => scene !== hero);
-      if (!('IntersectionObserver' in window)) {
-        observedScenes.forEach(playScene);
-        return;
-      }
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          playScene(entry.target as HTMLElement);
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          (entry.target as HTMLElement).dataset.visible = 'true';
           observer.unobserve(entry.target);
-        });
-      }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+        }
+      });
+    }, { threshold: 0.12 });
 
-      observedScenes.forEach((scene) => observer.observe(scene));
-      return () => observer.disconnect();
-    });
-
-    return () => scope.revert();
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
   }, []);
 
-  return <>
-    <a className="skip-link" href="#main">К содержанию</a>
-    <header className="site-header">
-      <div className="container header-inner">
-        <a className="brand-link" href="#top" aria-label="Порядок.Смены — на главную"><Logo /></a>
-        <nav className="desktop-nav" aria-label="Основная навигация">
-          {navigation.map((item) => <a key={item.href} href={item.href}>{item.label}</a>)}
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [menuOpen]);
+
+  const closeMenu = () => setMenuOpen(false);
+
+  return (
+    <div className="site-shell">
+      <header className="site-header">
+        <a className="brand" href="#top" aria-label="Порядок.Смены, на главную">
+          <span className="brand-mark">П</span>
+          <span>Порядок.Смены</span>
+        </a>
+
+        <nav className={`site-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Основная навигация">
+          <a href="#features" onClick={closeMenu}>Продукт</a>
+          <a href="#workflow" onClick={closeMenu}>Как работает</a>
+          <a href="#pilot" onClick={closeMenu}>Пилот</a>
+          <a href="#faq" onClick={closeMenu}>Вопросы</a>
         </nav>
+
         <div className="header-actions">
-          <ActionLink href={siteConfig.appUrl} variant="text">Войти</ActionLink>
-          <ActionLink href={siteConfig.leadUrl}>Запросить пилот</ActionLink>
+          <a className="button button-quiet desktop-login" href={siteConfig.appUrl}>Войти</a>
+          <a className="button button-primary header-cta" href={siteConfig.leadUrl}>Обсудить пилот</a>
+          <button
+            className="menu-button"
+            type="button"
+            aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={22} /> : <List size={22} />}
+          </button>
         </div>
-        <button className="mobile-menu-button" type="button" onClick={() => setMenuOpen((value) => !value)} aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} aria-controls="mobile-navigation">
-          {menuOpen ? <X /> : <Menu />}
-        </button>
-      </div>
-      <div id="mobile-navigation" className={`mobile-navigation${menuOpen ? ' open' : ''}`}>
-        <nav aria-label="Мобильная навигация">
-          {navigation.map((item) => <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>)}
-          <a href={siteConfig.appUrl}>Войти</a>
-          <ActionLink href={siteConfig.leadUrl} className="mobile-pilot">Запросить пилот</ActionLink>
-        </nav>
-      </div>
-    </header>
+      </header>
 
-    <main id="main" ref={motionRoot}>
-      <section className="hero section" id="top" data-motion-scene="hero">
-        <div className="container hero-grid">
-          <div className="hero-copy">
-            <p className="eyebrow">Для бизнеса со сменным персоналом</p>
-            <h1>Смены, люди и расчёты — в одном порядке</h1>
-            <p className="hero-lead">Порядок.Смены собирает график, фактические выходы, часы, начисления и выплаты в одном месте — без бесконечных таблиц, переписок и ручных сверок.</p>
+      <main id="top">
+        <section className="hero">
+          <div className="hero-copy" data-reveal>
+            <p className="context-line"><span /> Для бизнеса со сменными командами</p>
+            <h1>Смены и выплаты без ручной сверки</h1>
+            <p className="hero-lead">Сотрудники вносят смены в Telegram, администратор подтверждает, владелец видит начисления и выплаты.</p>
             <div className="hero-actions">
-              <ActionLink href={siteConfig.leadUrl}>Запросить пилот <ArrowRight /></ActionLink>
-              <ActionLink href="#workflow" variant="secondary">Посмотреть, как работает</ActionLink>
+              <a className="button button-primary button-large" href={siteConfig.leadUrl}>
+                Обсудить пилот <ArrowRight size={19} weight="bold" />
+              </a>
+              <a className="text-link" href="#product-view">Посмотреть продукт <ArrowRight size={17} /></a>
             </div>
-            <p className="risk-note"><CheckCircle2 />Настроим первую точку и поможем перенести сотрудников.</p>
-          </div>
-          <div className="hero-product">
-            <ProductImage src="/screens/admin-overview.png" alt="Обзор точек, смен и расчётов в web-админке Порядок.Смены" />
-            <ProductImage src="/screens/mini-dashboard.png" alt="Главный экран сотрудника в Telegram Mini App Порядок.Смены" mobile />
-          </div>
-        </div>
-      </section>
-
-      <section className="industry-strip" aria-label="Подходит для команд">
-        <div className="container industry-inner">
-          <span>Работает там, где есть смены</span>
-          <div>{industries.map((industry) => <span key={industry}>{industry}</span>)}</div>
-        </div>
-      </section>
-
-      <section className="section problem-section">
-        <div className="container" data-motion-scene="comparison">
-          <div className="section-heading">
-            <p className="section-index">01</p>
-            <h2>Excel, чаты и память администратора — не система учёта</h2>
-          </div>
-          <div className="comparison">
-            <div className="comparison-side comparison-before">
-              <h3>До</h3>
-              <ul>
-                <li>График в одной таблице</li><li>Подтверждения в переписке</li><li>Часы считаются вручную</li><li>Выплаты сверяются перед зарплатой</li><li>Проблемы видны слишком поздно</li>
-              </ul>
-            </div>
-            <div className="comparison-arrow" aria-hidden="true"><ArrowRight /></div>
-            <div className="comparison-side comparison-after">
-              <h3>После</h3>
-              <ul>
-                <li>Точки, сотрудники и смены в одном месте</li><li>Понятные статусы подтверждения</li><li>Начисления считаются по правилам</li><li>Выплаты и остатки видны</li><li>Собственник получает общую картину</li>
-              </ul>
+            <div className="hero-assurances" aria-label="Основные преимущества">
+              <span><Check size={16} weight="bold" /> Запуск с вашей командой</span>
+              <span><Check size={16} weight="bold" /> Без установки сотрудникам</span>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section className="section workflow-section" id="workflow" data-motion-scene="workflow">
-        <div className="container">
-          <div className="section-heading">
-            <p className="section-index">02</p>
-            <h2>Один рабочий ритм — от смены до выплаты</h2>
-            <p>Каждое действие получает понятный статус, ответственного и место в общей истории.</p>
+          <div className="hero-visual" data-reveal>
+            <div className="desktop-frame">
+              <div className="frame-bar"><i /><i /><i /><span>Панель владельца</span></div>
+              <img src="/screens/admin-overview.png" alt="Обзор смен и выплат в веб-панели Порядок.Смены" />
+            </div>
+            <div className="mobile-frame">
+              <div className="mobile-speaker" />
+              <img src="/screens/mini-dashboard.png" alt="Главная страница сотрудника в Telegram Mini App" />
+            </div>
           </div>
-          <ol className="workflow-list">
-            {workflow.map(([number, title, text]) => <li key={number}>
-              <span className="workflow-number">{number}</span>
-              <span className="workflow-mark" aria-hidden="true"><Logo compact /></span>
-              <div><h3>{title}</h3><p>{text}</p></div>
-            </li>)}
-          </ol>
-        </div>
-      </section>
+        </section>
 
-      <section className="section features-section" id="features">
-        <div className="container">
+        <section className="audience-strip" aria-label="Для каких команд подходит продукт">
+          <p>Кофейни</p><span /> <p>Бары</p><span /> <p>Пекарни</p><span /> <p>Рестораны</p><span /> <p>Небольшие сети</p>
+        </section>
+
+        <section className="section workflow-section" id="workflow">
           <div className="section-heading" data-reveal>
-            <p className="section-index">03</p>
-            <h2>Рабочие инструменты вместо ещё одной таблицы</h2>
+            <p className="section-kicker">Один рабочий контур</p>
+            <h2>От закрытой смены до зафиксированной выплаты</h2>
+            <p>Каждый участник видит свою часть процесса, а цифры не приходится собирать заново.</p>
           </div>
-
-          <article className="feature-block" data-motion-scene="feature">
-            <div className="feature-copy"><CalendarCheck2 /><p className="feature-kicker">Смены и подтверждения</p><h3>Проверяйте факт, а не собирайте сообщения</h3><p>Сотрудник вносит смену, управляющий видит детали и принимает решение. Pending-записи не теряются в чате.</p><ul><li>Кто, где и когда работал</li><li>Часы, статус и начисление</li><li>Редактирование, approve и reject</li></ul></div>
-            <ProductImage src="/screens/admin-shifts.png" alt="Таблица смен со статусами в web-админке" />
-          </article>
-
-          <article className="feature-block feature-reversed" data-motion-scene="feature">
-            <div className="feature-copy"><WalletCards /><p className="feature-kicker">Расчёты и выплаты</p><h3>Отделяйте начисленное от фактически выплаченного</h3><p>Расчёт сохраняется как снимок периода. Частичные и полные выплаты фиксируются отдельно и не меняют историю задним числом.</p><ul><li>Утверждённые смены, бонусы и удержания</li><li>Черновик и фиксация расчёта</li><li>Начислено, выплачено и осталось</li></ul></div>
-            <ProductImage src="/screens/admin-payroll.png" alt="Расчёты выплат в web-админке" />
-          </article>
-
-          <article className="feature-block">
-            <div className="feature-copy"><Building2 /><p className="feature-kicker">Точки и роли</p><h3>Одна команда может работать в разных местах</h3><p>Основная точка сотрудника и фактическая точка смены учитываются отдельно. Управляющий видит только разрешённый контур.</p><ul><li>Активные и архивные сотрудники</li><li>Несколько точек без дублирования людей</li><li>Роли и точечные разрешения</li></ul></div>
-            <ProductImage src="/screens/admin-team.png" alt="Управление командой и ролями в web-админке" />
-          </article>
-
-          <article className="feature-block feature-reversed" data-reveal>
-            <div className="feature-copy"><CircleDollarSign /><p className="feature-kicker">Обзор и отчётность</p><h3>Смотрите, что требует внимания прямо сейчас</h3><p>Web-обзор собирает реальные задачи, текущие смены и расчёты. XLSX и CSV помогают передать данные дальше без ручной пересборки.</p><ul><li>Сводка по доступным точкам</li><li>Экспорт смен и расчётов</li><li>Умная сводка объясняет готовые метрики</li></ul></div>
-            <ProductImage src="/screens/admin-overview.png" alt="Операционный обзор собственника" />
-          </article>
-        </div>
-      </section>
-
-      <section className="section roles-section">
-        <div className="container roles-layout" data-reveal>
-          <div className="section-heading compact"><p className="section-index">04</p><h2>Каждой роли — свой уровень ясности</h2></div>
-          <div className="roles-panel">
-            <div className="role-tabs" role="tablist" aria-label="Роли в продукте">
-              {roles.map((role) => <button key={role.id} type="button" role="tab" aria-selected={role.id === roleId} aria-controls="role-panel" onClick={() => setRoleId(role.id)}>{role.label}</button>)}
-            </div>
-            <div className="role-content" id="role-panel" role="tabpanel">
-              <div><h3>{activeRole.title}</h3><p>{activeRole.text}</p></div>
-              <ul>{activeRole.points.map((point) => <li key={point}><Check />{point}</li>)}</ul>
-            </div>
+          <div className="workflow-line">
+            {workflow.map((item) => (
+              <article className="workflow-step" key={item.number} data-reveal>
+                <span>{item.number}</span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="section migration-section">
-        <div className="container migration-layout" data-reveal>
-          <div><p className="section-index">05</p><h2>Не начинайте учёт заново</h2><p>Поможем перенести сотрудников, точки и основные правила из вашей текущей таблицы. Это услуга запуска, а не обещание автоматического импорта.</p></div>
-          <ol>
-            <li><span>1</span><div><strong>Присылаете таблицу</strong><small>Без подготовки нового шаблона.</small></div></li>
-            <li><span>2</span><div><strong>Вместе проверяем структуру</strong><small>Уточняем точки, роли и правила.</small></div></li>
-            <li><span>3</span><div><strong>Настраиваем первую точку</strong><small>Проверяем данные на реальном процессе.</small></div></li>
-            <li><span>4</span><div><strong>Команда начинает работать</strong><small>Сопровождаем первые смены.</small></div></li>
-          </ol>
-        </div>
-      </section>
-
-      <section className="section calculator-section">
-        <div className="container calculator-layout" data-reveal>
-          <div className="calculator-copy"><Calculator /><p className="section-index">06</p><h2>Сколько сейчас стоит ручной процесс?</h2><p>Это ориентир для разговора о процессе, а не обещание гарантированной экономии.</p></div>
-          <div className="calculator-form">
-            <label><span>Часов в неделю на графики и сверки</span><input type="number" min="0" step="1" value={hours} onChange={(event) => setHours(Number(event.target.value) || 0)} /></label>
-            <label><span>Стоимость часа управляющего, ₽</span><input type="number" min="0" step="100" value={hourCost} onChange={(event) => setHourCost(Number(event.target.value) || 0)} /></label>
-            <label><span>Ошибки и пересчёты в месяц, ₽</span><input type="number" min="0" step="500" value={extraCost} onChange={(event) => setExtraCost(Number(event.target.value) || 0)} /></label>
-            <div className="calculator-result" aria-live="polite"><span>Оценка стоимости ручного процесса</span><strong>{Math.round(manualCost).toLocaleString('ru-RU')} ₽ <small>в месяц</small></strong><p>{hours.toLocaleString('ru-RU')} ч × 4,3 × {hourCost.toLocaleString('ru-RU')} ₽ + {extraCost.toLocaleString('ru-RU')} ₽</p></div>
+        <section className="section product-section" id="product-view">
+          <div className="product-intro" data-reveal>
+            <p className="section-kicker">Рабочая картина</p>
+            <h2>Сразу видно, что происходит сейчас</h2>
+            <p>Ожидающие смены, начисления, фактические выплаты и состояние точек находятся в одном обзоре.</p>
           </div>
-        </div>
-      </section>
+          <figure className="product-shot" data-reveal>
+            <img src="/screens/admin-overview.png" alt="Рабочий обзор владельца с начислениями, сменами и точками" />
+            <figcaption><Clock size={17} /> Реальные данные по текущему периоду и выбранной точке</figcaption>
+          </figure>
+        </section>
 
-      <section className="section pricing-section" id="pricing">
-        <div className="container">
-          <div className="section-heading" data-reveal><p className="section-index">07</p><h2>Прозрачные тарифы без длинного согласования</h2><p>Финальные условия фиксируем перед пилотом. Автоматический биллинг пока не требуется для запуска.</p></div>
-          <div className="pricing-grid">
-            {pricing.map((plan) => <article className={`pricing-plan${plan.recommended ? ' recommended' : ''}`} key={plan.name} data-reveal>
-              {plan.recommended && <span className="plan-label">Рекомендуемый</span>}
-              <h3>{plan.name}</h3><p className="plan-price">{plan.price}<span>/ месяц</span></p><p className="plan-scope">{plan.scope}</p>
-              <ul>{plan.points.map((point) => <li key={point}><Check />{point}</li>)}</ul>
-              <ActionLink href={siteConfig.leadUrl} variant={plan.recommended ? 'primary' : 'secondary'}>Обсудить пилот</ActionLink>
-            </article>)}
+        <section className="section split-showcase" id="features">
+          <div className="split-copy" data-reveal>
+            <p className="section-kicker">Два удобных интерфейса</p>
+            <h2>Telegram для команды. Веб-панель для управления.</h2>
+            <p>Сотруднику не нужно осваивать тяжёлую систему. Администратор при этом получает полноценный рабочий инструмент.</p>
+            <ul className="clean-list">
+              <li><DeviceMobile size={20} /> Смена, история и выплаты внутри Telegram</li>
+              <li><Storefront size={20} /> Управление точками и командой в веб-панели</li>
+              <li><ShieldCheck size={20} /> Разные возможности для каждой роли</li>
+            </ul>
           </div>
-          <div className="enterprise-row" data-reveal><div><h3>Enterprise</h3><p>Для сложной оргструктуры, интеграционных требований и нескольких юридических лиц. Состав и цена — по запросу.</p></div><ActionLink href={siteConfig.leadUrl} variant="secondary">Обсудить задачу</ActionLink></div>
-        </div>
-      </section>
-
-      <section className="section pilot-section" id="pilot">
-        <div className="container pilot-layout" data-reveal>
-          <div><p className="eyebrow">Честный старт</p><h2>Ищем несколько команд для пилотного запуска</h2><p>Проверим продукт на ваших реальных процессах и вместе найдём границу между полезной автоматизацией и лишней сложностью.</p><ActionLink href={siteConfig.leadUrl}>Стать участником пилота <ArrowRight /></ActionLink></div>
-          <ul><li><Users /><span><strong>Поможем с настройкой</strong><small>Точки, сотрудники, роли и правила.</small></span></li><li><FileSpreadsheet /><span><strong>Перенесём исходные данные</strong><small>Как услугу запуска, без обещания автоимпорта.</small></span></li><li><MessageSquareText /><span><strong>Соберём обратную связь</strong><small>По первым сменам и расчётам.</small></span></li><li><ShieldCheck /><span><strong>Дадим прямую поддержку</strong><small>На период пилотной проверки.</small></span></li></ul>
-        </div>
-      </section>
-
-      <section className="section faq-section" id="faq">
-        <div className="container faq-layout">
-          <div className="section-heading compact" data-reveal><p className="section-index">08</p><h2>Частые вопросы</h2><p>Без обещаний функций, которых ещё нет.</p></div>
-          <div className="faq-list" data-reveal>
-            {faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown /></summary><p>{answer}</p></details>)}
+          <div className="payroll-shot" data-reveal>
+            <img src="/screens/admin-payroll.png" alt="Расчёты начислений и фактических выплат в веб-панели" />
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="final-cta section">
-        <div className="container final-cta-inner" data-reveal>
-          <div><h2>Соберите смены и расчёты в одном рабочем контуре</h2><p>Покажем продукт на ваших реальных процессах и поможем настроить первую точку.</p></div>
-          <ActionLink href={siteConfig.leadUrl}>Запросить пилот <ArrowRight /></ActionLink>
-        </div>
-      </section>
-    </main>
+        <section className="section capabilities-section">
+          <div className="section-heading compact" data-reveal>
+            <p className="section-kicker">Внутри продукта</p>
+            <h2>Достаточно функций, чтобы навести порядок</h2>
+          </div>
+          <div className="capability-list">
+            {capabilities.map(({ icon: Icon, title, text }) => (
+              <article className="capability-row" key={title} data-reveal>
+                <Icon size={23} />
+                <h3>{title}</h3>
+                <p>{text}</p>
+                <ArrowRight size={18} />
+              </article>
+            ))}
+          </div>
+        </section>
 
-    <footer className="site-footer">
-      <div className="container footer-grid">
-        <div className="footer-brand"><Logo /><p>Смены, люди и расчёты — в одном спокойном рабочем контуре.</p></div>
-        <nav aria-label="Навигация в подвале">{navigation.map((item) => <a key={item.href} href={item.href}>{item.label}</a>)}</nav>
-        <div className="footer-links"><a href={siteConfig.contactUrl}>Контакт</a><a href={siteConfig.appUrl}>Войти в систему</a><span aria-disabled="true">Политика конфиденциальности — готовится</span><span aria-disabled="true">Пользовательское соглашение — готовится</span></div>
-      </div>
-      <div className="container footer-bottom"><span>© 2026 Порядок.Смены</span><span>Продукт находится на этапе пилотного запуска</span></div>
-    </footer>
-  </>;
+        <section className="roles-band">
+          <div className="roles-heading" data-reveal>
+            <p className="section-kicker">Одна система, три взгляда</p>
+            <h2>Ничего лишнего для каждой роли</h2>
+          </div>
+          <div className="roles-list">
+            {roles.map(([title, text], index) => (
+              <div className="role-item" key={title} data-reveal>
+                <span>0{index + 1}</span><h3>{title}</h3><p>{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="section pilot-section" id="pilot">
+          <div className="pilot-copy" data-reveal>
+            <p className="section-kicker">Пилотный запуск</p>
+            <h2>Проверим продукт на вашей реальной команде</h2>
+            <p>Поможем настроить точки, сотрудников и правила оплаты. Вы оцените процесс на настоящих сменах без длинного внедрения.</p>
+            <a className="button button-primary button-large" href={siteConfig.contactUrl}>
+              Обсудить пилот <ArrowRight size={19} weight="bold" />
+            </a>
+          </div>
+          <div className="pilot-details" data-reveal>
+            <div><span>01</span><p>Настраиваем структуру точек и роли команды</p></div>
+            <div><span>02</span><p>Переносим действующие модели оплаты</p></div>
+            <div><span>03</span><p>Проводим первые смены и расчёт вместе</p></div>
+          </div>
+        </section>
+
+        <section className="section faq-section" id="faq">
+          <div className="faq-heading" data-reveal>
+            <p className="section-kicker">Частые вопросы</p>
+            <h2>Коротко о важном</h2>
+          </div>
+          <div className="faq-list">
+            {faqs.map(([question, answer]) => (
+              <details key={question} data-reveal>
+                <summary>{question}<CaretDown size={20} /></summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <div className="footer-brand"><span className="brand-mark">П</span><strong>Порядок.Смены</strong></div>
+        <p>Смены, начисления и выплаты в понятном порядке.</p>
+        <div><a href="#features">Продукт</a><a href="#pilot">Пилот</a><a href={siteConfig.appUrl}>Войти</a></div>
+      </footer>
+    </div>
+  );
 }
+
+export default App;
