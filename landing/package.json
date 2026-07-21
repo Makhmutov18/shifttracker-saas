@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.1",
+    "@phosphor-icons/react": "^2.1.10",
     "animejs": "^4.5.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",

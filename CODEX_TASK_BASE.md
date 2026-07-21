@@ -63,6 +63,8 @@ For UI tasks:
 
 Do not claim real Telegram QA unless the result was actually tested inside Telegram. Browser or mock testing must be described as such.
 
+For web-admin visual tasks, read `web-admin/DESIGN.md`. For frontend or landing design tasks, do not automatically apply the web-admin design system. Use the installed `design-taste-frontend` skill for landing pages and redesign audits when relevant. Preserve the existing stack: do not introduce Tailwind, Motion, GSAP, another icon library, or another design system unless explicitly requested. Existing React/Vite/CSS architecture remains authoritative. New and migrated web-admin surfaces use Phosphor, but do not perform global icon replacement in unrelated tasks.
+
 ## 5. Validation
 
 Always run:
