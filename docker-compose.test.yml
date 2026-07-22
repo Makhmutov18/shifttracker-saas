@@ -1,0 +1,20 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shifttracker_test
+      POSTGRES_USER: shifttracker_test
+      POSTGRES_PASSWORD: shifttracker_test_only
+      TZ: UTC
+      PGTZ: UTC
+    command: ["postgres", "-c", "timezone=UTC"]
+    ports:
+      - "${SHIFTTRACKER_TEST_POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shifttracker_test -d shifttracker_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    tmpfs:
+      - /var/lib/postgresql/data

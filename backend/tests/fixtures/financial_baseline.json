@@ -1,0 +1,34 @@
+{
+  "period": {
+    "start": "2026-06-01",
+    "end": "2026-06-30"
+  },
+  "shift_counts": {
+    "approved": 5,
+    "pending": 1,
+    "rejected": 1
+  },
+  "approved_hours": "36.00",
+  "approved_salary": "9500.00",
+  "adjustments": {
+    "bonuses": "500.00",
+    "deductions": "200.00",
+    "net": "300.00"
+  },
+  "all_venues_payroll_total": "9800.00",
+  "venue_payroll_run": {
+    "total_amount": "8800.00",
+    "total_paid": "1000.00",
+    "remaining_amount": "7800.00",
+    "revenue_total": "40000.00",
+    "payroll_share": "22.00"
+  },
+  "payments": {
+    "count": 1,
+    "total": "1000.00"
+  },
+  "sources": {
+    "shifts": 4,
+    "adjustments": 2
+  }
+}
