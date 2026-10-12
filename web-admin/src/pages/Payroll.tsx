@@ -3,7 +3,7 @@ import { Calculator, Check, ChevronLeft, ChevronRight, CircleDollarSign, Downloa
 import { api, type ExportFormat } from '../api';
 import { ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, Metric, MoneyValue, PageHeader, Pagination, StatusBadge, Toast, type SortDirection } from '../components/ui';
 import type { PayrollPreview, PayrollRun, PayrollRunItem, PayrollRunListItem, User, Venue } from '../types';
-import { currentMonthValue, formatDate, formatNumber, hasPermission, isOwnerOrAdmin, monthBounds, monthParts } from '../utils';
+import { currentMonthValue, formatDate, formatNumber, hasPermission, isOwnerOrAdmin, monthBounds, monthParts, summarizePayrollRuns } from '../utils';
 
 type ConfirmAction = { type: 'finalize' | 'cancel'; run: PayrollRun } | null;
 type RunSort = 'period' | 'status' | 'amount' | 'remaining';
@@ -209,7 +209,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
     finally { attempt.pending = false; setBusy(false); }
   };
 
-  const totals = useMemo(() => ({ accrued: runs.reduce((sum, run) => sum + Number(run.total_amount || 0), 0), paid: runs.reduce((sum, run) => sum + Number(run.total_paid || 0), 0), remaining: runs.filter((run) => run.status === 'finalized').reduce((sum, run) => sum + Math.max(0, Number(run.total_amount) - Number(run.total_paid)), 0) }), [runs]);
+  const totals = useMemo(() => summarizePayrollRuns(runs), [runs]);
   const filteredRuns = useMemo(() => runs
     .filter((run) => !statusFilter || run.status === statusFilter)
     .sort((left, right) => {
@@ -279,11 +279,11 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
 
   return <div className="payroll-page">
     <PageHeader title="Расчёты выплат" description="Формируйте начисления за период и фиксируйте фактические выплаты." action={canExport || canAct ? <div className="page-header-actions">{canExport && <button className="button secondary" type="button" onClick={openExport}><Download />Экспорт</button>}{canAct && <button className="button primary" type="button" onClick={openCreate}><Plus />Новый расчёт</button>}</div> : undefined} />
-    <section className="payroll-summary" aria-label="Финансовая сводка">
-      <div><span>Начислено</span><strong><MoneyValue value={totals.accrued} /></strong></div>
+    <section className="payroll-summary" aria-label="Финансовая сводка по зафиксированным расчётам">
+      <div><span>Зафиксировано</span><strong><MoneyValue value={totals.accrued} /></strong></div>
       <div><span>Выплачено</span><strong><MoneyValue value={totals.paid} /></strong></div>
       <div><span>Осталось</span><strong><MoneyValue value={totals.remaining} /></strong></div>
-      <div><span>Расчётов</span><strong>{runs.length}</strong></div>
+      <div><span>Всего расчётов</span><strong>{runs.length}</strong></div>
       {totals.paid > 0 && totals.remaining > 0 && <div className="payroll-summary-progress"><div className="progress-track" role="progressbar" aria-label="Доля выплаченного" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(paidProgress)}><span style={{ width: `${paidProgress}%` }} /></div><small>{Math.round(paidProgress)}% выплачено</small></div>}
     </section>
     {error && <div className="notice error">{error}</div>}

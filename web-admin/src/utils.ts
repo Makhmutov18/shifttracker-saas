@@ -1,4 +1,17 @@
-import type { PermissionKey, User } from './types';
+import type { PayrollRunListItem, PermissionKey, User } from './types';
+
+export function summarizePayrollRuns(runs: readonly Pick<PayrollRunListItem, 'status' | 'total_amount' | 'total_paid'>[]) {
+  const totals = { accrued: 0, paid: 0, remaining: 0 };
+  for (const run of runs) {
+    if (run.status !== 'finalized' && run.status !== 'paid') continue;
+    const accrued = Number(run.total_amount || 0);
+    const paid = Number(run.total_paid || 0);
+    totals.accrued += accrued;
+    totals.paid += paid;
+    totals.remaining += Math.max(0, accrued - paid);
+  }
+  return totals;
+}
 
 export function hasPermission(user: User | null, permission: PermissionKey): boolean {
   if (!user) return false;
