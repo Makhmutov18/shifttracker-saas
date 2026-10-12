@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SAEnum,
     UniqueConstraint,
+    Index,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -464,6 +465,7 @@ class PayrollRunAdjustmentSource(Base):
 
 class PayrollPayment(Base):
     __tablename__ = "payroll_payments"
+    __table_args__ = (Index("ix_payroll_payments_run_idempotency", "payroll_run_id", "idempotency_key", unique=True),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -478,6 +480,7 @@ class PayrollPayment(Base):
         Numeric(12, 2), nullable=False, default=Decimal("0.00")
     )
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    idempotency_key: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(

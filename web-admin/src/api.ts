@@ -93,7 +93,7 @@ export const api = {
   updatePayrollRunRevenue: (id: string, revenueTotal: number | null) => request<PayrollRun>(`/api/payroll-runs/${id}/revenue`, { method: 'PATCH', body: JSON.stringify({ revenue_total: revenueTotal }) }),
   finalizePayrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}/finalize`, { method: 'POST' }),
   cancelPayrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}/cancel`, { method: 'POST' }),
-  recordPayrollPayment: (id: string, data: { user_id: string; amount: number; payment_date: string; method?: string; comment?: string }) => request(`/api/payroll-runs/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  recordPayrollPayment: (id: string, data: { user_id: string; amount: number; payment_date: string; method?: string; comment?: string; idempotency_key?: string }) => request(`/api/payroll-runs/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
   users: (includeInactive = true) => request<User[]>(`/api/admin/users${query({ include_inactive: includeInactive })}`),
   createUser: (data: Record<string, unknown>) => request<InviteResult>('/api/admin/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id: string, data: Record<string, unknown>) => request<User>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

@@ -137,6 +137,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const [revenueError, setRevenueError] = useState('');
   const [revenueBusy, setRevenueBusy] = useState(false);
   const [paymentItem, setPaymentItem] = useState<PayrollRunItem | null>(null);
+  const paymentAttempt = useRef<{ key: string; pending: boolean } | null>(null);
   const [payment, setPayment] = useState({ amount: '', payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' });
   const [paymentError, setPaymentError] = useState('');
   const [confirm, setConfirm] = useState<ConfirmAction>(null);
@@ -193,16 +194,19 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
     catch (reason) { setRevenueError(reason instanceof Error ? reason.message : 'Не удалось сохранить выручку.'); }
     finally { setRevenueBusy(false); }
   };
-  const openPayment = (item: PayrollRunItem) => { setPaymentError(''); setPaymentItem(item); setPayment({ amount: item.remaining_amount, payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' }); };
+  const openPayment = (item: PayrollRunItem) => { if (paymentAttempt.current?.pending) return; paymentAttempt.current = { key: crypto.randomUUID(), pending: false }; setPaymentError(''); setPaymentItem(item); setPayment({ amount: item.remaining_amount, payment_date: new Date().toISOString().slice(0, 10), method: '', comment: '' }); };
   const closePayment = () => { if (busy) return; setPaymentItem(null); setPaymentError(''); };
   const recordPayment = async () => {
     if (!selected || !paymentItem || !canAct) return;
     const amount = Number(payment.amount); const remaining = Number(paymentItem.remaining_amount);
     if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) { setPaymentError('Сумма должна быть больше нуля и не превышать остаток.'); return; }
+    const attempt = paymentAttempt.current;
+    if (!attempt || attempt.pending) return;
+    attempt.pending = true;
     setBusy(true); setPaymentError('');
-    try { await api.recordPayrollPayment(selected.id, { user_id: paymentItem.user_id, amount, payment_date: payment.payment_date, method: payment.method || undefined, comment: payment.comment || undefined }); setSelected(await api.payrollRun(selected.id)); setPaymentItem(null); setPaymentError(''); setSuccess('Фактическая выплата записана.'); await loadRuns(); }
+    try { await api.recordPayrollPayment(selected.id, { user_id: paymentItem.user_id, amount, payment_date: payment.payment_date, method: payment.method || undefined, comment: payment.comment || undefined, idempotency_key: attempt.key }); setSelected(await api.payrollRun(selected.id)); setPaymentItem(null); setPaymentError(''); setSuccess('Фактическая выплата записана.'); await loadRuns(); }
     catch (reason) { setPaymentError(reason instanceof Error ? reason.message : 'Не удалось записать выплату.'); }
-    finally { setBusy(false); }
+    finally { attempt.pending = false; setBusy(false); }
   };
 
   const totals = useMemo(() => ({ accrued: runs.reduce((sum, run) => sum + Number(run.total_amount || 0), 0), paid: runs.reduce((sum, run) => sum + Number(run.total_paid || 0), 0), remaining: runs.filter((run) => run.status === 'finalized').reduce((sum, run) => sum + Math.max(0, Number(run.total_amount) - Number(run.total_paid)), 0) }), [runs]);

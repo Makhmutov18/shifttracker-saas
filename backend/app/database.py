@@ -174,6 +174,15 @@ async def init_db():
         """))
 
         await conn.execute(text("""
+            ALTER TABLE payroll_payments
+            ADD COLUMN IF NOT EXISTS idempotency_key UUID;
+        """))
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_payroll_payments_run_idempotency
+            ON payroll_payments(payroll_run_id, idempotency_key);
+        """))
+
+        await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL REFERENCES users(id),

@@ -31,6 +31,6 @@ Verified on 2026-10-12 with an isolated PostgreSQL 18 cluster: the full integrat
 
 - These guarantees apply to the application mutation paths, not arbitrary direct database writes bypassing them.
 - New sources arriving after selection are not included in that saved snapshot. Preview remains read-only and does not reserve sources.
-- Identical HTTP payment retries are not idempotent: two valid partial payments may both be recorded if the remaining balance allows them. This change prevents overpayment and invalid status transitions, not all duplicate user intent. Request idempotency keys remain a separate API task.
+- Clients without an operation key may still record two valid partial payments. The subsequent [payment idempotency change](PAYMENT_IDEMPOTENCY.md) protects retries carrying the same key; row locks alone protect balances and status transitions, not duplicate user intent.
 - Negative accrual handling and attributing monthly adjustments to partial-month periods are product decisions and were not changed.
 - No production deployment or live Telegram/browser QA is part of this change.

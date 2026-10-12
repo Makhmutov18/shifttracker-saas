@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -586,6 +586,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [paymentItem, setPaymentItem] = useState<PayrollRunItem | null>(null);
+  const paymentAttempt = useRef<{ key: string; pending: boolean } | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -779,6 +780,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
   };
 
   const openPaymentForm = (item: PayrollRunItem) => {
+    if (paymentAttempt.current?.pending) return;
+    paymentAttempt.current = { key: crypto.randomUUID(), pending: false };
     setPaymentItem(item);
     setPaymentAmount(String(item.remaining_amount || '0'));
     setPaymentDate(new Date().toISOString().slice(0, 10));
@@ -805,6 +808,9 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
       setError('Укажите дату выплаты.');
       return;
     }
+    const attempt = paymentAttempt.current;
+    if (!attempt || attempt.pending) return;
+    attempt.pending = true;
     setError(null);
     setSuccess(null);
     try {
@@ -815,6 +821,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         payment_date: paymentDate,
         method: paymentMethod.trim() || undefined,
         comment: paymentComment.trim() || undefined,
+        idempotency_key: attempt.key,
       });
       await refreshSelectedRun(selectedRun.id);
       setPaymentItem(null);
@@ -822,6 +829,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
     } catch (err) {
       setError(getPayrollRunError(err));
     } finally {
+      attempt.pending = false;
       setActionLoading(false);
     }
   };

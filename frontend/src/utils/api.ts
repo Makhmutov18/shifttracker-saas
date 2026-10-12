@@ -607,6 +607,7 @@ export interface CreatePayrollPaymentRequest {
   payment_date: string;
   method?: string;
   comment?: string;
+  idempotency_key?: string;
 }
 
 export interface PayrollPaymentResult {

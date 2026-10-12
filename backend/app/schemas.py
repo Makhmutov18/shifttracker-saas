@@ -307,6 +307,7 @@ class PayrollPaymentCreate(BaseModel):
     payment_date: date
     method: Optional[str] = None
     comment: Optional[str] = None
+    idempotency_key: Optional[uuid.UUID] = None
 
 
 class PayrollPaymentResult(BaseModel):

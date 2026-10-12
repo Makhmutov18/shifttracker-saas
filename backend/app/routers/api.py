@@ -1359,7 +1359,30 @@ async def create_payroll_payment(
         run = run_result.scalar_one_or_none()
         if run is None or not _payroll_run_is_visible(run, user):
             raise HTTPException(status_code=404, detail="Payroll run not found")
-        if run.status != PayrollRunStatus.finalized:
+
+        amount = safe_decimal(payment_data.amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        existing_payment = None
+        if payment_data.idempotency_key is not None:
+            existing_payment = (await session.execute(
+                select(PayrollPayment).where(
+                    PayrollPayment.payroll_run_id == payroll_run_id,
+                    PayrollPayment.idempotency_key == payment_data.idempotency_key,
+                )
+            )).scalar_one_or_none()
+            if existing_payment is not None and (
+                existing_payment.created_by_id != user.id
+                or existing_payment.user_id != payment_data.user_id
+                or existing_payment.amount != amount
+                or existing_payment.payment_date != payment_data.payment_date
+                or existing_payment.method != payment_data.method
+                or existing_payment.comment != payment_data.comment
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Этот запрос выплаты уже записан с другими данными. Обновите расчёт и проверьте историю выплат.",
+                )
+        # A lost response must remain retryable even when the first payment completed the run.
+        if existing_payment is None and run.status != PayrollRunStatus.finalized:
             raise HTTPException(status_code=409, detail="Payments can only be recorded for finalized payroll runs")
 
         item_result = await session.execute(
@@ -1375,7 +1398,11 @@ async def create_payroll_payment(
         if item is None:
             raise HTTPException(status_code=404, detail="Employee is not included in this payroll run")
 
-        amount = safe_decimal(payment_data.amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if existing_payment is not None:
+            result = _payroll_payment_result(existing_payment, item, run)
+            await session.rollback()
+            return result
+
         current_paid = safe_decimal(item.paid_amount)
         current_remaining = safe_decimal(item.remaining_amount)
         if current_paid < 0 or current_remaining < 0:
@@ -1414,6 +1441,7 @@ async def create_payroll_payment(
             method=payment_data.method,
             comment=payment_data.comment,
             created_by_id=user.id,
+            idempotency_key=payment_data.idempotency_key,
         )
         session.add(payment)
         await session.flush()
@@ -1425,6 +1453,10 @@ async def create_payroll_payment(
         await session.rollback()
         raise
 
+    return _payroll_payment_result(payment, item, run)
+
+
+def _payroll_payment_result(payment: PayrollPayment, item: PayrollRunItem, run: PayrollRun) -> PayrollPaymentResult:
     return PayrollPaymentResult(
         payment=PayrollPaymentRead(
             id=payment.id,
