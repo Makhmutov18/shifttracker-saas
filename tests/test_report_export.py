@@ -51,7 +51,7 @@ def _endpoint_source(name: str) -> str:
     return ast.get_source_segment(API_SOURCE, endpoint) or ""
 
 
-def _sample_report():
+def _sample_report(*, revenue="12000", monthly=False, all_venues=False):
     home = Venue(id=uuid.uuid4(), name="Главная")
     other = Venue(id=uuid.uuid4(), name="Выездная")
     creator = User(
@@ -138,11 +138,11 @@ def _sample_report():
         id=uuid.uuid4(),
         title="Июльский расчёт",
         period_start=date(2026, 7, 1),
-        period_end=date(2026, 7, 15),
+        period_end=date(2026, 7, 31 if monthly else 15),
         status=PayrollRunStatus.finalized,
         total_amount=Decimal("99999"),
         total_paid=Decimal("99999"),
-        revenue_total=Decimal("12000"),
+        revenue_total=Decimal(revenue) if revenue is not None else None,
         created_by_id=creator.id,
         venue_id=other.id,
         created_at=datetime(2026, 7, 16, 10, tzinfo=timezone.utc),
@@ -167,10 +167,11 @@ def _sample_report():
     return assemble_report_data(
         month=7,
         year=2026,
-        venue_name="Выездная",
+        venue_name="Все точки" if all_venues else "Выездная",
         shifts=shifts,
         adjustments=[bonus, deduction],
         payroll_runs=[payroll_run],
+        venue_id=None if all_venues else other.id,
     )
 
 
@@ -226,6 +227,80 @@ class ReportExportTests(unittest.TestCase):
         overview = {label: value for label, value, _ in report.overview}
         self.assertEqual(overview["Зафиксировано"], Decimal("1650"))
         self.assertEqual(overview["Выплачено"], Decimal("500"))
+
+    def test_missing_revenue_never_falls_back_to_shift_revenue(self) -> None:
+        report = _sample_report(revenue=None, monthly=True)
+        overview = {label: value for label, value, _ in report.overview}
+        self.assertIsNone(overview["Выручка"])
+        self.assertIsNone(overview["Доля ФОТ"])
+        self.assertIsNone(report.payroll_runs[0]["revenue"])
+        self.assertIsNone(report.payroll_runs[0]["payroll_share"])
+        self.assertEqual(report.shifts[0]["revenue"], Decimal("10000"))
+        workbook = load_workbook(io.BytesIO(build_xlsx(report)))
+        self.assertIsNone(workbook["Расчёты и выплаты"]["I5"].value)
+        self.assertIsNone(workbook["Расчёты и выплаты"]["I6"].value)
+        self.assertIsNone(workbook["Расчёты и выплаты"]["J5"].value)
+
+    def test_exact_month_uses_run_amount_and_actual_revenue(self) -> None:
+        report = _sample_report(monthly=True)
+        overview = {label: value for label, value, _ in report.overview}
+        self.assertEqual(overview["Выручка"], Decimal("12000"))
+        # The helper uses PayrollRun.total_amount, not live shifts or item aggregation.
+        self.assertEqual(overview["Доля ФОТ"], Decimal("8.3333"))
+        self.assertEqual(report.payroll_runs[0]["payroll_share"], Decimal("8.3333"))
+        workbook = load_workbook(io.BytesIO(build_xlsx(report)))
+        self.assertEqual(workbook["Расчёты и выплаты"]["I6"].value, 12000)
+
+    def test_partial_period_and_all_venues_do_not_claim_monthly_revenue(self) -> None:
+        for report in (_sample_report(), _sample_report(monthly=True, all_venues=True)):
+            with self.subTest(scope=report.venue_name, period=report.payroll_runs[0]["period_end"]):
+                overview = {label: value for label, value, _ in report.overview}
+                self.assertIsNone(overview["Выручка"])
+                self.assertIsNone(overview["Доля ФОТ"])
+                self.assertEqual(report.payroll_runs[0]["revenue"], Decimal("12000"))
+                workbook = load_workbook(io.BytesIO(build_xlsx(report)))
+                self.assertIsNone(workbook["Расчёты и выплаты"]["I6"].value)
+
+    def test_zero_negative_and_unscoped_revenue(self) -> None:
+        for value in ("0", "-100"):
+            report = _sample_report(revenue=value, monthly=True)
+            overview = {label: amount for label, amount, _ in report.overview}
+            self.assertEqual(overview["Выручка"], Decimal("0") if value == "0" else None)
+            self.assertIsNone(overview["Доля ФОТ"])
+            self.assertIsNone(report.payroll_runs[0]["payroll_share"])
+        run = PayrollRun(
+            period_start=date(2026, 7, 1), period_end=date(2026, 7, 31),
+            status=PayrollRunStatus.finalized, venue_id=None,
+            total_amount=Decimal("100"), revenue_total=Decimal("1000"), items=[],
+        )
+        report = assemble_report_data(month=7, year=2026, venue_name="Все точки",
+                                      shifts=[], adjustments=[], payroll_runs=[run])
+        self.assertIsNone(report.payroll_runs[0]["revenue"])
+        self.assertIsNone(report.payroll_runs[0]["payroll_share"])
+
+    def test_overlapping_runs_do_not_double_count_revenue(self) -> None:
+        venue_id = uuid.uuid4()
+
+        def run(start, end, status):
+            return PayrollRun(
+                period_start=start, period_end=end, status=status, venue_id=venue_id,
+                total_amount=Decimal("100"), revenue_total=Decimal("1000"), items=[],
+            )
+
+        monthly = run(date(2026, 7, 1), date(2026, 7, 31), PayrollRunStatus.finalized)
+        for status in (PayrollRunStatus.finalized, PayrollRunStatus.paid,
+                       PayrollRunStatus.draft, PayrollRunStatus.cancelled):
+            with self.subTest(status=status):
+                overlap = run(date(2026, 6, 25), date(2026, 7, 15), status)
+                report = assemble_report_data(
+                    month=7, year=2026, venue_name="Точка", venue_id=venue_id,
+                    shifts=[], adjustments=[], payroll_runs=[monthly, overlap],
+                )
+                overview = {label: value for label, value, _ in report.overview}
+                expected = None if status in (PayrollRunStatus.finalized, PayrollRunStatus.paid) else Decimal("1000")
+                self.assertEqual(overview["Выручка"], expected)
+                workbook = load_workbook(io.BytesIO(build_xlsx(report)))
+                self.assertEqual(workbook["Расчёты и выплаты"]["I7"].value, expected)
 
     def test_workbook_structure_formatting_and_empty_period(self) -> None:
         report = _sample_report()

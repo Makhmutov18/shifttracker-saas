@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import Adjustment, AdjustmentType, PayrollRun, Shift, User, Venue
-from app.utils import calculate_payout_total, safe_decimal
+from app.utils import calculate_payout_total, calculate_payroll_share, safe_decimal
 
 
 MONEY_FORMAT = '#,##0.00 [$₽-ru-RU]'
@@ -108,6 +108,42 @@ class ReportData:
         return f"{MONTH_NAMES[self.month - 1].capitalize()} {self.year}"
 
 
+def _run_revenue(payroll_run: PayrollRun) -> Decimal | None:
+    value = getattr(payroll_run, "revenue_total", None)
+    if getattr(payroll_run, "venue_id", None) is None or value is None:
+        return None
+    revenue = safe_decimal(value)
+    return revenue if revenue >= 0 else None
+
+
+def _share_fraction(amount: Decimal, revenue: Decimal | None) -> Decimal | None:
+    percent = calculate_payroll_share(amount, revenue)
+    return percent / Decimal("100") if percent is not None else None
+
+
+def _monthly_revenue_snapshot(
+    payroll_runs: list[PayrollRun], month: int, year: int, venue_id: uuid.UUID | None,
+) -> tuple[Decimal | None, Decimal | None]:
+    if venue_id is None:
+        return None, None
+    start = date(year, month, 1)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+    candidates = [
+        run for run in payroll_runs
+        if run.venue_id == venue_id
+        and _enum_value(run.status) in ("finalized", "paid")
+        and run.period_start <= end and run.period_end >= start
+    ]
+    # Do not combine partial or overlapping revenue snapshots into a monthly metric.
+    if len(candidates) != 1:
+        return None, None
+    run = candidates[0]
+    if run.period_start != start or run.period_end != end:
+        return None, None
+    revenue = _run_revenue(run)
+    return revenue, _share_fraction(safe_decimal(run.total_amount), revenue)
+
+
 def assemble_report_data(
     *,
     month: int,
@@ -116,7 +152,9 @@ def assemble_report_data(
     shifts: Iterable[Shift],
     adjustments: Iterable[Adjustment],
     payroll_runs: Iterable[PayrollRun],
+    venue_id: uuid.UUID | None = None,
 ) -> ReportData:
+    payroll_runs = list(payroll_runs)
     shift_rows: list[dict[str, Any]] = []
     adjustment_rows: list[dict[str, Any]] = []
     payroll_rows: list[dict[str, Any]] = []
@@ -125,7 +163,6 @@ def assemble_report_data(
     status_counts = {"approved": 0, "pending": 0, "rejected": 0}
     approved_hours = Decimal("0")
     approved_amount = Decimal("0")
-    approved_revenue = Decimal("0")
     cross_venue_count = 0
 
     for shift in shifts:
@@ -146,7 +183,6 @@ def assemble_report_data(
         if status == "approved":
             approved_hours += hours
             approved_amount += salary
-            approved_revenue += revenue
             if is_cross_venue:
                 cross_venue_count += 1
 
@@ -249,7 +285,6 @@ def assemble_report_data(
     fixed_total = Decimal("0")
     paid_total = Decimal("0")
     remaining_total = Decimal("0")
-    snapshot_revenue = Decimal("0")
     for payroll_run in payroll_runs:
         status = _enum_value(getattr(payroll_run, "status", None), "draft")
         items = list(getattr(payroll_run, "items", None) or [])
@@ -260,13 +295,12 @@ def assemble_report_data(
             accrued = safe_decimal(getattr(payroll_run, "total_amount", None))
             paid = safe_decimal(getattr(payroll_run, "total_paid", None))
             remaining = max(Decimal("0"), accrued - paid)
-        revenue = safe_decimal(getattr(payroll_run, "revenue_total", None))
+        revenue = _run_revenue(payroll_run)
 
         if status in ("finalized", "paid"):
             fixed_total += accrued
             paid_total += paid
             remaining_total += remaining
-            snapshot_revenue += revenue
 
         payroll_rows.append(
             {
@@ -281,16 +315,14 @@ def assemble_report_data(
                 "paid": paid,
                 "remaining": remaining,
                 "revenue": revenue,
-                "payroll_share": accrued / revenue if revenue > 0 else None,
+                "payroll_share": _share_fraction(safe_decimal(payroll_run.total_amount), revenue),
                 "completed_at": getattr(payroll_run, "paid_at", None)
                 or getattr(payroll_run, "finalized_at", None),
             }
         )
 
     total_accrued = calculate_payout_total(approved_amount, bonus_total, deduction_total)
-    revenue_for_share = snapshot_revenue if snapshot_revenue > 0 else approved_revenue
-    share_amount = fixed_total if snapshot_revenue > 0 else total_accrued
-    payroll_share = share_amount / revenue_for_share if revenue_for_share > 0 else None
+    revenue_for_share, payroll_share = _monthly_revenue_snapshot(payroll_runs, month, year, venue_id)
     overview: list[tuple[str, Any, str | None]] = [
         ("Период", f"{MONTH_NAMES[month - 1].capitalize()} {year}", None),
         ("Точка", safe_spreadsheet_text(venue_name, "Все точки"), None),
@@ -307,7 +339,7 @@ def assemble_report_data(
         ("Осталось", remaining_total, "money"),
         ("Сотрудники", len(employee_totals), "integer"),
         ("Cross-venue смены", cross_venue_count, "integer"),
-        ("Выручка", revenue_for_share, "money"),
+        ("Выручка", revenue_for_share, "money" if revenue_for_share is not None else None),
         ("Доля ФОТ", payroll_share, "percent" if payroll_share is not None else None),
     ]
 
@@ -373,6 +405,7 @@ async def load_report_data(
         shifts=shifts,
         adjustments=adjustments,
         payroll_runs=payroll_runs,
+        venue_id=venue_id,
     )
 
 
@@ -616,9 +649,13 @@ def _write_payroll_runs(workbook: Workbook, report: ReportData) -> None:
         _add_table(sheet, name="PayrollRunsTable", columns=len(headers), last_row=4 + len(report.payroll_runs))
         total_row = 5 + len(report.payroll_runs)
         sheet.cell(total_row, 1, "Итого")
-        for column, key in ((6, "accrued"), (7, "paid"), (8, "remaining"), (9, "revenue")):
+        for column, key in ((6, "accrued"), (7, "paid"), (8, "remaining")):
             sheet.cell(total_row, column, sum((row[key] for row in report.payroll_runs), Decimal("0")))
             sheet.cell(total_row, column).number_format = MONEY_FORMAT
+        # Revenue periods can overlap; only an unambiguous monthly snapshot is a total.
+        revenue = next(value for label, value, _ in report.overview if label == "Выручка")
+        sheet.cell(total_row, 9, revenue)
+        sheet.cell(total_row, 9).number_format = MONEY_FORMAT
         for cell in sheet[total_row]:
             cell.font = TOTAL_FONT
             cell.fill = TOTAL_FILL

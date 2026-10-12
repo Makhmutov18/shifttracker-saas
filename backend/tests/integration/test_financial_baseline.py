@@ -25,6 +25,7 @@ from app.routers.api import (
     payroll_run_preview,
 )
 from app.schemas import PayrollPaymentCreate, PayrollRunCreate
+from app.services.report_export import load_report_data
 from app.utils import calculate_payroll_share, calculate_salary
 from tests.fixtures.baseline import PAYMENT_DATE, PERIOD_END, PERIOD_START
 
@@ -176,3 +177,24 @@ async def test_period_revenue_is_a_saved_run_value_not_sum_of_shift_revenue(db_s
             session=db_session,
         )
     assert error.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_export_revenue_uses_exact_venue_snapshot_without_shift_fallback(db_session, baseline):
+    report = await load_report_data(db_session, month=6, year=2026, venue_id=baseline.venues["home"].id)
+    overview = {label: value for label, value, _ in report.overview}
+    assert overview["Выручка"] == Decimal("40000.00")
+    assert overview["Доля ФОТ"] == Decimal("0.22")
+    assert report.payroll_runs[0]["payroll_share"] == Decimal("0.22")
+    assert sum((row["revenue"] for row in report.shifts), Decimal("0")) == Decimal("70000.00")
+
+    all_venues = await load_report_data(db_session, month=6, year=2026, venue_id=None)
+    assert dict((label, value) for label, value, _ in all_venues.overview)["Выручка"] is None
+    baseline.payroll_run.revenue_total = None
+    await db_session.commit()
+    report = await load_report_data(db_session, month=6, year=2026, venue_id=baseline.venues["home"].id)
+    overview = {label: value for label, value, _ in report.overview}
+    assert overview["Выручка"] is None
+    assert overview["Доля ФОТ"] is None
+    assert report.payroll_runs[0]["revenue"] is None
+    assert report.payroll_runs[0]["accrued"] == Decimal("8800.00")
