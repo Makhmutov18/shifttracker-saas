@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from urllib.parse import urlparse
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -10,6 +12,7 @@ class Settings(BaseSettings):
 
     # Telegram
     BOT_TOKEN: str = ""
+    TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: int = Field(default=86400, ge=60, le=86400)
     BOT_USERNAME: str = ""
     WEBAPP_URL: str = "https://localhost:8000"
     TELEGRAM_OIDC_CLIENT_ID: str = ""
@@ -38,6 +41,17 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    @property
+    def telegram_webhook_secret(self) -> str:
+        if not self.BOT_TOKEN:
+            return ""
+        # Stable across replicas without exposing the bot token to webhook callers.
+        return hmac.new(
+            self.BOT_TOKEN.encode("utf-8"),
+            b"shifttracker:telegram-webhook:v1",
+            hashlib.sha256,
+        ).hexdigest()
 
     @property
     def webhook_base_url(self) -> str:

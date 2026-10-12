@@ -134,7 +134,7 @@ async def get_web_session_user(
 def ensure_web_csrf(request: Request, web_session: WebSession) -> None:
     if request.method.upper() in {"GET", "HEAD", "OPTIONS"}:
         return
-    token = request.headers.get("X-CSRF-Token") or request.cookies.get(WEB_CSRF_COOKIE)
+    token = request.headers.get("X-CSRF-Token")
     if not token or not hmac.compare_digest(hash_secret(token), web_session.csrf_token_hash):
         raise HTTPException(status_code=403, detail="Проверка безопасности не пройдена. Обновите страницу.")
 
@@ -180,9 +180,22 @@ def validate_init_data(init_data: str) -> bool:
     Returns True if valid, False otherwise.
     """
     try:
-        parsed = dict(parse_qsl(init_data))
+        if not settings.BOT_TOKEN:
+            return False
+        pairs = parse_qsl(init_data, keep_blank_values=True)
+        parsed = dict(pairs)
+        if len(parsed) != len(pairs):
+            return False
         received_hash = parsed.pop("hash", None)
         if not received_hash:
+            return False
+
+        auth_date_raw = parsed.get("auth_date", "")
+        if not auth_date_raw.isascii() or not auth_date_raw.isdecimal():
+            return False
+        auth_date = int(auth_date_raw)
+        now = int(datetime.now(timezone.utc).timestamp())
+        if auth_date <= 0 or not -30 <= now - auth_date <= settings.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS:
             return False
 
         # Sort keys alphabetically and build data_check_string

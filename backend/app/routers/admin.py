@@ -329,7 +329,7 @@ async def create_user(
 
     logger.info(
         f"Admin {admin.name} created user {new_user.name} "
-        f"(role={role.value}, invite_token={invite_token})"
+        f"(role={role.value})"
     )
 
     return AdminCreateUserResponse(

@@ -1,5 +1,6 @@
 import os
 import logging
+import hmac
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
@@ -24,7 +25,7 @@ _dispatcher = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: init DB, seed admin, setup bot webhook."""
+    """Initialize the schema and bot without modifying existing user access."""
     global _bot, _dispatcher
 
     install_oidc_access_log_filter()
@@ -32,58 +33,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up...")
     await init_db()
     logger.info("Database initialized")
-
-    # ─── Seed admin user ──────────────────────────────────────────────────────
-    ADMIN_TELEGRAM_ID = 7673563218
-    try:
-        from sqlalchemy import select
-        from app.database import async_session_factory
-        from app.models import User, Venue, UserRole
-        from decimal import Decimal
-
-        async with async_session_factory() as session:
-            # Check if admin already exists
-            result = await session.execute(
-                select(User).where(User.telegram_id == ADMIN_TELEGRAM_ID)
-            )
-            admin = result.scalar_one_or_none()
-
-            if not admin:
-                # Find or create a default venue
-                result = await session.execute(
-                    select(Venue).limit(1)
-                )
-                venue = result.scalar_one_or_none()
-
-                if not venue:
-                    venue = Venue(name="Основное заведение")
-                    session.add(venue)
-                    await session.flush()
-
-                # Create admin user
-                admin = User(
-                    telegram_id=ADMIN_TELEGRAM_ID,
-                    name="Admin",
-                    role=UserRole.owner,
-                    venue_id=venue.id,
-                    hourly_rate=Decimal("0.00"),
-                    is_active=True,
-                )
-                session.add(admin)
-                await session.commit()
-                logger.info(f"Admin user seeded (telegram_id={ADMIN_TELEGRAM_ID})")
-            else:
-                # Ensure admin has correct role and is_active
-                if admin.role not in (UserRole.owner, UserRole.admin):
-                    admin.role = UserRole.owner
-                    logger.info(f"Admin role corrected to admin (telegram_id={ADMIN_TELEGRAM_ID})")
-                if not admin.is_active:
-                    admin.is_active = True
-                    logger.info(f"Admin is_active set to True (telegram_id={ADMIN_TELEGRAM_ID})")
-                await session.commit()
-                logger.info(f"Admin user already exists (telegram_id={ADMIN_TELEGRAM_ID})")
-    except Exception as e:
-        logger.error(f"Failed to seed admin user: {e}")
 
     # Setup bot webhook in production
     if settings.BOT_TOKEN:
@@ -100,7 +49,9 @@ async def lifespan(app: FastAPI):
         if "localhost" in webhook_url or "127.0.0.1" in webhook_url:
             logger.warning(f"Skipping webhook setup for local URL: {webhook_url}")
         else:
-            await _bot.set_webhook(url=webhook_url)
+            await _bot.set_webhook(
+                url=webhook_url, secret_token=settings.telegram_webhook_secret
+            )
             logger.info(f"Bot webhook set to {webhook_url}")
 
     yield
@@ -146,9 +97,16 @@ async def telegram_webhook(request: Request):
     """Receive Telegram updates via webhook."""
     global _bot, _dispatcher
 
+    expected_secret = settings.telegram_webhook_secret
+    received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected_secret or not hmac.compare_digest(
+        received_secret.encode("utf-8"), expected_secret.encode("utf-8")
+    ):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     if not _bot or not _dispatcher:
         logger.warning("Bot not initialized, skipping webhook update")
-        return {"ok": False}
+        raise HTTPException(status_code=503, detail="Bot unavailable")
 
     try:
         update_data = await request.json()
@@ -156,10 +114,10 @@ async def telegram_webhook(request: Request):
         update = Update.model_validate(update_data)
         await _dispatcher.feed_update(_bot, update)
         return {"ok": True}
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        # Don't re-raise — Telegram will retry if we return non-200
-        return {"ok": False, "error": str(e)}
+    except Exception:
+        # Exceptions may contain update contents or bot credentials; never log them.
+        logger.error("Telegram webhook update failed")
+        raise HTTPException(status_code=500, detail="Webhook processing failed") from None
 
 
 # ─── Frontend static files ──────────────────────────────────────────────────
