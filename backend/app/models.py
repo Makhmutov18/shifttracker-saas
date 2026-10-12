@@ -313,6 +313,7 @@ class PayrollRun(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    planned_payment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     status: Mapped[PayrollRunStatus] = mapped_column(
         SAEnum(PayrollRunStatus, name="payroll_run_status"),
         nullable=False,

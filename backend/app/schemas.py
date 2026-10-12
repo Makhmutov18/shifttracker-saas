@@ -298,6 +298,13 @@ class PayrollRunCreate(BaseModel):
     venue_id: Optional[uuid.UUID] = None
     notes: Optional[str] = None
     revenue_total: Optional[Decimal] = Field(None, ge=0)
+    planned_payment_date: Optional[date] = None
+
+    @model_validator(mode="after")
+    def validate_planned_payment_date(self):
+        if self.planned_payment_date is not None and self.planned_payment_date < self.period_end:
+            raise ValueError("Плановая дата выплаты не может быть раньше конца периода")
+        return self
 
 
 class PayrollRunRevenueUpdate(BaseModel):
@@ -352,11 +359,40 @@ class PayrollScheduleSettingsRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PayrollScheduleUpdate(BaseModel):
+    schedule_type: Literal["manual", "twice_monthly"]
+    first_payment_day: Optional[int] = Field(None, ge=16, le=31, strict=True)
+    second_payment_day: Optional[int] = Field(None, ge=1, le=15, strict=True)
+
+    model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def validate_days(self):
+        if self.schedule_type == "twice_monthly" and (self.first_payment_day is None or self.second_payment_day is None):
+            raise ValueError("Укажите оба дня выплаты")
+        return self
+
+
+class PayrollSchedulePeriod(BaseModel):
+    period_start: date
+    period_end: date
+    planned_payment_date: date
+
+
+class PayrollScheduleOut(BaseModel):
+    venue_id: uuid.UUID
+    schedule_type: Literal["manual", "twice_monthly"] = "manual"
+    first_payment_day: Optional[int] = None
+    second_payment_day: Optional[int] = None
+    periods: list[PayrollSchedulePeriod] = Field(default_factory=list)
+
+
 class PayrollRunRead(BaseModel):
     id: uuid.UUID
     title: str
     period_start: date
     period_end: date
+    planned_payment_date: Optional[date] = None
     status: str
     total_amount: Decimal = Decimal("0.00")
     total_paid: Decimal = Decimal("0.00")
@@ -381,6 +417,7 @@ class PayrollRunListItem(BaseModel):
     title: str
     period_start: date
     period_end: date
+    planned_payment_date: Optional[date] = None
     venue_id: Optional[uuid.UUID] = None
     venue_name: Optional[str] = None
     status: str
@@ -407,6 +444,7 @@ class PersonalPayrollRunRead(BaseModel):
     title: str
     period_start: date
     period_end: date
+    planned_payment_date: Optional[date] = None
     venue_name: str
     status: str
     final_amount: Decimal = Decimal("0.00")

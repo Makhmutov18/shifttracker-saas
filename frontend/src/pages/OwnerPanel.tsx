@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import AdjustmentDatesReview from '../components/AdjustmentDatesReview';
+import PayrollScheduleControl from '../components/PayrollScheduleControl';
 import {
   AdminCreateUserResponse,
   AuditLog,
@@ -568,10 +569,11 @@ function formatPayrollShare(value?: string | number | null) {
 
 function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate: boolean; userVenueId: string; restrictToVenue: boolean }) {
   const now = new Date();
-  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const defaultStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const defaultEnd = now.toISOString().slice(0, 10);
   const [periodStart, setPeriodStart] = useState(defaultStart);
   const [periodEnd, setPeriodEnd] = useState(defaultEnd);
+  const [plannedPaymentDate, setPlannedPaymentDate] = useState('');
   const [venueId, setVenueId] = useState('');
   const [revenueInput, setRevenueInput] = useState('');
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -667,6 +669,14 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
 
   const handleCreate = async () => {
     if (!preview || !canCreate) return;
+    if (preview.period_start !== periodStart || preview.period_end !== periodEnd || (preview.venue_id || '') !== venueId) {
+      setError('Период или точка изменились. Повторите предварительный расчёт.');
+      return;
+    }
+    if (plannedPaymentDate && plannedPaymentDate < periodEnd) {
+      setError('Плановая дата выплаты не может быть раньше конца периода.');
+      return;
+    }
     if (venueId && previewRevenue === undefined) {
       setError('Введите выручку числом не меньше нуля или оставьте поле пустым.');
       return;
@@ -679,6 +689,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
         period_start: periodStart,
         period_end: periodEnd,
         venue_id: venueId || undefined,
+        planned_payment_date: plannedPaymentDate || undefined,
         ...(venueId && previewRevenue != null ? { revenue_total: previewRevenue } : {}),
       });
       setSuccess('Черновик расчёта сформирован.');
@@ -842,6 +853,11 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
           <h2 className="text-base font-semibold text-tg-text">Расчёты выплат</h2>
           <p className="mt-1 text-sm text-tg-hint">Сформируйте расчёт начислений за выбранный период</p>
         </div>
+        {venueId && <PayrollScheduleControl key={venueId} venueId={venueId} canEdit={canCreate} disabled={saving || previewLoading}
+          onSelect={(period) => {
+            setPeriodStart(period.period_start); setPeriodEnd(period.period_end);
+            setPlannedPaymentDate(period.planned_payment_date); setPreview(null);
+          }} />}
         <form onSubmit={handlePreview} className="owner-payroll-form">
           <div className="owner-date-grid">
             <label className="text-xs text-tg-hint">
@@ -849,7 +865,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               <input
                 type="date"
                 value={periodStart}
-                onChange={(event) => setPeriodStart(event.target.value)}
+                disabled={saving || previewLoading}
+                onChange={(event) => { setPeriodStart(event.target.value); setPreview(null); setPlannedPaymentDate(''); }}
                 className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
               />
             </label>
@@ -858,7 +875,8 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               <input
                 type="date"
                 value={periodEnd}
-                onChange={(event) => setPeriodEnd(event.target.value)}
+                disabled={saving || previewLoading}
+                onChange={(event) => { setPeriodEnd(event.target.value); setPreview(null); setPlannedPaymentDate(''); }}
                 className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
               />
             </label>
@@ -867,9 +885,11 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             Точка
             <select
               value={venueId}
+              disabled={saving || previewLoading}
               onChange={(event) => {
                 setVenueId(event.target.value);
                 setPreview(null);
+                setPlannedPaymentDate('');
               }}
               className="mt-1.5 w-full appearance-none rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none"
             >
@@ -879,6 +899,12 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
               ))}
             </select>
           </label>
+          {canCreate && <label className="block text-xs text-tg-hint">
+            Плановая дата выплаты (необязательно)
+            <input type="date" value={plannedPaymentDate} min={periodEnd || undefined} disabled={saving}
+              onChange={(event) => setPlannedPaymentDate(event.target.value)} className="owner-field-control mt-1.5" />
+            <span className="owner-payroll-field-help">Это план, а не отметка о фактической выплате.</span>
+          </label>}
           {venueId ? (
             <label className="block text-xs text-tg-hint">
               Выручка точки за период <span>(необязательно)</span>
@@ -886,6 +912,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                 type="text"
                 inputMode="decimal"
                 value={revenueInput}
+                disabled={saving}
                 onChange={(event) => setRevenueInput(event.target.value)}
                 placeholder="Например: 850 000"
                 className="mt-1.5 w-full rounded-xl bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint"
@@ -998,6 +1025,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(run)}</p>
                   <p className="mt-1 text-xs text-tg-hint">{run.venue_name || 'Все точки'} · {formatPayrollPeriod(run.period_start, run.period_end)}</p>
+                  {run.planned_payment_date && <p className="mt-1 text-xs text-tg-hint">Плановая выплата: {formatDate(run.planned_payment_date)}</p>}
                 </div>
                 <span className="owner-status-badge shrink-0" data-status={run.status}>{getPayrollRunStatusLabel(run.status)}</span>
               </div>
@@ -1027,6 +1055,7 @@ function PayrollRunsTab({ canCreate, userVenueId, restrictToVenue }: { canCreate
             <div>
               <h3 className="text-sm font-semibold text-tg-text">{getPayrollRunDisplayTitle(selectedRun)}</h3>
               <p className="mt-1 text-xs text-tg-hint">{formatPayrollPeriod(selectedRun.period_start, selectedRun.period_end)} · {selectedRun.venue_name || 'Все точки'}</p>
+              {selectedRun.planned_payment_date && <p className="mt-1 text-xs text-tg-hint">Плановая выплата: {formatDate(selectedRun.planned_payment_date)}</p>}
             </div>
             <button type="button" onClick={() => setSelectedRun(null)} className="text-xs text-tg-hint">Закрыть</button>
           </div>

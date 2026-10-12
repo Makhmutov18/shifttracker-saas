@@ -17,6 +17,7 @@ from app.models import (
     User, Venue, Shift, Expense, UserRole, ShiftStatus, AuditLog, Adjustment, AdjustmentType,
     PayrollRun, PayrollRunItem, PayrollRunStatus, PayrollPayment,
     PayrollRunShiftSource, PayrollRunAdjustmentSource,
+    PayrollScheduleSettings, PayrollScheduleType,
 )
 from app.permissions import has_permission
 from app.schemas import (
@@ -27,6 +28,7 @@ from app.schemas import (
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollRunRevenueUpdate,
+    PayrollScheduleUpdate, PayrollScheduleOut,
     PayrollPaymentCreate, PayrollPaymentResult, PersonalPayrollRunRead, PersonalPayrollPaymentRead,
     VenueStatsRow, ExportDownloadLinkRequest, ExportDownloadLinkOut,
 )
@@ -43,6 +45,7 @@ from app.utils import (
 )
 from app.notifications import notify_shift_approved, notify_shift_rejected, notify_bonus_added, notify_penalty_added
 from app.services.report_export import build_csv, build_xlsx, load_report_data
+from app.services.payroll_schedule import twice_monthly_periods
 
 import uuid
 import logging
@@ -902,6 +905,89 @@ def _build_payroll_preview(
     )
 
 
+async def _get_payroll_schedule(session: AsyncSession, venue_id: uuid.UUID) -> PayrollScheduleSettings | None:
+    records = (await session.scalars(select(PayrollScheduleSettings).where(
+        PayrollScheduleSettings.venue_id == venue_id, PayrollScheduleSettings.is_active.is_(True),
+    ))).all()
+    if len(records) > 1:
+        raise HTTPException(status_code=409, detail="Для точки найдено несколько графиков. Требуется проверка настроек.")
+    schedule = records[0] if records else None
+    if schedule is not None and schedule.schedule_type not in (PayrollScheduleType.manual, PayrollScheduleType.twice_monthly):
+        raise HTTPException(status_code=409, detail="Этот тип графика пока не поддерживается")
+    return schedule
+
+
+def _schedule_response(venue_id: uuid.UUID, schedule: PayrollScheduleSettings | None, year: int | None = None, month: int | None = None):
+    if schedule is None or schedule.schedule_type == PayrollScheduleType.manual:
+        return PayrollScheduleOut(venue_id=venue_id)
+    periods = []
+    try:
+        if year is not None and month is not None:
+            periods = twice_monthly_periods(year, month, schedule.first_payment_day, schedule.second_payment_day)
+        elif schedule.first_payment_day is None or schedule.second_payment_day is None:
+            raise ValueError("Missing schedule days")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=409, detail="Проверьте дни выплаты в настройках графика") from None
+    return PayrollScheduleOut(venue_id=venue_id, schedule_type="twice_monthly",
+                              first_payment_day=schedule.first_payment_day,
+                              second_payment_day=schedule.second_payment_day, periods=periods)
+
+
+@router.get("/payroll-schedule", response_model=PayrollScheduleOut)
+async def get_payroll_schedule(
+    venue_id: uuid.UUID,
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(..., ge=1, le=9998),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not _can_view_payroll_runs(user):
+        raise HTTPException(status_code=403, detail="Нет права просмотра расчётов команды")
+    if not _can_manage_all_venue_shifts(user) and venue_id != user.venue_id:
+        raise HTTPException(status_code=404, detail="Точка не найдена")
+    if await session.get(Venue, venue_id) is None:
+        raise HTTPException(status_code=404, detail="Точка не найдена")
+    return _schedule_response(venue_id, await _get_payroll_schedule(session, venue_id), year, month)
+
+
+@router.put("/payroll-schedule", response_model=PayrollScheduleOut)
+async def save_payroll_schedule(
+    venue_id: uuid.UUID,
+    data: PayrollScheduleUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if user.role not in (UserRole.owner, UserRole.admin) or not _can_view_payroll_runs(user):
+        raise HTTPException(status_code=403, detail="Только владелец и администратор могут настраивать график выплат")
+    try:
+        # Serializes the first insertion too, without rewriting existing schedule rows at startup.
+        venue = await session.scalar(select(Venue).where(Venue.id == venue_id, Venue.is_active.is_(True)).with_for_update())
+        if venue is None:
+            raise HTTPException(status_code=404, detail="Активная точка не найдена")
+        schedule = await _get_payroll_schedule(session, venue_id)
+        old = _schedule_response(venue_id, schedule).model_dump(mode="json", exclude={"periods"})
+        if schedule is None:
+            schedule = PayrollScheduleSettings(venue_id=venue_id)
+            session.add(schedule)
+        schedule.schedule_type = PayrollScheduleType(data.schedule_type)
+        twice = data.schedule_type == "twice_monthly"
+        schedule.first_payment_day = data.first_payment_day if twice else None
+        schedule.second_payment_day = data.second_payment_day if twice else None
+        schedule.first_period_rule = "1-15:current_month" if twice else None
+        schedule.second_period_rule = "16-end:next_month" if twice else None
+        schedule.advance_percent = None
+        schedule.updated_at = datetime.now(timezone.utc)
+        response = _schedule_response(venue_id, schedule)
+        session.add(AuditLog(user_id=user.id, venue_id=venue_id, action="payroll_schedule_updated",
+                             entity_type="venue", entity_id=venue_id, old_value=old,
+                             new_value=response.model_dump(mode="json", exclude={"periods"})))
+        await session.commit()
+        return response
+    except Exception:
+        await session.rollback()
+        raise
+
+
 @router.post("/payroll-runs", response_model=PayrollRunRead, status_code=201)
 async def create_payroll_run(
     payroll_data: PayrollRunCreate,
@@ -984,6 +1070,7 @@ async def create_payroll_run(
         created_by_id=user.id,
         venue_id=payroll_data.venue_id,
         notes=payroll_data.notes,
+        planned_payment_date=payroll_data.planned_payment_date,
     )
     payroll_run.items = [
         PayrollRunItem(
@@ -1056,6 +1143,7 @@ async def list_payroll_runs(
             title=run.title,
             period_start=run.period_start,
             period_end=run.period_end,
+            planned_payment_date=getattr(run, "planned_payment_date", None),
             venue_id=run.venue_id,
             venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Все точки",
             status=run.status.value if hasattr(run.status, "value") else str(run.status),
@@ -1118,6 +1206,7 @@ async def list_my_payroll_runs(
                 title=run.title,
                 period_start=run.period_start,
                 period_end=run.period_end,
+                planned_payment_date=getattr(run, "planned_payment_date", None),
                 venue_name=safe_text(getattr(run.venue, "name", None), "Основная точка") if run.venue else "Основная точка",
                 status=run.status.value if hasattr(run.status, "value") else str(run.status),
                 final_amount=item.final_amount,
@@ -1157,6 +1246,7 @@ async def get_payroll_run(
         title=run.title,
         period_start=run.period_start,
         period_end=run.period_end,
+        planned_payment_date=getattr(run, "planned_payment_date", None),
         status=run.status.value if hasattr(run.status, "value") else str(run.status),
         total_amount=run.total_amount,
         total_paid=run.total_paid,

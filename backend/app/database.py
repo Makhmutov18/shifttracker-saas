@@ -179,6 +179,11 @@ async def init_db():
         """))
 
         await conn.execute(text("""
+            ALTER TABLE payroll_runs
+            ADD COLUMN IF NOT EXISTS planned_payment_date DATE;
+        """))
+
+        await conn.execute(text("""
             ALTER TABLE payroll_payments
             ADD COLUMN IF NOT EXISTS idempotency_key UUID;
         """))

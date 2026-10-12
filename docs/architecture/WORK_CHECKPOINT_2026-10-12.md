@@ -56,3 +56,18 @@ The owner subsequently approved continuing, with management controls kept out of
 The next separate increment remains the simple twice-monthly schedule and a saved planned payment date. It is not implemented by the adjustment-review change. Keep work on the current feature branch; no production rollout or merge to main is performed here.
 
 Verification for the adjustment-review increment: 202 root unit tests, 84 PostgreSQL integration tests and 38 client Node tests passed. Mini App build, TypeScript check, backend compilation and diff checks passed. The first sandbox build failed with Windows `EPERM`; the build passed outside sandbox. The disposable PostgreSQL process also needed to run outside sandbox. One new test fixture was corrected to avoid persisting an impossible NULL home venue; application schema constraints were not changed. Browser/Telegram visual QA was not performed.
+
+## Completed schedule increment: 13 October 2026
+
+The subsequent approval to continue covers the first schedule increment, now implemented after adjustment-review commit `a8638b14197a2faaafd4efa093dbb47256d13fef`. Work remains on `feature/multitenant-phase-0`; main and production are unchanged. Earlier resume points above are historical, not the current implementation state.
+
+- Per-venue manual/twice-monthly settings reuse `PayrollScheduleSettings`. Existing payroll access gates reads; only owner/admin with payroll access may save. First saves serialize on the venue row and settings/audit history commit together.
+- Calendar suggestions cover inclusive 1-15 and 16-month-end periods, including 20/5 and 25/10 schedules, leap years and year rollover. Holidays are handled manually, not inferred.
+- Payroll runs accept an optional explicit `planned_payment_date` and return that saved date in management and personal history. Existing rows remain NULL. Old clients omitting the field remain manual even if a schedule exists. Settings edits never move saved dates or change financial snapshots.
+- The Mini App management payroll form exposes settings and period suggestions. Employees see only a conditional planned-date line in their own Payouts history, not extra management controls.
+- No automatic creation/finalization/payment, tax accounting, employment classification, employee overrides or workspace inheritance was added. Existing accrual formulas, source reservations and actual payments remain unchanged.
+- The additive migration is `backend/app/migrations/20261012_add_planned_payment_date.sql`; deploy schema/backend before clients when rollout is explicitly approved. No production migration or deployment was performed here.
+
+Verification: 209 root unit tests, 102 PostgreSQL integration tests and 44 client Node tests passed. Final Mini App build, TypeScript check, backend compilation and diff checks passed. Browser/Telegram QA was not performed. PostgreSQL tests use only the disposable local test database. Preserve the unrelated untracked files listed above.
+
+See `docs/architecture/PAYROLL_SCHEDULES.md` for contracts and boundaries. A separate next increment may expose the same schedule/planned-date workflow in web-admin; do not duplicate calendar calculations in the client. Holiday calendars, reminders and statutory payroll remain separately scoped future work.

@@ -300,6 +300,7 @@ function PayrollRunRow({ run }: { run: PersonalPayrollRun }) {
         </div>
       </button>
 
+      {run.planned_payment_date && <p className="text-sm text-tg-hint px-4 pb-3">Плановая выплата: {formatDate(run.planned_payment_date)}</p>}
       <div className="payouts-run-totals">
         <div><span>Начислено</span><strong>{formatCurrency(run.final_amount)}</strong></div>
         <div><span>Выплачено</span><strong>{formatCurrency(run.paid_amount)}</strong></div>

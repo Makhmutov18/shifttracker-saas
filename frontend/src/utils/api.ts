@@ -474,6 +474,7 @@ export interface PayrollRunListItem {
   title: string;
   period_start: string;
   period_end: string;
+  planned_payment_date?: string | null;
   venue_id: string | null;
   venue_name: string | null;
   status: 'draft' | 'finalized' | 'paid' | 'cancelled' | string;
@@ -524,6 +525,7 @@ export interface PersonalPayrollRun {
   title: string;
   period_start: string;
   period_end: string;
+  planned_payment_date?: string | null;
   venue_name: string;
   status: 'finalized' | 'paid' | string;
   final_amount: string;
@@ -556,6 +558,34 @@ export interface CreatePayrollRunRequest {
   venue_id?: string;
   notes?: string;
   revenue_total?: number;
+  planned_payment_date?: string;
+}
+
+export interface PayrollSchedulePeriod {
+  period_start: string;
+  period_end: string;
+  planned_payment_date: string;
+}
+
+export interface PayrollSchedule {
+  venue_id: string;
+  schedule_type: 'manual' | 'twice_monthly';
+  first_payment_day: number | null;
+  second_payment_day: number | null;
+  periods: PayrollSchedulePeriod[];
+}
+
+export async function getPayrollSchedule(venueId: string, month: number, year: number): Promise<PayrollSchedule> {
+  const params = new URLSearchParams({ venue_id: venueId, month: String(month), year: String(year) });
+  return request<PayrollSchedule>(`/payroll-schedule?${params}`);
+}
+
+export async function savePayrollSchedule(
+  venueId: string, data: Pick<PayrollSchedule, 'schedule_type' | 'first_payment_day' | 'second_payment_day'>,
+): Promise<PayrollSchedule> {
+  return request<PayrollSchedule>(`/payroll-schedule?${new URLSearchParams({ venue_id: venueId })}`, {
+    method: 'PUT', body: JSON.stringify(data),
+  });
 }
 
 export async function createPayrollRun(data: CreatePayrollRunRequest): Promise<PayrollRunDetail> {
