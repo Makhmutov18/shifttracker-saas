@@ -71,3 +71,11 @@ The subsequent approval to continue covers the first schedule increment, now imp
 Verification: 209 root unit tests, 102 PostgreSQL integration tests and 44 client Node tests passed. Final Mini App build, TypeScript check, backend compilation and diff checks passed. Browser/Telegram QA was not performed. PostgreSQL tests use only the disposable local test database. Preserve the unrelated untracked files listed above.
 
 See `docs/architecture/PAYROLL_SCHEDULES.md` for contracts and boundaries. A separate next increment may expose the same schedule/planned-date workflow in web-admin; do not duplicate calendar calculations in the client. Holiday calendars, reminders and statutory payroll remain separately scoped future work.
+
+## Completed web-admin follow-up: 13 October 2026
+
+Following schedule commit `1de1037a62b65894981f6ba95b50bf15c9b5caa8`, the owner requested continuation. The web-admin payroll creation drawer now uses the existing schedule GET/PUT for a concrete globally selected venue and sends the optional explicit planned date on the existing payroll-run POST. Owner/admin can configure days or keep manual periods. Read-only viewers see only saved dates in list/cards/details; ordinary employee screens are unchanged.
+
+Backend-generated period suggestions are reused without client calendar calculations. Manual period/venue changes invalidate preview and suggested dates. Creation rejects a mismatched preview or a planned date before period end. Late preview responses from another context are ignored; rapid save/create requests are guarded. Errors keep settings/creation open, and actual payment recording and historical financial snapshots are untouched.
+
+Verification: all 57 client Node tests passed (13 new web-admin schedule/create/API cases). Web-admin TypeScript/production build and diff checks passed. Backend and Mini App code were not changed or rebuilt for this frontend-only increment. Browser QA, dev servers and screenshots were not run. Work stays on `feature/multitenant-phase-0`, with no main merge or production deployment. Existing unrelated untracked files remain untouched.

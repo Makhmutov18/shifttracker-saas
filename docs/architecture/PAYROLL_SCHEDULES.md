@@ -36,7 +36,15 @@ Amounts, source reservations, previews, snapshots, exports and payment idempoten
 
 The existing management payroll form shows the schedule control only for a selected concrete venue. Owner/admin can expand settings; payroll viewers can use available period suggestions read-only. Selecting a suggested half-month fills the period and planned-date fields and invalidates the previous preview. Manual date/venue changes clear the suggested date and preview, preventing an unrelated date from carrying into another period. The normal preview/create flow still performs the calculation and snapshot save.
 
-The employee's existing Payouts history adds only a conditional `Плановая выплата` line from their own saved run. No settings, team totals or management revenue fields are exposed. Web-admin schedule controls are not added in this increment; older web-admin clients continue creating manual runs with no planned date.
+The employee's existing Payouts history adds only a conditional `Плановая выплата` line from their own saved run. No settings, team totals or management revenue fields are exposed.
+
+## Web-admin
+
+The follow-up web-admin increment exposes the same workflow inside the existing `Новый расчёт` drawer. Only owner/admin can open creation/settings; payroll viewers retain read-only access to saved calculations and their planned dates. Settings and suggestions are shown only for the concrete venue selected in the existing global filter; there is no second venue selector or all-venue schedule.
+
+The client loads server-generated half-month suggestions for the selected work month. Selecting one fills the inclusive period and planned date and clears the previous preview. Manual period or global venue changes clear that date and preview; late preview responses from a different context are ignored. The optional date can be edited or omitted before creation and cannot precede period end. Schedule errors leave manual calculation available; failed settings saves retain the editor. Settings saves and calculation requests prevent rapid double submission.
+
+Creation uses the existing preview and snapshot POST, with only the explicit optional planned-date field added. No calendar arithmetic or payroll formulas are duplicated in the client. List/mobile cards and details show the saved date only when present; they do not derive it from today's settings. Finalize/cancel, actual payment recording, exports and other pages are unchanged. Older clients omitting the field still create manual runs with no planned date.
 
 ## Rollout and tests
 

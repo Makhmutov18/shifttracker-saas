@@ -119,6 +119,7 @@ export interface PayrollRunListItem {
   title: string;
   period_start: string;
   period_end: string;
+  planned_payment_date?: string | null;
   venue_id?: string | null;
   venue_name?: string | null;
   status: string;
@@ -162,6 +163,20 @@ export interface PayrollRun extends PayrollRunListItem {
   notes?: string | null;
   items: PayrollRunItem[];
   payments: PayrollPayment[];
+}
+
+export interface PayrollSchedulePeriod {
+  period_start: string;
+  period_end: string;
+  planned_payment_date: string;
+}
+
+export interface PayrollSchedule {
+  venue_id: string;
+  schedule_type: 'manual' | 'twice_monthly';
+  first_payment_day: number | null;
+  second_payment_day: number | null;
+  periods: PayrollSchedulePeriod[];
 }
 
 export interface AuditLog {

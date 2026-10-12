@@ -1,5 +1,5 @@
 import { resolveAuth } from './auth';
-import type { AuditLog, InviteResult, PayrollPreview, PayrollRun, PayrollRunListItem, PayrollSummary, Shift, User, Venue, VenueStatsRow } from './types';
+import type { AuditLog, InviteResult, PayrollPreview, PayrollRun, PayrollRunListItem, PayrollSchedule, PayrollSummary, Shift, User, Venue, VenueStatsRow } from './types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -85,11 +85,13 @@ export const api = {
   payrollPreview: (start: string, end: string, venueId?: string) => request<PayrollPreview>(`/api/payroll-runs/preview${query({ period_start: start, period_end: end, venue_id: venueId })}`),
   payrollRuns: (venueId?: string) => request<PayrollRunListItem[]>(`/api/payroll-runs${query({ venue_id: venueId })}`),
   payrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}`),
+  payrollSchedule: (venueId: string, month: number, year: number) => request<PayrollSchedule>(`/api/payroll-schedule${query({ venue_id: venueId, month, year })}`),
+  savePayrollSchedule: (venueId: string, data: Pick<PayrollSchedule, 'schedule_type' | 'first_payment_day' | 'second_payment_day'>) => request<PayrollSchedule>(`/api/payroll-schedule${query({ venue_id: venueId })}`, { method: 'PUT', body: JSON.stringify(data) }),
   createReportDownloadLink: (format: ExportFormat, month: number, year: number, venueId?: string) => request<ReportDownloadLink>('/api/export/download-link', {
     method: 'POST',
     body: JSON.stringify({ format, month, year, venue_id: venueId }),
   }),
-  createPayrollRun: (data: { title?: string; period_start: string; period_end: string; venue_id?: string; notes?: string; revenue_total?: number }) => request<PayrollRun>('/api/payroll-runs', { method: 'POST', body: JSON.stringify(data) }),
+  createPayrollRun: (data: { title?: string; period_start: string; period_end: string; venue_id?: string; notes?: string; revenue_total?: number; planned_payment_date?: string }) => request<PayrollRun>('/api/payroll-runs', { method: 'POST', body: JSON.stringify(data) }),
   updatePayrollRunRevenue: (id: string, revenueTotal: number | null) => request<PayrollRun>(`/api/payroll-runs/${id}/revenue`, { method: 'PATCH', body: JSON.stringify({ revenue_total: revenueTotal }) }),
   finalizePayrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}/finalize`, { method: 'POST' }),
   cancelPayrollRun: (id: string) => request<PayrollRun>(`/api/payroll-runs/${id}/cancel`, { method: 'POST' }),

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Calculator, Check, ChevronLeft, ChevronRight, CircleDollarSign, Download, FileSpreadsheet, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import { api, type ExportFormat } from '../api';
+import { PayrollScheduleFields } from '../components/PayrollScheduleFields';
 import { ConfirmationDialog, DataTable, DateRangeFields, Drawer, EmptyState, ErrorState, FilterBar, FormField, LoadingState, Metric, MoneyValue, PageHeader, Pagination, StatusBadge, Toast, type SortDirection } from '../components/ui';
-import type { PayrollPreview, PayrollRun, PayrollRunItem, PayrollRunListItem, User, Venue } from '../types';
+import type { PayrollPreview, PayrollRun, PayrollRunItem, PayrollRunListItem, PayrollSchedulePeriod, User, Venue } from '../types';
 import { currentMonthValue, formatDate, formatNumber, hasPermission, isOwnerOrAdmin, monthBounds, monthParts, summarizePayrollRuns } from '../utils';
 
 type ConfirmAction = { type: 'finalize' | 'cancel'; run: PayrollRun } | null;
@@ -121,11 +122,16 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   const bounds = monthBounds(currentMonthValue());
   const [periodStart, setPeriodStart] = useState(bounds.start);
   const [periodEnd, setPeriodEnd] = useState(bounds.end);
+  const [plannedPaymentDate, setPlannedPaymentDate] = useState('');
   const [runs, setRuns] = useState<PayrollRunListItem[]>([]);
   const [preview, setPreview] = useState<PayrollPreview | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const createPending = useRef(false);
+  const creationScope = useRef('');
+  creationScope.current = JSON.stringify([venueId, periodStart, periodEnd, createOpen]);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportMonth, setExportMonth] = useState(currentMonthValue());
   const [exportLoading, setExportLoading] = useState<ExportFormat | null>(null);
@@ -160,28 +166,41 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   };
   useEffect(() => { void loadRuns(); }, [venueId]);
   useEffect(() => { setPage(1); }, [venueId, statusFilter, sortKey, sortDirection]);
-  useEffect(() => { setRevenueInput(''); setPreview(null); setCreateError(''); }, [venueId]);
+  useEffect(() => { setRevenueInput(''); setPreview(null); setPlannedPaymentDate(''); setCreateError(''); }, [venueId]);
 
   const openRun = async (id: string) => { setBusy(true); setError(''); setPaymentItem(null); setPaymentError(''); setRevenueEditOpen(false); setRevenueError(''); try { setSelected(await api.payrollRun(id)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось открыть расчёт.'); } finally { setBusy(false); } };
   const doPreview = async () => {
+    if (!canAct || createPending.current || scheduleBusy) return;
     if (!periodStart || !periodEnd || periodStart > periodEnd) { setCreateError('Проверьте даты периода.'); return; }
     if (venueId && parseRevenue(revenueInput) === undefined) { setCreateError('Введите выручку числом не меньше нуля или оставьте поле пустым.'); return; }
+    const scope = creationScope.current;
+    createPending.current = true;
     setCreateBusy(true); setCreateError(''); setSuccess('');
-    try { setPreview(await api.payrollPreview(periodStart, periodEnd, venueId || undefined)); }
-    catch (reason) { setCreateError(reason instanceof Error ? reason.message : 'Не удалось сформировать предварительный расчёт.'); }
-    finally { setCreateBusy(false); }
+    try {
+      const result = await api.payrollPreview(periodStart, periodEnd, venueId || undefined);
+      if (scope === creationScope.current) setPreview(result);
+    }
+    catch (reason) { if (scope === creationScope.current) setCreateError(reason instanceof Error ? reason.message : 'Не удалось сформировать предварительный расчёт.'); }
+    finally { createPending.current = false; setCreateBusy(false); }
   };
   const createRun = async () => {
-    if (!preview || !canAct) return;
+    if (!preview || !canAct || createPending.current || scheduleBusy) return;
+    if (preview.period_start !== periodStart || preview.period_end !== periodEnd || (preview.venue_id || '') !== venueId) {
+      setCreateError('Период или точка изменились. Повторите предварительный расчёт.'); return;
+    }
+    if (plannedPaymentDate && plannedPaymentDate < periodEnd) {
+      setCreateError('Плановая дата выплаты не может быть раньше конца периода.'); return;
+    }
     const revenueTotal = venueId ? parseRevenue(revenueInput) : null;
     if (revenueTotal === undefined) { setCreateError('Введите выручку числом не меньше нуля или оставьте поле пустым.'); return; }
+    createPending.current = true;
     setCreateBusy(true); setCreateError('');
     try {
-      const run = await api.createPayrollRun({ period_start: periodStart, period_end: periodEnd, venue_id: venueId || undefined, ...(venueId && revenueTotal != null ? { revenue_total: revenueTotal } : {}) });
+      const run = await api.createPayrollRun({ period_start: periodStart, period_end: periodEnd, venue_id: venueId || undefined, planned_payment_date: plannedPaymentDate || undefined, ...(venueId && revenueTotal != null ? { revenue_total: revenueTotal } : {}) });
       setSuccess('Черновик расчёта сформирован.'); setCreateOpen(false); setPreview(null);
       await loadRuns(); await openRun(run.id);
     } catch (reason) { setCreateError(reason instanceof Error ? reason.message : 'Не удалось сформировать черновик.'); }
-    finally { setCreateBusy(false); }
+    finally { createPending.current = false; setCreateBusy(false); }
   };
   const transition = async () => { if (!confirm) return; setBusy(true); setError(''); try { const updated = confirm.type === 'finalize' ? await api.finalizePayrollRun(confirm.run.id) : await api.cancelPayrollRun(confirm.run.id); setSelected(updated); setSuccess(confirm.type === 'finalize' ? 'Расчёт зафиксирован.' : 'Расчёт отменён.'); setConfirm(null); await loadRuns(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Не удалось изменить статус расчёта.'); } finally { setBusy(false); } };
   const openRevenueEditor = () => { if (!selected || selected.status !== 'draft' || !selected.venue_id || !canAct) return; setRevenueDraft(selected.revenue_total == null ? '' : String(selected.revenue_total)); setRevenueError(''); setRevenueEditOpen(true); };
@@ -230,8 +249,8 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault(); void openRun(id);
   };
-  const openCreate = () => { setPreview(null); setRevenueInput(''); setCreateError(''); setCreateOpen(true); };
-  const closeCreate = () => { if (createBusy) return; setCreateOpen(false); setPreview(null); setRevenueInput(''); setCreateError(''); };
+  const openCreate = () => { setPreview(null); setPlannedPaymentDate(''); setRevenueInput(''); setCreateError(''); setCreateOpen(true); };
+  const closeCreate = () => { if (createBusy || scheduleBusy) return; setCreateOpen(false); setPreview(null); setPlannedPaymentDate(''); setRevenueInput(''); setCreateError(''); };
   const openExport = () => { setExportMonth(currentMonthValue()); setExportError(''); setExportOpen(true); };
   const closeExport = () => { if (exportLoading) return; setExportOpen(false); setExportError(''); };
   const downloadReport = async (format: ExportFormat) => {
@@ -261,8 +280,12 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       setExportLoading(null);
     }
   };
-  const updatePeriodStart = (value: string) => { setPeriodStart(value); setPreview(null); setCreateError(''); };
-  const updatePeriodEnd = (value: string) => { setPeriodEnd(value); setPreview(null); setCreateError(''); };
+  const updatePeriodStart = (value: string) => { setPeriodStart(value); setPreview(null); setPlannedPaymentDate(''); setCreateError(''); };
+  const updatePeriodEnd = (value: string) => { setPeriodEnd(value); setPreview(null); setPlannedPaymentDate(''); setCreateError(''); };
+  const selectScheduledPeriod = (period: PayrollSchedulePeriod) => {
+    setPeriodStart(period.period_start); setPeriodEnd(period.period_end);
+    setPlannedPaymentDate(period.planned_payment_date); setPreview(null); setCreateError('');
+  };
   const selectedVenueName = venueId ? venues.find((venue) => venue.id === venueId)?.name || 'Точка не указана' : 'Все точки';
   const previewRevenue = venueId ? parseRevenue(revenueInput) : null;
   const previewPayrollShare = preview && previewRevenue != null && previewRevenue > 0 ? Number(preview.total_amount || 0) / previewRevenue * 100 : null;
@@ -293,13 +316,13 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       <DataTable label="Сохранённые расчёты" headers={[{ label: 'Период', sortKey: 'period' }, 'Точка', { label: 'Статус', sortKey: 'status' }, 'Сотрудников', { label: 'Начислено', sortKey: 'amount', align: 'right' }, { label: 'Выплачено', align: 'right' }, { label: 'Осталось', sortKey: 'remaining', align: 'right' }, 'Автор']} sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} empty={!filteredRuns.length}>
         {pageRuns.map((run) => {
           const remaining = Math.max(0, Number(run.total_amount) - Number(run.total_paid));
-          return <tr className={`payroll-table-row${run.status === 'draft' ? ' is-draft' : ''}${remaining > 0 && run.status === 'finalized' ? ' has-remaining' : ''}`} tabIndex={0} onClick={() => void openRun(run.id)} onKeyDown={(event) => openFromKeyboard(event, run.id)} aria-label={`Открыть расчёт за период ${formatDate(run.period_start)} — ${formatDate(run.period_end)}`} key={run.id}><td><div className="cell-main">{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</div><div className="cell-sub">Создан {formatDate(run.created_at)}</div>{run.payroll_share_percent != null && <div className="cell-sub">ФОТ {formatPayrollShare(run.payroll_share_percent)}</div>}</td><td>{run.venue_name || 'Все точки'}</td><td><StatusBadge status={run.status} /></td><td>{run.employees_count}</td><td className="align-right"><MoneyValue value={run.total_amount} /></td><td className="align-right"><MoneyValue value={run.total_paid} /></td><td className="align-right payroll-remaining"><MoneyValue value={remaining} /></td><td>{run.created_by_name || 'Пользователь'}</td></tr>;
+          return <tr className={`payroll-table-row${run.status === 'draft' ? ' is-draft' : ''}${remaining > 0 && run.status === 'finalized' ? ' has-remaining' : ''}`} tabIndex={0} onClick={() => void openRun(run.id)} onKeyDown={(event) => openFromKeyboard(event, run.id)} aria-label={`Открыть расчёт за период ${formatDate(run.period_start)} — ${formatDate(run.period_end)}`} key={run.id}><td><div className="cell-main">{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</div><div className="cell-sub">Создан {formatDate(run.created_at)}</div>{run.planned_payment_date && <div className="cell-sub">Плановая выплата: {formatDate(run.planned_payment_date)}</div>}{run.payroll_share_percent != null && <div className="cell-sub">ФОТ {formatPayrollShare(run.payroll_share_percent)}</div>}</td><td>{run.venue_name || 'Все точки'}</td><td><StatusBadge status={run.status} /></td><td>{run.employees_count}</td><td className="align-right"><MoneyValue value={run.total_amount} /></td><td className="align-right"><MoneyValue value={run.total_paid} /></td><td className="align-right payroll-remaining"><MoneyValue value={remaining} /></td><td>{run.created_by_name || 'Пользователь'}</td></tr>;
         })}
       </DataTable>
       {!filteredRuns.length && <EmptyState title="Расчёты не найдены" description={runs.length ? 'Измените фильтр статуса.' : 'Сформируйте предварительный расчёт и сохраните его как черновик.'} />}
       <div className="mobile-cards">{pageRuns.map((run) => {
         const remaining = Math.max(0, Number(run.total_amount) - Number(run.total_paid));
-        return <button className="mobile-card payroll-mobile-card" type="button" key={run.id} onClick={() => void openRun(run.id)}><span className="payroll-mobile-card-head"><strong>{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</strong><StatusBadge status={run.status} /></span><span className="cell-sub">{run.venue_name || 'Все точки'}{run.payroll_share_percent != null ? ` · ФОТ ${formatPayrollShare(run.payroll_share_percent)}` : ''}</span><span className="payroll-mobile-card-values"><span><small>Начислено</small><MoneyValue value={run.total_amount} /></span><span><small>Осталось</small><MoneyValue value={remaining} /></span></span></button>;
+        return <button className="mobile-card payroll-mobile-card" type="button" key={run.id} onClick={() => void openRun(run.id)}><span className="payroll-mobile-card-head"><strong>{run.title || `${formatDate(run.period_start)} — ${formatDate(run.period_end)}`}</strong><StatusBadge status={run.status} /></span><span className="cell-sub">{run.venue_name || 'Все точки'}{run.payroll_share_percent != null ? ` · ФОТ ${formatPayrollShare(run.payroll_share_percent)}` : ''}</span>{run.planned_payment_date && <span className="cell-sub">Плановая выплата: {formatDate(run.planned_payment_date)}</span>}<span className="payroll-mobile-card-values"><span><small>Начислено</small><MoneyValue value={run.total_amount} /></span><span><small>Осталось</small><MoneyValue value={remaining} /></span></span></button>;
       })}</div>
       <Pagination page={page} pageSize={PAGE_SIZE} total={filteredRuns.length} onPage={setPage} />
     </section>
@@ -320,10 +343,15 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       </div>
     </Drawer>}
 
-    <Drawer title="Новый расчёт" open={createOpen} onClose={closeCreate} size="wide" footer={<><button className="button secondary" disabled={createBusy} onClick={closeCreate}>Отмена</button>{preview?.rows.length ? <button className="button primary" disabled={createBusy || !canAct} onClick={() => void createRun()}><Plus />Сформировать черновик</button> : <button className="button primary" disabled={createBusy} onClick={() => void doPreview()}><Calculator />Предварительный расчёт</button>}</>}>
+    <Drawer title="Новый расчёт" open={createOpen && canAct} onClose={closeCreate} size="wide" footer={<><button className="button secondary" disabled={createBusy || scheduleBusy} onClick={closeCreate}>Отмена</button>{preview?.rows.length ? <button className="button primary" disabled={createBusy || scheduleBusy || !canAct} onClick={() => void createRun()}><Plus />Сформировать черновик</button> : <button className="button primary" disabled={createBusy || scheduleBusy} onClick={() => void doPreview()}><Calculator />Предварительный расчёт</button>}</>}>
       <div className="payroll-create-drawer">
+        {venueId && <PayrollScheduleFields key={venueId} venueId={venueId} initialMonth={periodStart.slice(0, 7) || currentMonthValue()} canEdit={canAct} disabled={createBusy}
+          onSelect={selectScheduledPeriod} onBusyChange={setScheduleBusy} />}
+        <fieldset className="payroll-create-fields" disabled={createBusy || scheduleBusy}>
         <div className="payroll-create-controls"><DateRangeFields start={periodStart} end={periodEnd} onStart={updatePeriodStart} onEnd={updatePeriodEnd} /><div className="payroll-create-venue"><span>Фактическая точка смен</span><strong>{selectedVenueName}</strong><small>{venueId ? 'В расчёт войдут смены на выбранной точке' : 'В расчёт войдут все фактические смены компании'}</small></div></div>
+        <FormField label="Плановая дата выплаты" hint="Необязательно"><input type="date" value={plannedPaymentDate} min={periodEnd || undefined} onChange={(event) => { setPlannedPaymentDate(event.target.value); setCreateError(''); }} /><small className="payroll-schedule-note">Это план, а не отметка о фактической выплате.</small></FormField>
         {venueId ? <FormField label="Выручка точки за период" hint="Необязательно"><input type="text" inputMode="decimal" value={revenueInput} onChange={(event) => setRevenueInput(event.target.value)} placeholder="Например: 850 000" /><small className="payroll-revenue-help">Для расчёта доли ФОТ. На начисления сотрудникам не влияет.</small></FormField> : <div className="payroll-revenue-note">Выручка указывается в расчёте по конкретной точке.</div>}
+        </fieldset>
         {createError && <div className="notice error">{createError}</div>}
         {createBusy && !preview ? <LoadingState text="Формируем предварительный расчёт…" /> : preview ? <div className="payroll-preview"><div className="metrics"><Metric label="Сотрудники" value={preview.employees_count} /><Metric label="Смены" value={preview.shifts_count} /><Metric label="Часы" value={`${formatNumber(preview.total_hours)} ч`} /><Metric label="Начислено" value={<MoneyValue value={preview.total_amount} />} /></div>
           {previewRevenue !== null && previewRevenue !== undefined && <section className="payroll-economics" aria-label="Экономика периода"><h3>Экономика периода</h3><dl><div><dt>Начислено</dt><dd><MoneyValue value={preview.total_amount} /></dd></div><div><dt>Выручка</dt><dd><MoneyValue value={previewRevenue} /></dd></div><div><dt>Доля ФОТ</dt><dd>{previewPayrollShare == null ? '—' : formatPayrollShare(previewPayrollShare)}</dd></div></dl></section>}
@@ -338,7 +366,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
       {busy && !selected ? <LoadingState /> : selected && <div className="payroll-details">
         <section className="payroll-details-header">
           <div className="payroll-details-title"><StatusBadge status={selected.status} /><h3>{selected.title || `${formatDate(selected.period_start)} — ${formatDate(selected.period_end)}`}</h3><p>{formatDate(selected.period_start)} — {formatDate(selected.period_end)} · {selected.venue_name || 'Все точки'}</p></div>
-          {(selected.created_by_name || selected.created_at) && <dl className="payroll-details-meta">{selected.created_by_name && <div><dt>Автор</dt><dd>{selected.created_by_name}</dd></div>}{selected.created_at && <div><dt>Создан</dt><dd>{formatDate(selected.created_at)}</dd></div>}</dl>}
+          {(selected.planned_payment_date || selected.created_by_name || selected.created_at) && <dl className="payroll-details-meta">{selected.planned_payment_date && <div><dt>Плановая выплата</dt><dd>{formatDate(selected.planned_payment_date)}</dd></div>}{selected.created_by_name && <div><dt>Автор</dt><dd>{selected.created_by_name}</dd></div>}{selected.created_at && <div><dt>Создан</dt><dd>{formatDate(selected.created_at)}</dd></div>}</dl>}
         </section>
 
         <section className="payroll-details-summary" aria-label="Сводка расчёта">
