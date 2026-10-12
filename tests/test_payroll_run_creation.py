@@ -27,7 +27,9 @@ class PayrollRunCreationTests(unittest.TestCase):
 
     def test_creation_reuses_preview_and_persists_item_snapshot(self) -> None:
         source = _endpoint_source("create_payroll_run")
-        self.assertIn("await payroll_run_preview(", source)
+        self.assertIn("await _load_payroll_sources(", source)
+        self.assertIn("preview = _build_payroll_preview(", source)
+        self.assertIn("for_update=True", source)
         for field in (
             "base_amount=row.base_amount",
             "bonus_amount=row.bonuses",

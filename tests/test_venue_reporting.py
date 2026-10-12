@@ -24,7 +24,7 @@ def _endpoint_source(name: str) -> str:
     endpoint = next(
         node
         for node in API_MODULE.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == name
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == name
     )
     return ast.get_source_segment(API_SOURCE, endpoint) or ""
 
@@ -38,14 +38,15 @@ class VenueReportingTests(unittest.TestCase):
             self.assertNotIn("or_(", source)
 
     def test_payroll_preview_and_run_sources_use_actual_venue(self) -> None:
-        preview_source = _endpoint_source("payroll_run_preview")
+        preview_source = _endpoint_source("_load_payroll_sources")
         create_source = _endpoint_source("create_payroll_run")
+        self.assertIn("await _load_payroll_sources(", _endpoint_source("payroll_run_preview"))
+        self.assertIn("await _load_payroll_sources(", create_source)
         self.assertIn("Shift.venue_id == venue_id", preview_source)
         self.assertIn("Adjustment.venue_id == venue_id", preview_source)
-        self.assertIn('"Несколько точек"', preview_source)
-        self.assertIn("Shift.venue_id == payroll_data.venue_id", create_source)
-        self.assertIn("Adjustment.venue_id == payroll_data.venue_id", create_source)
-        self.assertNotIn("User.venue_id == payroll_data.venue_id", create_source)
+        self.assertIn('"Несколько точек"', _endpoint_source("_build_payroll_preview"))
+        self.assertIn("payroll_data.venue_id", create_source)
+        self.assertNotIn("User.venue_id == venue_id", preview_source)
 
     def test_export_uses_actual_shift_and_adjustment_venues(self) -> None:
         source = REPORT_EXPORT_PATH.read_text(encoding="utf-8")

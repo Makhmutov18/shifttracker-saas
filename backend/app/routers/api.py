@@ -738,6 +738,16 @@ async def payroll_run_preview(
     if period_start > period_end:
         raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
 
+    approved_shifts, adjustments = await _load_payroll_sources(
+        period_start, period_end, venue_id, user, session,
+    )
+    return _build_payroll_preview(period_start, period_end, venue_id, approved_shifts, adjustments)
+
+
+async def _load_payroll_sources(
+    period_start: date, period_end: date, venue_id: uuid.UUID | None,
+    user: User, session: AsyncSession, *, for_update: bool = False,
+):
     shifts_query = (
         select(Shift, User)
         .outerjoin(User, Shift.user_id == User.id)
@@ -752,7 +762,12 @@ async def payroll_run_preview(
         shifts_query = shifts_query.where(Shift.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
         shifts_query = shifts_query.where(Shift.venue_id == user.venue_id)
-    shifts_result = await session.execute(shifts_query.order_by(User.name, Shift.date))
+    if for_update:
+        # Every creator locks shifts, then adjustments, in ID order across replicas.
+        shifts_query = shifts_query.order_by(Shift.id).with_for_update(of=Shift)
+    else:
+        shifts_query = shifts_query.order_by(User.name, Shift.date)
+    shifts_result = await session.execute(shifts_query.execution_options(populate_existing=True))
     approved_shifts = shifts_result.all()
 
     adjustments_query = (
@@ -768,9 +783,17 @@ async def payroll_run_preview(
         adjustments_query = adjustments_query.where(Adjustment.venue_id == venue_id)
     elif not _can_manage_all_venue_shifts(user):
         adjustments_query = adjustments_query.where(Adjustment.venue_id == user.venue_id)
-    adjustments_result = await session.execute(adjustments_query)
+    if for_update:
+        adjustments_query = adjustments_query.order_by(Adjustment.id).with_for_update(of=Adjustment)
+    adjustments_result = await session.execute(adjustments_query.execution_options(populate_existing=True))
     adjustments = adjustments_result.all()
+    return approved_shifts, adjustments
 
+
+def _build_payroll_preview(
+    period_start: date, period_end: date, venue_id: uuid.UUID | None,
+    approved_shifts, adjustments,
+) -> PayrollPreviewOut:
     rows_by_user: dict[uuid.UUID, dict] = {}
     for shift, shift_user in approved_shifts:
         if shift_user is None:
@@ -872,6 +895,8 @@ async def create_payroll_run(
 ):
     if user.role not in (UserRole.owner, UserRole.admin):
         raise HTTPException(status_code=403, detail="Only owners and admins can create payroll runs")
+    if not has_permission(user, "can_view_team_payroll"):
+        raise HTTPException(status_code=403, detail="Only users with payroll access can preview payroll")
     if payroll_data.period_start > payroll_data.period_end:
         raise HTTPException(status_code=400, detail="period_start must be before or equal to period_end")
     if payroll_data.revenue_total is not None and payroll_data.venue_id is None:
@@ -888,29 +913,12 @@ async def create_payroll_run(
         else None
     )
 
-    source_shifts_query = (
-        select(Shift.id)
-        .where(
-            Shift.status == "approved",
-            Shift.date >= payroll_data.period_start,
-            Shift.date <= payroll_data.period_end,
-        )
+    approved_shifts, adjustments = await _load_payroll_sources(
+        payroll_data.period_start, payroll_data.period_end, payroll_data.venue_id,
+        user, session, for_update=True,
     )
-    if payroll_data.venue_id is not None:
-        source_shifts_query = source_shifts_query.where(Shift.venue_id == payroll_data.venue_id)
-    source_shifts_result = await session.execute(source_shifts_query)
-    source_shift_ids = list(source_shifts_result.scalars().all())
-
-    source_adjustments_query = select(Adjustment.id).where(
-        Adjustment.year * 100 + Adjustment.month >= payroll_data.period_start.year * 100 + payroll_data.period_start.month,
-        Adjustment.year * 100 + Adjustment.month <= payroll_data.period_end.year * 100 + payroll_data.period_end.month,
-    )
-    if payroll_data.venue_id is not None:
-        source_adjustments_query = source_adjustments_query.where(
-            Adjustment.venue_id == payroll_data.venue_id
-        )
-    source_adjustments_result = await session.execute(source_adjustments_query)
-    source_adjustment_ids = list(source_adjustments_result.scalars().all())
+    source_shift_ids = [shift.id for shift, _ in approved_shifts]
+    source_adjustment_ids = [adjustment.id for adjustment, _ in adjustments]
 
     active_run_statuses = (
         PayrollRunStatus.draft,
@@ -942,12 +950,10 @@ async def create_payroll_run(
         if adjustment_conflict_result.scalar_one_or_none() is not None:
             raise HTTPException(status_code=409, detail="An adjustment is already included in another payroll run")
 
-    preview = await payroll_run_preview(
-        period_start=payroll_data.period_start,
-        period_end=payroll_data.period_end,
-        venue_id=payroll_data.venue_id,
-        user=user,
-        session=session,
+    # Snapshot and source links must use exactly the same locked rows.
+    preview = _build_payroll_preview(
+        payroll_data.period_start, payroll_data.period_end, payroll_data.venue_id,
+        approved_shifts, adjustments,
     )
     title = payroll_data.title or (
         f"Payroll {payroll_data.period_start.isoformat()} - {payroll_data.period_end.isoformat()}"
@@ -1198,6 +1204,8 @@ async def update_payroll_run_revenue(
 
     result = await session.execute(
         select(PayrollRun).where(PayrollRun.id == payroll_run_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     run = result.scalar_one_or_none()
     if run is None or not _payroll_run_is_visible(run, user):
@@ -1275,6 +1283,8 @@ async def finalize_payroll_run(
         select(PayrollRun)
         .options(selectinload(PayrollRun.payments))
         .where(PayrollRun.id == payroll_run_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     run = result.scalar_one_or_none()
     if run is None or not _payroll_run_is_visible(run, user):
@@ -1306,6 +1316,8 @@ async def cancel_payroll_run(
         select(PayrollRun)
         .options(selectinload(PayrollRun.payments))
         .where(PayrollRun.id == payroll_run_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     run = result.scalar_one_or_none()
     if run is None or not _payroll_run_is_visible(run, user):
@@ -1341,6 +1353,7 @@ async def create_payroll_payment(
         run_result = await session.execute(
             select(PayrollRun)
             .with_for_update()
+            .execution_options(populate_existing=True)
             .where(PayrollRun.id == payroll_run_id)
         )
         run = run_result.scalar_one_or_none()
@@ -1352,6 +1365,7 @@ async def create_payroll_payment(
         item_result = await session.execute(
             select(PayrollRunItem)
             .with_for_update()
+            .execution_options(populate_existing=True)
             .where(
                 PayrollRunItem.payroll_run_id == payroll_run_id,
                 PayrollRunItem.user_id == payment_data.user_id,
@@ -1384,6 +1398,7 @@ async def create_payroll_payment(
         all_items_result = await session.execute(
             select(PayrollRunItem)
             .with_for_update()
+            .execution_options(populate_existing=True)
             .where(PayrollRunItem.payroll_run_id == payroll_run_id)
         )
         all_items = all_items_result.scalars().all()

@@ -16,7 +16,12 @@ def _preview_source() -> str:
         for node in API_MODULE.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "payroll_run_preview"
     )
-    return ast.get_source_segment(API_SOURCE, endpoint) or ""
+    helpers = [
+        node for node in API_MODULE.body
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+        and node.name in {"_load_payroll_sources", "_build_payroll_preview"}
+    ]
+    return "\n".join(ast.get_source_segment(API_SOURCE, node) or "" for node in [endpoint, *helpers])
 
 
 class PayrollPreviewTests(unittest.TestCase):
