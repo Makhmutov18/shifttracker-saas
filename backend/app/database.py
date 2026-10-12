@@ -169,6 +169,11 @@ async def init_db():
         """))
 
         await conn.execute(text("""
+            ALTER TABLE adjustments
+            ADD COLUMN IF NOT EXISTS accrual_date DATE;
+        """))
+
+        await conn.execute(text("""
             ALTER TABLE payroll_runs
             ADD COLUMN IF NOT EXISTS revenue_total NUMERIC(14,2);
         """))

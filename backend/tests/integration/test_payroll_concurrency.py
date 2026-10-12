@@ -79,6 +79,9 @@ async def competing_operations(first_operation, second_operation):
 @pytest.mark.parametrize("adjustments_only", [False, True])
 async def test_concurrent_creation_cannot_reserve_sources_twice(db_session, baseline, adjustments_only):
     baseline.payroll_run.status = PayrollRunStatus.cancelled
+    if adjustments_only:
+        for adjustment in baseline.adjustments.values():
+            adjustment.accrual_date = date(2026, 6, 20)
     await db_session.commit()
     start = date(2026, 6, 20) if adjustments_only else PERIOD_START
     data = PayrollRunCreate(period_start=start, period_end=PERIOD_END, venue_id=baseline.venues["home"].id)

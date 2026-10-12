@@ -283,6 +283,7 @@ class Adjustment(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    accrual_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

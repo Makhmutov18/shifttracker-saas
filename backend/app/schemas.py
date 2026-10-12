@@ -219,6 +219,11 @@ class AdjustmentCreate(BaseModel):
     amount: Decimal = Field(..., gt=0)
     reason: str = Field(..., min_length=1, max_length=500)
     venue_id: Optional[uuid.UUID] = None
+    accrual_date: Optional[date] = None
+
+
+class AdjustmentAccrualDateUpdate(BaseModel):
+    accrual_date: date
 
 
 class AdjustmentOut(BaseModel):
@@ -232,6 +237,7 @@ class AdjustmentOut(BaseModel):
     created_by: uuid.UUID
     month: int
     year: int
+    accrual_date: Optional[date] = None
     created_at: datetime
     user_name: Optional[str] = None
     creator_name: Optional[str] = None

@@ -2555,6 +2555,10 @@ function AdjustTab({ user }: { user: User }) {
   const [type, setType] = useState<'bonus' | 'penalty'>('bonus');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [accrualDate, setAccrualDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -2603,6 +2607,7 @@ function AdjustTab({ user }: { user: User }) {
         type,
         amount: amt,
         reason: reason.trim(),
+        accrual_date: accrualDate,
       });
       hapticSuccess();
       setSuccess(true);
@@ -2674,6 +2679,11 @@ function AdjustTab({ user }: { user: User }) {
               Удержание
             </button>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="adjustment-accrual-date" className="block text-sm text-tg-hint mb-1.5">Дата начисления</label>
+          <input id="adjustment-accrual-date" type="date" required value={accrualDate} onChange={(e) => setAccrualDate(e.target.value)} className="owner-field-control" />
         </div>
 
         <div>

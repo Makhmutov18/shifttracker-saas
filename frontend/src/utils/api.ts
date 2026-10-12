@@ -753,6 +753,7 @@ export interface Adjustment {
   created_by: string;
   month: number;
   year: number;
+  accrual_date?: string | null;
   created_at: string;
   user_name: string | null;
   creator_name: string | null;
@@ -764,6 +765,7 @@ export interface AdjustmentCreate {
   type: 'bonus' | 'penalty';
   amount: number;
   reason: string;
+  accrual_date?: string;
 }
 
 export async function createAdjustment(data: AdjustmentCreate): Promise<Adjustment> {

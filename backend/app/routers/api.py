@@ -7,6 +7,7 @@ from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import quote
 import secrets
+import calendar
 
 import jwt
 
@@ -21,7 +22,7 @@ from app.permissions import has_permission
 from app.schemas import (
     UserOut, VenueOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
-    AuditLogOut, AdjustmentCreate, AdjustmentOut,
+    AuditLogOut, AdjustmentCreate, AdjustmentOut, AdjustmentAccrualDateUpdate,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollRunRevenueUpdate,
@@ -786,7 +787,20 @@ async def _load_payroll_sources(
     if for_update:
         adjustments_query = adjustments_query.order_by(Adjustment.id).with_for_update(of=Adjustment)
     adjustments_result = await session.execute(adjustments_query.execution_options(populate_existing=True))
-    adjustments = adjustments_result.all()
+    adjustments = []
+    for adjustment, employee in adjustments_result.all():
+        if adjustment.accrual_date is not None:
+            if period_start <= adjustment.accrual_date <= period_end:
+                adjustments.append((adjustment, employee))
+            continue
+        month_start = date(adjustment.year, adjustment.month, 1)
+        month_end = date(adjustment.year, adjustment.month, calendar.monthrange(adjustment.year, adjustment.month)[1])
+        if period_start > month_start or period_end < month_end:
+            raise HTTPException(
+                status_code=422,
+                detail="В выбранном периоде есть бонусы или удержания без даты начисления. Укажите даты старых корректировок или выберите полный месяц.",
+            )
+        adjustments.append((adjustment, employee))
     return approved_shifts, adjustments
 
 
@@ -1670,8 +1684,9 @@ async def create_adjustment(
         amount=adjustment_data.amount,
         reason=adjustment_data.reason,
         created_by=user.id,
-        month=now.month,
-        year=now.year,
+        month=adjustment_data.accrual_date.month if adjustment_data.accrual_date else now.month,
+        year=adjustment_data.accrual_date.year if adjustment_data.accrual_date else now.year,
+        accrual_date=adjustment_data.accrual_date,
     )
     session.add(adjustment)
     await session.commit()
@@ -1690,6 +1705,7 @@ async def create_adjustment(
             "amount": str(adjustment_data.amount),
             "reason": adjustment_data.reason,
             "venue_id": str(adjustment.venue_id),
+            "accrual_date": adjustment.accrual_date.isoformat() if adjustment.accrual_date else None,
         },
     )
     session.add(log)
@@ -1722,8 +1738,52 @@ async def create_adjustment(
         created_by=adjustment.created_by,
         month=adjustment.month,
         year=adjustment.year,
+        accrual_date=adjustment.accrual_date,
         created_at=adjustment.created_at.isoformat() if adjustment.created_at else "",
     )
+
+
+@router.patch("/adjustments/{adjustment_id}/accrual-date", response_model=AdjustmentOut)
+async def update_adjustment_accrual_date(
+    adjustment_id: uuid.UUID,
+    data: AdjustmentAccrualDateUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not has_permission(user, "can_manage_adjustments"):
+        raise HTTPException(status_code=403, detail="Нет права управлять бонусами и удержаниями")
+    try:
+        adjustment = (await session.execute(
+            select(Adjustment).where(Adjustment.id == adjustment_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        if adjustment is None or (not _can_manage_all_venue_shifts(user) and adjustment.venue_id != user.venue_id):
+            raise HTTPException(status_code=404, detail="Корректировка не найдена")
+        if (data.accrual_date.year, data.accrual_date.month) != (adjustment.year, adjustment.month):
+            raise HTTPException(status_code=422, detail="Дата начисления должна быть в исходном месяце корректировки")
+        source = await session.scalar(
+            select(PayrollRunAdjustmentSource.id)
+            .join(PayrollRun, PayrollRun.id == PayrollRunAdjustmentSource.payroll_run_id)
+            .where(
+                PayrollRunAdjustmentSource.adjustment_id == adjustment.id,
+                PayrollRun.status.in_((PayrollRunStatus.draft, PayrollRunStatus.finalized, PayrollRunStatus.paid)),
+            ).limit(1)
+        )
+        if source is not None:
+            raise HTTPException(status_code=409, detail="Корректировка уже включена в действующий расчёт. Дату менять нельзя.")
+        old_date = adjustment.accrual_date
+        adjustment.accrual_date = data.accrual_date
+        session.add(AuditLog(
+            user_id=user.id, target_user_id=adjustment.user_id, venue_id=adjustment.venue_id,
+            action="adjustment_date_updated", entity_type="adjustment", entity_id=adjustment.id,
+            old_value={"accrual_date": old_date.isoformat() if old_date else None},
+            new_value={"accrual_date": data.accrual_date.isoformat()},
+        ))
+        await session.commit()
+        return AdjustmentOut.model_validate(adjustment)
+    except Exception:
+        await session.rollback()
+        raise
 
 
 @router.get("/adjustments", response_model=list[AdjustmentOut])
@@ -1766,6 +1826,7 @@ async def list_adjustments(
             created_by=a.created_by,
             month=a.month,
             year=a.year,
+            accrual_date=a.accrual_date,
             created_at=a.created_at.isoformat() if a.created_at else "",
             user_name=a.user.name if a.user else None,
             creator_name=a.creator.name if a.creator else None,
