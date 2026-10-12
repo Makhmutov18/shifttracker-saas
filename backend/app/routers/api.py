@@ -23,6 +23,7 @@ from app.schemas import (
     UserOut, VenueOut, ShiftCreate, ShiftOut, ShiftUpdate,
     ExpenseCreate, ExpenseOut, MonthlyStats,
     AuditLogOut, AdjustmentCreate, AdjustmentOut, AdjustmentAccrualDateUpdate,
+    ManagedAdjustmentOut, ManagedAdjustmentPage,
     PayrollSummaryOut, PayrollSummaryRow, PayrollPreviewOut, PayrollPreviewRow,
     PayrollRunCreate, PayrollRunRead, PayrollRunListItem, PayrollRunItemRead, PayrollPaymentRead,
     PayrollRunRevenueUpdate,
@@ -1741,6 +1742,58 @@ async def create_adjustment(
         accrual_date=adjustment.accrual_date,
         created_at=adjustment.created_at.isoformat() if adjustment.created_at else "",
     )
+
+
+@router.get("/admin/adjustments", response_model=ManagedAdjustmentPage)
+async def list_managed_adjustments(
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(..., ge=1, le=9999),
+    venue_id: uuid.UUID | None = None,
+    undated_only: bool = True,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not has_permission(user, "can_manage_adjustments"):
+        raise HTTPException(status_code=403, detail="Нет права управлять бонусами и удержаниями")
+    if not _can_manage_all_venue_shifts(user):
+        if user.venue_id is None or (venue_id is not None and venue_id != user.venue_id):
+            raise HTTPException(status_code=403, detail="Нет доступа к корректировкам этой точки")
+        venue_id = user.venue_id
+
+    filters = [Adjustment.month == month, Adjustment.year == year]
+    if venue_id is not None:
+        filters.append(Adjustment.venue_id == venue_id)
+    if undated_only:
+        filters.append(Adjustment.accrual_date.is_(None))
+    total = await session.scalar(select(func.count(Adjustment.id)).where(*filters))
+    # This flag is advisory; the PATCH rechecks reservations under a source lock.
+    reserved = (
+        select(PayrollRunAdjustmentSource.id)
+        .join(PayrollRun, PayrollRun.id == PayrollRunAdjustmentSource.payroll_run_id)
+        .where(
+            PayrollRunAdjustmentSource.adjustment_id == Adjustment.id,
+            PayrollRun.status.in_((PayrollRunStatus.draft, PayrollRunStatus.finalized, PayrollRunStatus.paid)),
+        ).exists()
+    )
+    rows = (await session.execute(
+        select(Adjustment, reserved.label("reserved"))
+        .options(selectinload(Adjustment.user), selectinload(Adjustment.creator), selectinload(Adjustment.venue))
+        .where(*filters)
+        .order_by(Adjustment.created_at.desc(), Adjustment.id.desc())
+        .offset((page - 1) * per_page).limit(per_page)
+    )).all()
+    items = []
+    for adjustment, is_reserved in rows:
+        data = AdjustmentOut.model_validate(adjustment).model_dump()
+        data.update(
+            user_name=adjustment.user.name if adjustment.user else None,
+            venue_name=adjustment.venue.name if adjustment.venue else None,
+            creator_name=adjustment.creator.name if adjustment.creator else None,
+        )
+        items.append(ManagedAdjustmentOut(**data, date_editable=not is_reserved))
+    return ManagedAdjustmentPage(items=items, total=total or 0, page=page, per_page=per_page)
 
 
 @router.patch("/adjustments/{adjustment_id}/accrual-date", response_model=AdjustmentOut)

@@ -783,6 +783,34 @@ export async function getAdjustments(month?: number, year?: number): Promise<Adj
   return request<Adjustment[]>(`/adjustments${qs ? `?${qs}` : ''}`);
 }
 
+export interface ManagedAdjustment extends Adjustment {
+  date_editable: boolean;
+}
+
+export interface ManagedAdjustmentPage {
+  items: ManagedAdjustment[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export async function getManagedAdjustments(
+  month: number, year: number, venueId: string, undatedOnly: boolean, page: number,
+): Promise<ManagedAdjustmentPage> {
+  const params = new URLSearchParams({
+    month: String(month), year: String(year), undated_only: String(undatedOnly), page: String(page),
+  });
+  if (venueId) params.set('venue_id', venueId);
+  return request<ManagedAdjustmentPage>(`/admin/adjustments?${params}`);
+}
+
+export async function updateAdjustmentAccrualDate(id: string, accrualDate: string): Promise<Adjustment> {
+  return request<Adjustment>(`/adjustments/${id}/accrual-date`, {
+    method: 'PATCH',
+    body: JSON.stringify({ accrual_date: accrualDate }),
+  });
+}
+
 // Users (admin)
 
 export async function getUsers(includeInactive = false): Promise<User[]> {

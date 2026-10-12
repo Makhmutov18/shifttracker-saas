@@ -23,7 +23,17 @@ The existing `can_manage_adjustments` permission and venue scope apply. Missing/
 
 Dates cannot change while the adjustment belongs to a `draft`, `finalized` or `paid` run (`409`). A cancelled run no longer reserves it. Updating locks the adjustment row, sharing the creator's source-lock protocol, and writes an `adjustment_date_updated` audit event in the same transaction. Concurrent creation either observes the new date or commits first and blocks the date edit.
 
-Historical backfill is an explicit authorized API operation in this stage; a team-wide review/backfill screen is not yet implemented. Do not directly update dates in production SQL or cancel paid history to force a backfill.
+Historical backfill is an explicit authorized operation. The Mini App management section now includes a monthly review list with an inline date editor. Do not directly update dates in production SQL or cancel paid history to force a backfill.
+
+## Management review
+
+`GET /api/admin/adjustments` requires `can_manage_adjustments`. Required `month/year` filters refer to the original accrual month, not creation time. The default `undated_only=true` shows legacy records without dates; `false` includes dated records. The response contains `items`, `total`, `page` and `per_page` (default 20, maximum 100) with stable newest-first ordering.
+
+Owner/admin can optionally select a venue or review all venues. Other authorized managers are limited to their own assigned venue; asking for another venue, or having no assigned venue, returns `403`. Attribution is always `Adjustment.venue_id`, not the employee's current home venue. Archived venues and employees remain available for historical review. The personal `GET /api/adjustments` remains self-only and its response contract is unchanged.
+
+Each management item includes employee/venue/creator names and `date_editable`. Any reservation by a draft, finalized or paid run disables the date action. Cancelled reservations do not block it. This flag is informational, not authorization: the existing PATCH still locks and rechecks the source when saving, including when a run was created after the list loaded.
+
+The Mini App review is mounted only within the permission-gated management section. It has month/venue filters, undated/all selection, pagination and loading/error/empty/success states. Undated records open with an empty date field, constrained to the original month. Failed saves keep the form and entered date; successful saves reload the list. Nothing is backfilled in bulk. Employee screens, payroll formulas, snapshots and payment records are unchanged.
 
 ## Rollout and limits
 

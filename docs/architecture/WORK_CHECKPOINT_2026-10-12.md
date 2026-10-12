@@ -1,0 +1,58 @@
+# Work checkpoint: 12 October 2026
+
+## Resume point
+
+- Branch: `feature/multitenant-phase-0`.
+- HEAD: `9c13c72cacf4a86cde0bfb3b083239a105c5d8e5` (`attribute payroll adjustments by explicit accrual date`). The local branch matches its remote tracking branch.
+- This work has not been merged into main or deployed to production.
+- The latest completed change is documented in `docs/security/ADJUSTMENT_ACCRUAL_DATES.md`.
+- The owner explicitly approved using an accrual date for bonuses/deductions. Existing undated records must not be dated silently from `created_at`.
+- New Mini App adjustments submit an explicit date. Preview/create select dated adjustments by inclusive period boundaries. Undated legacy adjustments require full coverage of their recorded month; partial coverage is rejected rather than silently omitting or duplicating them.
+- An authorized accrual-date PATCH exists for unused adjustments. Active payroll source reservations and saved snapshots remain protected.
+- A team-wide legacy-adjustment review/dating screen is not implemented yet. This was the next proposed implementation step; do not weaken the personal adjustments endpoint to build it.
+
+## Last completed verification
+
+Recorded from the preceding implementation stage, not rerun for this checkpoint:
+
+- Root unit tests: 202 passed.
+- PostgreSQL integration tests: 64 passed on each of two runs.
+- Existing client Node tests: 29 passed.
+- Mini App production build and TypeScript check passed.
+- Backend compilation and `git diff --check` passed.
+- No browser QA was performed. The disposable test PostgreSQL instance was stopped.
+
+Preserve unrelated untracked `.mimocode/`, `tmp/` and landing experiment files. They are not part of payroll work.
+
+## New product discussion (not implementation approval)
+
+The owner paused implementation to discuss differing salary models, employment/accounting arrangements, payment methods and schedules.
+
+Two concrete schedule examples:
+
+| Inclusive accrual period | Schedule A | Schedule B |
+| --- | --- | --- |
+| Days 1-15 of a month | Day 20 of the same month | Day 25 of the same month |
+| Day 16 through month end | Day 5 of the next month | Day 10 of the next month |
+
+Keep these concepts separate in the proposed product model:
+
+1. Accrual rules determine earned amounts. Preserve saved historical shift earnings and current payroll formulas.
+2. Period rules select sources; schedule rules map each period to a planned payment date, including a month offset and real month end.
+3. Payroll runs/items save calculation snapshots. A scheduled date must not automatically approve shifts, finalize runs or mark money paid.
+4. Payroll payments record actual full/partial payments with their actual dates and methods. Cash/bank is a payment method, not a legal-employment classification.
+5. Statutory payroll, gross/net wages, taxes and employment compliance need a separate explicitly scoped accounting design. Do not introduce white/gray/black salary modes or pretend that a payment method proves compliance.
+
+`PayrollScheduleSettings` is existing data-model groundwork, not an implemented automatic scheduling feature. Manual periods must remain available. If schedules are introduced, settings changes must not silently move historical saved obligations.
+
+An advance that is actual money already paid should be represented as a payment against an obligation, not also subtracted as a deduction. Historical adjustments labelled as advances must not be reclassified automatically; any reconciliation needs explicit rules and protection against double counting.
+
+Potential sequence for discussion: legacy accrual-date review, simple twice-monthly schedule plus planned due date, then richer payment-method/accounting support only if real users need it. No application code, schema, API or deployment changes are authorized by this discussion alone.
+
+## Subsequent implementation authorization
+
+The owner subsequently approved continuing, with management controls kept out of ordinary employee screens. The next increment implements the legacy-adjustment review: a scoped management-only paginated GET and a Mini App inline editor that calls the existing protected date PATCH. See `docs/security/ADJUSTMENT_ACCRUAL_DATES.md` for the current contract. The preceding resume point records the state before this increment.
+
+The next separate increment remains the simple twice-monthly schedule and a saved planned payment date. It is not implemented by the adjustment-review change. Keep work on the current feature branch; no production rollout or merge to main is performed here.
+
+Verification for the adjustment-review increment: 202 root unit tests, 84 PostgreSQL integration tests and 38 client Node tests passed. Mini App build, TypeScript check, backend compilation and diff checks passed. The first sandbox build failed with Windows `EPERM`; the build passed outside sandbox. The disposable PostgreSQL process also needed to run outside sandbox. One new test fixture was corrected to avoid persisting an impossible NULL home venue; application schema constraints were not changed. Browser/Telegram visual QA was not performed.

@@ -20,6 +20,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
+import AdjustmentDatesReview from '../components/AdjustmentDatesReview';
 import {
   AdminCreateUserResponse,
   AuditLog,
@@ -2550,6 +2551,8 @@ function getVenueLabel(venue: Venue) {
 }
 
 function AdjustTab({ user }: { user: User }) {
+  const [revision, setRevision] = useState(0);
+  const [reviewVenues, setReviewVenues] = useState<Venue[]>(() => user.venue ? [user.venue] : []);
   const [userId, setUserId] = useState('');
   const [venueId, setVenueId] = useState(user.venue_id || '');
   const [type, setType] = useState<'bonus' | 'penalty'>('bonus');
@@ -2579,6 +2582,16 @@ function AdjustTab({ user }: { user: User }) {
     };
     fetchOptions();
   }, [canChooseVenue, user.venue, user.venue_id]);
+
+  useEffect(() => {
+    let active = true;
+    if (canChooseVenue) {
+      getVenues().then((data) => {
+        if (active) setReviewVenues(Array.isArray(data) ? data : []);
+      }).catch(() => { /* The all-points list remains available if venue options fail. */ });
+    }
+    return () => { active = false; };
+  }, [canChooseVenue]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2611,6 +2624,7 @@ function AdjustTab({ user }: { user: User }) {
       });
       hapticSuccess();
       setSuccess(true);
+      setRevision((value) => value + 1);
       setAmount('');
       setReason('');
       setTimeout(() => setSuccess(false), 2000);
@@ -2623,6 +2637,7 @@ function AdjustTab({ user }: { user: User }) {
   };
 
   return (
+    <div className="space-y-6">
     <div className="owner-form-surface">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
@@ -2732,6 +2747,8 @@ function AdjustTab({ user }: { user: User }) {
               )}
             </button>
       </form>
+    </div>
+    <AdjustmentDatesReview user={user} venues={reviewVenues} revision={revision} />
     </div>
   );
 }

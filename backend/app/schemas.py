@@ -245,6 +245,17 @@ class AdjustmentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ManagedAdjustmentOut(AdjustmentOut):
+    date_editable: bool
+
+
+class ManagedAdjustmentPage(BaseModel):
+    items: list[ManagedAdjustmentOut]
+    total: int
+    page: int
+    per_page: int
+
+
 class VenueStatsRow(BaseModel):
     venue_id: uuid.UUID
     venue_name: str
