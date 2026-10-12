@@ -67,18 +67,48 @@ git diff --check
 
 This change does not complete the security or architecture roadmap. Next:
 
-1. Separate shift approval and editing permissions end to end. Both clients
-   currently conflate these rights too; a backend-only restriction would leave
-   misleading enabled controls. Include target-venue authorization and tests.
-2. Prove the PostgreSQL integration baseline in an isolated test database.
-3. Serialize payroll source reservation and cancellation/payment transitions.
-4. Decide partial-period adjustment attribution and negative accrual handling
+1. Prove the PostgreSQL integration baseline in an isolated test database.
+2. Serialize payroll source reservation and cancellation/payment transitions.
+3. Decide partial-period adjustment attribution and negative accrual handling
    before changing any payroll rule.
-5. Correct report revenue semantics and the admin summary's treatment of
+4. Correct report revenue semantics and the admin summary's treatment of
    cancelled/draft runs without altering salary formulas.
 
 Keep these changes on the existing architecture feature branch until reviewed.
 No production rollout or merge to `main` is part of this hardening stage.
+
+## Shift authorization follow-up
+
+`PATCH /api/shifts/{id}` checks requested fields before mutating the shift:
+
+- `can_approve_shifts` is required for status updates, including a resent status.
+- `can_edit_team_shifts` is required for time, revenue, cashier hours, venue and
+  standalone comment changes.
+- An approver may attach a review comment when moving a pending shift to approved
+  or rejected, without gaining general editing rights.
+- Requests mixing allowed and forbidden changes are rejected as a whole.
+- Non-owner/admin users cannot read or mutate another actual work venue's shifts,
+  or move a pending shift outside their venue. Existing pending-only venue editing
+  and active-venue validation remain in place.
+- `can_view_team_shifts` now correctly grants venue-scoped team history, not just
+  personal history. Ordinary employees retain personal cross-venue history.
+
+Both clients separate edit and approval controls. Saving edits no longer resends
+the current status in web-admin. Mini App Dashboard gets its current-month pending
+count from the existing pending-shifts endpoint, so approvers do not need payroll
+view permission. No financial formula, role default or permission key is changed.
+The web-admin permission helper now honors explicit admin denials and senior
+defaults, matching the existing backend and Mini App behavior.
+
+`tests/test_shift_permissions.py` exercises real ASGI routes with mocked storage,
+including inspection of the generated SQL scope. This is not a PostgreSQL
+integration test. Client permission defaults and overrides are tested without a
+browser or new dependency:
+
+```powershell
+cd web-admin
+node --test tests/permissions.test.mjs
+```
 
 References: [Telegram webhook secret](https://core.telegram.org/bots/api#setwebhook),
 [Mini App validation](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).

@@ -42,7 +42,8 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const canApprove = hasPermission(user, 'can_approve_shifts');
-  const canEdit = hasPermission(user, 'can_edit_team_shifts') || canApprove;
+  const canEdit = hasPermission(user, 'can_edit_team_shifts');
+  const canManageAllVenues = user.role === 'owner' || user.role === 'admin';
 
   const load = async () => {
     setLoading(true); setError('');
@@ -100,9 +101,14 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
   const toggleStatus = (nextStatus: Exclude<ShiftStatusFilter, ''>) => setStatus((current) => current === nextStatus ? '' : nextStatus);
   const venueName = (shift: Shift) => shift.venue_name?.trim() || venueMap.get(shift.venue_id || '')?.name || 'Точка не указана';
   const save = async (nextStatus?: 'approved' | 'rejected') => {
-    if (!selected) return; setSaving(true); setError('');
+    if (!selected || (nextStatus ? !canApprove : !canEdit)) return; setSaving(true); setError('');
     try {
-      const updated = await api.updateShift(selected.id, { venue_id: form.venue_id || undefined, start_time: form.start_time, end_time: form.end_time, revenue: form.revenue || null, comment: form.comment || null, status: nextStatus ?? selected.status });
+      const changes: Partial<Shift> = canEdit ? { venue_id: form.venue_id || undefined, start_time: form.start_time, end_time: form.end_time, revenue: form.revenue || null, comment: form.comment || null } : {};
+      if (nextStatus) {
+        changes.status = nextStatus;
+        if (!canEdit && form.comment !== (selected.comment ?? '')) changes.comment = form.comment;
+      }
+      const updated = await api.updateShift(selected.id, changes);
       setShifts((current) => current.map((shift) => shift.id === updated.id ? updated : shift));
       setSuccess(nextStatus === 'approved' ? 'Смена утверждена.' : nextStatus === 'rejected' ? 'Смена отклонена.' : 'Изменения смены сохранены.');
       setSelected(null); setConfirm(null);
@@ -166,7 +172,7 @@ export function ShiftsPage({ user, venues, venueId }: { user: User; venues: Venu
       <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
     </section>
     <Drawer title="Детали смены" open={Boolean(selected)} onClose={() => setSelected(null)} footer={<><button className="button secondary" onClick={() => setSelected(null)}>Закрыть</button>{selected?.status === 'pending' && canApprove && <><button className="button secondary" disabled={saving} onClick={() => setConfirm('rejected')}><X />Отклонить</button><button className="button primary" disabled={saving} onClick={() => setConfirm('approved')}><Check />Утвердить</button></>}</>}>
-      {selected && <div className="form-section"><h3>{userMap.get(selected.user_id)?.name || 'Сотрудник'} · {formatDate(selected.date)}</h3><FormField label="Точка смены">{selected.status === 'pending' && canEdit ? <select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })}>{(venues ?? []).filter((venue) => venue.is_active).map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select> : <div className="field-readonly-value">{venueName(selected)}</div>}</FormField><FormField label="Начало смены"><input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Конец смены"><input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Выручка"><input type="number" min="0" value={form.revenue} onChange={(event) => setForm({ ...form, revenue: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Комментарий"><textarea value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} disabled={!canEdit} /></FormField>{canEdit && <button className="button secondary" disabled={saving} onClick={() => void save()}>Сохранить изменения</button>}</div>}
+      {selected && <div className="form-section"><h3>{userMap.get(selected.user_id)?.name || 'Сотрудник'} · {formatDate(selected.date)}</h3><FormField label="Точка смены">{selected.status === 'pending' && canEdit ? <select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })}>{(venues ?? []).filter((venue) => venue.is_active && (canManageAllVenues || venue.id === user.venue_id)).map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select> : <div className="field-readonly-value">{venueName(selected)}</div>}</FormField><FormField label="Начало смены"><input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Конец смены"><input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Выручка"><input type="number" min="0" value={form.revenue} onChange={(event) => setForm({ ...form, revenue: event.target.value })} disabled={!canEdit} /></FormField><FormField label="Комментарий"><textarea value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} disabled={!canEdit && !(canApprove && selected.status === 'pending')} /></FormField>{canEdit && <button className="button secondary" disabled={saving} onClick={() => void save()}>Сохранить изменения</button>}</div>}
     </Drawer>
     <ConfirmationDialog open={Boolean(confirm)} title={confirm === 'approved' ? 'Утвердить смену?' : 'Отклонить смену?'} text={confirm === 'approved' ? 'Смена войдёт в начисления сотрудника.' : 'Отклонённая смена не войдёт в начисления.'} confirmLabel={confirm === 'approved' ? 'Утвердить' : 'Отклонить'} danger={confirm === 'rejected'} onClose={() => setConfirm(null)} onConfirm={() => confirm && void save(confirm)} />
     <Toast message={success} onClose={() => setSuccess('')} />

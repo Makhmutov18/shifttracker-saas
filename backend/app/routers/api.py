@@ -79,6 +79,7 @@ def _can_manage_all_venue_shifts(user: User) -> bool:
 def _can_view_team_history_scope(user: User) -> bool:
     return (
         _can_manage_all_venue_shifts(user)
+        or has_permission(user, "can_view_team_shifts")
         or has_permission(user, "can_view_team_payroll")
         or has_permission(user, "can_approve_shifts")
         or has_permission(user, "can_edit_team_shifts")
@@ -457,14 +458,30 @@ async def update_shift(
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
 
-    # Only admin/senior can approve/update shifts
-    if not (has_permission(user, "can_approve_shifts") or has_permission(user, "can_edit_team_shifts")):
-        raise HTTPException(status_code=403, detail="Only users with shift edit rights can update shifts")
+    can_approve = has_permission(user, "can_approve_shifts")
+    can_edit = has_permission(user, "can_edit_team_shifts")
+    if not (can_approve or can_edit):
+        raise HTTPException(status_code=403, detail="Нет права изменять смены")
+
+    # Authorize every requested field before mutating the loaded shift.
+    if shift_data.status is not None:
+        if not can_approve:
+            raise HTTPException(status_code=403, detail="Нет права утверждать или отклонять смены")
+        if shift_data.status not in ("pending", "approved", "rejected"):
+            raise HTTPException(status_code=400, detail="Некорректный статус смены")
+    edit_fields = ("venue_id", "start_time", "end_time", "cashier_hours", "revenue")
+    if not can_edit and any(getattr(shift_data, field) is not None for field in edit_fields):
+        raise HTTPException(status_code=403, detail="Нет права редактировать данные смены")
+    is_review = shift.status == "pending" and shift_data.status in ("approved", "rejected")
+    if shift_data.comment is not None and not (can_edit or (can_approve and is_review)):
+        raise HTTPException(status_code=403, detail="Нет права редактировать комментарий смены")
 
     old_status = shift.status
     old_venue_id = shift.venue_id
 
     if shift_data.venue_id is not None and shift_data.venue_id != shift.venue_id:
+        if not _can_manage_all_venue_shifts(user) and shift_data.venue_id != user.venue_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к выбранной точке")
         if shift.status != "pending":
             raise HTTPException(status_code=409, detail="Точку можно изменить только у смены на подтверждении")
         await _get_active_venue(session, shift_data.venue_id)
@@ -481,8 +498,6 @@ async def update_shift(
     if shift_data.comment is not None:
         shift.comment = shift_data.comment
     if shift_data.status is not None:
-        if shift_data.status not in ("pending", "approved", "rejected"):
-            raise HTTPException(status_code=400, detail=f"Invalid status: {shift_data.status}")
         old_status = shift.status
         shift.status = shift_data.status
 

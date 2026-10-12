@@ -2,8 +2,13 @@ import type { PermissionKey, User } from './types';
 
 export function hasPermission(user: User | null, permission: PermissionKey): boolean {
   if (!user) return false;
-  if (user.role === 'owner' || user.role === 'admin') return true;
-  return Boolean(user.permissions?.[permission]);
+  if (user.role === 'owner') return true;
+  const explicit = user.permissions?.[permission];
+  if (typeof explicit === 'boolean') return explicit;
+  if (user.role === 'admin') return true;
+  return user.role === 'senior' && (
+    permission === 'can_approve_shifts' || permission === 'can_edit_team_shifts' || permission === 'can_view_team_shifts'
+  );
 }
 
 export function isOwnerOrAdmin(user: User | null): boolean {

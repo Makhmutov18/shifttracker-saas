@@ -3,10 +3,9 @@ import { AlertCircle, ChevronRight, LoaderCircle, Sparkles } from 'lucide-react'
 import {
   ApiRequestError,
   generateAiWeeklySummary,
-  getPayrollSummary,
+  getPendingShifts,
   getShifts,
   type AiWeeklySummary,
-  type PayrollSummary,
   type Shift,
   type User as UserType,
 } from '../utils/api';
@@ -15,7 +14,7 @@ import { formatCurrency, formatDate, formatHours, formatTime } from '../utils/he
 import { useShifts } from '../hooks/useShifts';
 import { getTelegramUser } from '../utils/telegram';
 import UserAvatar from '../components/UserAvatar';
-import { canAccessOwnerPanel, hasPermission } from '../utils/permissions';
+import { hasPermission } from '../utils/permissions';
 
 type Page = 'dashboard' | 'shift' | 'history' | 'owner' | 'profile';
 type OwnerPanelTab = 'invite' | 'approve' | 'adjust' | 'audit' | 'team' | 'venues';
@@ -118,9 +117,9 @@ export default function Dashboard({ user, onNavigate }: Props) {
   const { stats, loading: statsLoading, error: statsError } = useStats();
   const { shifts, loading: shiftsLoading, error: shiftsError } = useShifts();
   const telegramUser = getTelegramUser();
-  const canApproveShifts = canAccessOwnerPanel(user) || hasPermission(user, 'can_approve_shifts');
+  const canApproveShifts = hasPermission(user, 'can_approve_shifts');
   const canUseAiSummary = user.role === 'owner' || user.role === 'admin';
-  const [summary, setSummary] = useState<Pick<PayrollSummary, 'pending_shifts_count' | 'approved_shifts_count'> | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
   const [extraWeekShifts, setExtraWeekShifts] = useState<Shift[]>([]);
@@ -173,25 +172,25 @@ export default function Dashboard({ user, onNavigate }: Props) {
 
   useEffect(() => {
     if (!canApproveShifts) {
-      setSummary(null);
+      setPendingCount(0);
       setSummaryError(false);
       return;
     }
 
     let cancelled = false;
     const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     setSummaryLoading(true);
     setSummaryError(false);
-    getPayrollSummary(now.getMonth() + 1, now.getFullYear())
+    getPendingShifts()
       .then((data) => {
-        if (!cancelled) setSummary({
-          pending_shifts_count: data.pending_shifts_count ?? 0,
-          approved_shifts_count: data.approved_shifts_count ?? 0,
-        });
+        if (!cancelled) setPendingCount(
+          (Array.isArray(data) ? data : []).filter((shift) => shift.date?.startsWith(monthKey)).length
+        );
       })
       .catch(() => {
         if (!cancelled) {
-          setSummary(null);
+          setPendingCount(0);
           setSummaryError(true);
         }
       })
@@ -216,7 +215,6 @@ export default function Dashboard({ user, onNavigate }: Props) {
   const monthLabel = getCurrentMonthLabel();
   const venueName = user.venue?.name?.trim() || 'Основная точка';
   const paySummary = getPayModelSummary(user);
-  const pendingCount = summary?.pending_shifts_count ?? 0;
   const latestVenueName = latestShift?.venue_name?.trim() || 'Точка не указана';
   const shiftTime = latestShift
     ? [latestShift.start_time && formatTime(latestShift.start_time), latestShift.end_time && formatTime(latestShift.end_time)].filter(Boolean).join('–')

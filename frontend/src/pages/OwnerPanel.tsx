@@ -400,7 +400,7 @@ const MANAGEMENT_PERMISSION_OPTIONS: { key: PermissionKey; label: string }[] = [
 
 export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: Props) {
   const [tab, setTab] = useState<Tab | null>(initialTab ?? null);
-  const canApprove = hasPermission(user, 'can_approve_shifts') || hasPermission(user, 'can_edit_team_shifts');
+  const canReviewShifts = hasPermission(user, 'can_approve_shifts') || hasPermission(user, 'can_edit_team_shifts');
   const canManageTeam = hasPermission(user, 'can_manage_team');
   const canManageAdjustments = hasPermission(user, 'can_manage_adjustments');
   const canViewPayroll = hasPermission(user, 'can_view_team_payroll');
@@ -409,7 +409,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
 
   const visibleTabs: { id: Tab; label: string; description: string; icon: React.ReactNode; visible: boolean }[] = [
     { id: 'invite', label: 'Приглашение', description: 'Добавить сотрудника и настроить доступ', icon: <UserPlus />, visible: canManageTeam },
-    { id: 'approve', label: 'Подтверждение смен', description: 'Проверить новые смены команды', icon: <CheckCircle />, visible: canApprove },
+    { id: 'approve', label: 'Подтверждение смен', description: 'Проверить новые смены команды', icon: <CheckCircle />, visible: canReviewShifts },
     { id: 'adjust', label: 'Бонусы и удержания', description: 'Добавить корректировку начислений', icon: <Gift />, visible: canManageAdjustments },
     { id: 'audit', label: 'История действий', description: 'Посмотреть изменения в команде', icon: <History />, visible: canViewAudit },
     { id: 'team', label: 'Команда', description: 'Сотрудники, ставки и права', icon: <Users />, visible: canManageTeam },
@@ -477,7 +477,7 @@ export default function OwnerPanel({ user, initialTab, onInitialTabConsumed }: P
         ) : (
           <OwnerPanelBoundary>
             {tab === 'invite' && canManageTeam && <InviteTab />}
-            {tab === 'approve' && canApprove && <ApproveTab />}
+            {tab === 'approve' && canReviewShifts && <ApproveTab user={user} />}
             {tab === 'adjust' && canManageAdjustments && <AdjustTab user={user} />}
             {tab === 'audit' && canViewAudit && <AuditTab />}
             {tab === 'team' && canManageTeam && <TeamTab user={user} />}
@@ -1391,7 +1391,10 @@ function InviteTab() {
   );
 }
 
-function ApproveTab() {
+function ApproveTab({ user }: { user: User }) {
+  const canApprove = hasPermission(user, 'can_approve_shifts');
+  const canEdit = hasPermission(user, 'can_edit_team_shifts');
+  const canManageAllVenues = user.role === 'owner' || user.role === 'admin';
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1403,7 +1406,8 @@ function ApproveTab() {
 
   const safeShifts = Array.isArray(shifts) ? shifts : [];
   const safeUserNames = userNames ?? {};
-  const safeVenues = Array.isArray(venues) ? venues : [];
+  const safeVenues = (Array.isArray(venues) ? venues : [])
+    .filter((venue) => canManageAllVenues || venue.id === user.venue_id);
   const venueNames = safeVenues.reduce<Record<string, string>>((acc, venue) => {
     if (venue?.id) acc[venue.id] = venue.name || 'Точка не указана';
     return acc;
@@ -1511,7 +1515,7 @@ function ApproveTab() {
   }, []);
 
   const startEdit = (shift: Shift) => {
-    if (!shift?.id) return;
+    if (!canEdit || !shift?.id) return;
     setEditingShiftId(shift.id);
     setDraft(buildDraft(shift));
   };
@@ -1522,7 +1526,7 @@ function ApproveTab() {
   };
 
   const saveEdit = async (shiftId: string) => {
-    if (!draft || !shiftId) return;
+    if (!canEdit || !draft || !shiftId) return;
 
     try {
       setSavingShiftId(shiftId);
@@ -1547,7 +1551,7 @@ function ApproveTab() {
   };
 
   const handleApprove = async (shiftId: string) => {
-    if (!shiftId) return;
+    if (!canApprove || !shiftId) return;
 
     try {
       setSavingShiftId(shiftId);
@@ -1567,7 +1571,7 @@ function ApproveTab() {
   };
 
   const handleReject = async (shiftId: string) => {
-    if (!shiftId) return;
+    if (!canApprove || !shiftId) return;
 
     try {
       setSavingShiftId(shiftId);
@@ -1779,7 +1783,7 @@ function ApproveTab() {
               <p className="owner-comment">{commentText}</p>
             )}
 
-            {!isEditing && Boolean(shift?.id) && (
+            {canEdit && !isEditing && Boolean(shift?.id) && (
               <button
                 onClick={() => startEdit(shift)}
                 className="owner-secondary-action w-full"
@@ -1789,7 +1793,7 @@ function ApproveTab() {
               </button>
             )}
 
-            <div className="owner-approval-actions">
+            {canApprove && <div className="owner-approval-actions">
               <button
                 onClick={() => handleApprove(shiftId)}
                 disabled={!shift?.id || isSaving || Boolean(editingShiftId === shiftId && draft)}
@@ -1806,7 +1810,7 @@ function ApproveTab() {
                 <XCircle className="w-4 h-4" />
                 Отклонить
               </button>
-            </div>
+            </div>}
           </article>
         );
       })}
