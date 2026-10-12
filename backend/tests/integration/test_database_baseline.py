@@ -35,6 +35,8 @@ async def test_repeated_initialization_preserves_existing_data_and_payroll_value
         await db_session.scalar(select(PayrollRun.total_paid).where(PayrollRun.id == baseline.payroll_run.id)),
     )
 
+    # Release read locks before bootstrap opens a separate DDL transaction.
+    await db_session.commit()
     await init_db()
     await init_db()
 

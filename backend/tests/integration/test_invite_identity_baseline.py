@@ -26,8 +26,12 @@ class FakeMessage:
 
 
 def _sync_test_engine():
-    url = str(database.engine.url).replace("postgresql+asyncpg://", "postgresql://", 1)
-    return create_engine(url, pool_pre_ping=True)
+    url = database.engine.url.set(drivername="postgresql+psycopg2")
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        connect_args={"options": "-c statement_timeout=30000 -c lock_timeout=5000"},
+    )
 
 
 @pytest.mark.asyncio
