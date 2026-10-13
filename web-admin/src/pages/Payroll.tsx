@@ -300,7 +300,7 @@ export function PayrollPage({ user, venues, venueId }: { user: User; venues: Ven
   if (loading) return <LoadingState text="Загружаем расчёты выплат…" />;
   if (error && !runs.length && !preview) return <ErrorState message={error} retry={loadRuns} />;
 
-  return <div className="payroll-page">
+  return <div className="payroll-page" data-drawer-footer={canAct && (createOpen || Boolean(selected && (paymentItem || selected.status === 'draft')))}>
     <PageHeader title="Расчёты выплат" description="Формируйте начисления за период и фиксируйте фактические выплаты." action={canExport || canAct ? <div className="page-header-actions">{canExport && <button className="button secondary" type="button" onClick={openExport}><Download />Экспорт</button>}{canAct && <button className="button primary" type="button" onClick={openCreate}><Plus />Новый расчёт</button>}</div> : undefined} />
     <section className="payroll-summary" aria-label="Финансовая сводка по зафиксированным расчётам">
       <div><span>Зафиксировано</span><strong><MoneyValue value={totals.accrued} /></strong></div>

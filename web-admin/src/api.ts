@@ -18,6 +18,10 @@ export class ApiError extends Error {
 }
 
 function errorText(status: number, detail?: string): string {
+  if (status === 409 && (detail === 'An approved shift is already included in another payroll run'
+    || detail === 'An adjustment is already included in another payroll run')) {
+    return 'Часть источников уже включена в другой активный расчёт.';
+  }
   if (detail) return detail;
   if (status === 401) return 'Сессия не подтверждена. Откройте админку через Telegram.';
   if (status === 403) return 'У вас нет доступа к этому действию.';

@@ -342,6 +342,7 @@ tbody tr { content-visibility: auto; contain-intrinsic-size: 56px; }
 .toast button { width: 36px; height: 36px; min-height: 36px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); }
 .toast button:hover { background: var(--surface-muted); }
 .toast button svg { width: 16px; }
+.payroll-page[data-drawer-footer="true"] > .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .loading-state { min-height: 420px; display: grid; grid-template-rows: 40px 112px 240px auto; gap: 20px; align-content: center; padding: 34px; color: var(--text-muted); }
 .loading-state > span { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .loading-state > span svg { width: 18px; }
