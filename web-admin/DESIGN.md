@@ -38,8 +38,8 @@ tokens:
     control-height: "40px"
     touch-target-min: "44px"
   shape:
-    control-radius: "8px"
-    panel-radius: "16px"
+    control-radius: "16px"
+    panel-radius: "24px"
     pill-radius: "9999px"
 ---
 
@@ -77,9 +77,11 @@ Tables, lists, command bars, filters, drawers, and operational panels take prior
 
 Create depth with the semantic surface steps and restrained borders. Use a subtle shadow only when it clarifies a drawer, popover, or elevated control. Panels should sit on the background without heavy floating effects. Do not stack decorative cards inside cards.
 
+The owner approved a Telegram-inspired visual evolution on 16 October 2026: frosted translucent navigation (sidebar and mobile header), with an opaque fallback and reduced-transparency support. Keep financial panels, tables and forms opaque. This is a CSS material treatment, not liquid-glass distortion; do not add gradients, glow, decorative textures or new dependencies.
+
 ## Shapes
 
-Use 8px radius for controls, 14px to 16px for panels, and pill radius only for compact status badges where the shape communicates status. Keep one radius language across a surface. A panel should represent one operational question or one coherent object.
+Use 16px radius for controls and 24px for panels; shell and drawer corners may use 28px. Compact status badges retain a smaller radius. Keep one radius language across a surface without changing data density or introducing nested cards. A panel should represent one operational question or one coherent object.
 
 ## Iconography
 

@@ -15,13 +15,17 @@
   --tg-control-bg: #ffffff;
   --tg-control-border: #dfe2e7;
   --tg-border: #dfe2e7;
-  --tg-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --tg-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --surface-muted: #eceef1;
   --border-subtle: #dfe2e7;
   --border-strong: #cfd3da;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-card: var(--tg-shadow);
+  --radius-card: 1.5rem;
+  --radius-control: 1rem;
+  --radius-sheet: 1.75rem;
+  --sheet-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
   --text-primary: #171717;
   --text-secondary: #666a73;
   --dock-surface: rgba(255, 255, 255, 0.68);
@@ -41,20 +45,20 @@
   --danger: #be3340;
   --danger-soft: #fcecef;
   --motion-fast: 140ms;
-  --motion-base: 200ms;
+  --motion-base: 240ms;
   --motion-slow: 280ms;
   --motion-sheet-backdrop-enter: 400ms;
   --motion-sheet-enter: 400ms;
   --motion-sheet-exit: 220ms;
   --motion-sheet-drag-return: 220ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 [data-theme='dark'],
 .dark {
-  --tg-bg: #0a0a0a;
+  --tg-bg: #0d0d0d;
   --tg-text: #f5f5f5;
   --tg-hint: #a3a3a3;
   --tg-link: #69a0ff;
@@ -62,17 +66,18 @@
   --tg-button: #3b82f6;
   --tg-button-text: #ffffff;
   --tg-secondary-bg: #202020;
-  --tg-card-bg: #151515;
+  --tg-card-bg: #191919;
   --tg-control-bg: #1b1b1b;
   --tg-control-border: #2b2b2b;
   --tg-border: #2b2b2b;
-  --tg-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
-  --surface: #151515;
+  --tg-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+  --surface: #191919;
   --surface-elevated: #1b1b1b;
   --surface-muted: #202020;
   --border-subtle: #2b2b2b;
   --border-strong: #3a3a3a;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-card: var(--tg-shadow);
+  --sheet-shadow: 0 -8px 32px rgba(0, 0, 0, 0.28);
   --text-primary: #f5f5f5;
   --text-secondary: #a3a3a3;
   --dock-surface: rgba(12, 12, 12, 0.66);
@@ -109,7 +114,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 [data-theme='dark'] body,
@@ -316,6 +321,14 @@ button:disabled {
   }
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .dock-shell {
+    background: var(--dock-surface-fallback);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 .dock-item {
   min-width: 0;
   min-height: 3.5rem;
@@ -473,7 +486,7 @@ button:disabled {
 
 .dashboard-finance {
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -565,7 +578,7 @@ button:disabled {
   min-height: 2.75rem;
   padding: 0.95rem 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
   text-align: left;
   transition: transform var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
@@ -692,7 +705,7 @@ button:disabled {
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--border-subtle);
   border-left: 3px solid var(--warning);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--warning);
 }
@@ -732,7 +745,7 @@ button:disabled {
   min-width: 0;
   padding: 0.95rem 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -956,7 +969,7 @@ button:disabled {
   margin-top: 0.75rem;
   padding: 0.85rem 0.9rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
   text-align: left;
   transition: transform var(--motion-fast) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
@@ -1032,7 +1045,7 @@ button:disabled {
   margin-top: 0.75rem;
   padding: 0.85rem 0.9rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -1402,7 +1415,7 @@ button:disabled {
 .shift-summary {
   padding: 0.9rem 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -1560,10 +1573,10 @@ button:disabled {
   overflow-y: auto;
   border: 1px solid var(--border-subtle);
   border-bottom: 0;
-  border-radius: 1rem 1rem 0 0;
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   padding: 0.55rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
   background: var(--surface-elevated);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sheet-shadow);
   outline: none;
   opacity: 1;
   transform: translateY(calc(100% + 0.5rem));
@@ -1716,7 +1729,7 @@ button:disabled {
 .history-summary {
   padding: 1rem 1.1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -1933,7 +1946,7 @@ button:disabled {
 .history-expenses-list {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2143,7 +2156,7 @@ button:disabled {
 .payouts-current {
   padding: 1rem 1.1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2234,7 +2247,7 @@ button:disabled {
 .payouts-shifts-list {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2456,7 +2469,7 @@ button:disabled {
 .profile-list {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2546,7 +2559,7 @@ button:disabled {
 .profile-month-summary {
   padding: 0.9rem 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2696,7 +2709,7 @@ button:disabled {
 .owner-management-hub {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2751,7 +2764,7 @@ button:disabled {
 .owner-empty-state {
   padding: 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--text-secondary);
   font-size: 0.875rem;
@@ -2768,7 +2781,7 @@ button:disabled {
 .owner-form-surface {
   padding: 0.9rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2792,7 +2805,7 @@ button:disabled {
 .owner-compact-summary {
   padding-inline: 1rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2803,7 +2816,7 @@ button:disabled {
 .owner-list-surface {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2921,7 +2934,7 @@ button:disabled {
 .owner-list-surface .owner-team-list .owner-employee-card {
   padding: 0.82rem 0.85rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -3278,7 +3291,7 @@ button:disabled {
 .owner-payroll-details {
   padding: 0.85rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
 }
 
 .owner-payroll-form,
@@ -3707,7 +3720,7 @@ button:disabled {
 .owner-audit-list {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -3887,8 +3900,28 @@ input[type='checkbox'] {
   accent-color: var(--tg-primary);
 }
 
+.shift-primary-button,
+.shift-secondary-button,
+.shift-time-control,
+.shift-venue-control,
+.shift-comment-input,
+.bottom-sheet-primary,
+.bottom-sheet-secondary,
+.history-filter-button,
+.history-export-button,
+.history-export-option,
+.history-filter-fields select,
+.payouts-period-button,
+.payouts-period-field select,
+.owner-primary-action,
+.owner-secondary-action,
+.owner-payroll-primary {
+  border-radius: var(--radius-control);
+}
+
 .surface-card {
   background: var(--surface);
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
 
